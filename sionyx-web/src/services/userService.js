@@ -1,0 +1,328 @@
+import { ref, get, update } from 'firebase/database';
+import { httpsCallable } from 'firebase/functions';
+import { database, functions } from '../config/firebase';
+import { logger } from '../utils/logger';
+
+/**
+ * Get all users in an organization
+ */
+export const getAllUsers = async orgId => {
+  try {
+    const usersRef = ref(database, `organizations/${orgId}/users`);
+    const snapshot = await get(usersRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: true,
+        users: [],
+      };
+    }
+
+    const usersData = snapshot.val();
+    const users = Object.keys(usersData).map(uid => ({
+      uid,
+      ...usersData[uid],
+    }));
+
+    // Sort by creation date (newest first)
+    users.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+
+    return {
+      success: true,
+      users,
+    };
+  } catch (error) {
+    logger.error('Error getting users:', error);
+    return {
+      success: false,
+      error: error.message,
+      users: [],
+    };
+  }
+};
+
+/**
+ * Get user's purchase history
+ */
+export const getUserPurchaseHistory = async (orgId, userId) => {
+  try {
+    const purchasesRef = ref(database, `organizations/${orgId}/purchases`);
+    const snapshot = await get(purchasesRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: true,
+        purchases: [],
+      };
+    }
+
+    const allPurchases = snapshot.val();
+    const userPurchases = Object.keys(allPurchases)
+      .filter(key => allPurchases[key].userId === userId)
+      .map(key => ({
+        id: key,
+        ...allPurchases[key],
+      }));
+
+    // Sort by date (newest first)
+    userPurchases.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+
+    return {
+      success: true,
+      purchases: userPurchases,
+    };
+  } catch (error) {
+    logger.error('Error getting user purchases:', error);
+    return {
+      success: false,
+      error: error.message,
+      purchases: [],
+    };
+  }
+};
+
+/**
+ * Adjust user's balance (time and prints)
+ */
+export const adjustUserBalance = async (orgId, userId, adjustments) => {
+  try {
+    // First get the current user data
+    const userRef = ref(database, `organizations/${orgId}/users/${userId}`);
+    const snapshot = await get(userRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: false,
+        error: 'User not found',
+      };
+    }
+
+    const currentUser = snapshot.val();
+
+    // Calculate new values
+    const updates = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (adjustments.timeSeconds !== undefined) {
+      updates.remainingTime = (currentUser.remainingTime || 0) + adjustments.timeSeconds;
+      // Ensure it doesn't go negative
+      if (updates.remainingTime < 0) updates.remainingTime = 0;
+    }
+
+    if (adjustments.prints !== undefined) {
+      updates.printBalance = (currentUser.printBalance || 0) + adjustments.prints;
+      // Ensure it doesn't go negative
+      if (updates.printBalance < 0) updates.printBalance = 0;
+    }
+
+    await update(userRef, updates);
+
+    return {
+      success: true,
+      message: 'User balance adjusted successfully',
+      newBalance: {
+        remainingTime: updates.remainingTime,
+        printBalance: updates.printBalance,
+      },
+    };
+  } catch (error) {
+    logger.error('Error adjusting user balance:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Grant admin permission to a user
+ */
+export const grantAdminPermission = async (orgId, userId) => {
+  try {
+    const userRef = ref(database, `organizations/${orgId}/users/${userId}`);
+    const snapshot = await get(userRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: false,
+        error: 'User not found',
+      };
+    }
+
+    const updates = {
+      isAdmin: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await update(userRef, updates);
+
+    return {
+      success: true,
+      message: 'Admin permission granted successfully',
+    };
+  } catch (error) {
+    logger.error('Error granting admin permission:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Revoke admin permission from a user
+ */
+export const revokeAdminPermission = async (orgId, userId) => {
+  try {
+    const userRef = ref(database, `organizations/${orgId}/users/${userId}`);
+    const snapshot = await get(userRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: false,
+        error: 'User not found',
+      };
+    }
+
+    const updates = {
+      isAdmin: false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await update(userRef, updates);
+
+    return {
+      success: true,
+      message: 'Admin permission revoked successfully',
+    };
+  } catch (error) {
+    logger.error('Error revoking admin permission:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Reset user password (admin only)
+ * Calls Firebase Cloud Function to update user's password
+ */
+export const resetUserPassword = async (orgId, userId, newPassword) => {
+  try {
+    const resetPasswordFn = httpsCallable(functions, 'resetUserPassword');
+    const result = await resetPasswordFn({ orgId, userId, newPassword });
+
+    return {
+      success: true,
+      message: result.data.message || 'הסיסמה אופסה בהצלחה',
+    };
+  } catch (error) {
+    logger.error('Error resetting user password:', error);
+
+    // Extract error message from Firebase function error
+    const errorMessage = error.message || 'שגיאה באיפוס הסיסמה';
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+};
+
+/**
+ * Delete a user (admin only).
+ * Calls Cloud Function which handles auth deletion, messages, and computer cleanup.
+ */
+export const deleteUser = async (orgId, userId) => {
+  try {
+    const deleteUserFn = httpsCallable(functions, 'deleteUser');
+    const result = await deleteUserFn({ orgId, userId });
+
+    return {
+      success: true,
+      message: result.data.message || 'המשתמש נמחק בהצלחה',
+    };
+  } catch (error) {
+    logger.error('Error deleting user:', error);
+    const errorMessage = error.message || 'שגיאה במחיקת המשתמש';
+    return { success: false, error: errorMessage };
+  }
+};
+
+/**
+ * Kick a user (force logout)
+ */
+export const kickUser = async (orgId, userId) => {
+  try {
+    const userRef = ref(database, `organizations/${orgId}/users/${userId}`);
+    const snapshot = await get(userRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: false,
+        error: 'User not found',
+      };
+    }
+
+    const currentUser = snapshot.val();
+
+    // Check if user is already kicked (prevent spam clicking)
+    if (currentUser.forceLogout === true) {
+      return {
+        success: false,
+        error: 'User has already been kicked',
+      };
+    }
+
+    const updates = {
+      forceLogout: true,
+      forceLogoutTimestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await update(userRef, updates);
+
+    // Also disassociate user from computer if they have a current computer
+    if (currentUser.currentComputerId) {
+      const computerRef = ref(
+        database,
+        `organizations/${orgId}/computers/${currentUser.currentComputerId}`
+      );
+      await update(computerRef, {
+        currentUserId: null,
+        lastUserLogout: new Date().toISOString(),
+        isActive: false,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Clear user's computer association
+      await update(userRef, {
+        currentComputerId: null,
+        currentComputerName: null,
+        lastComputerLogout: new Date().toISOString(),
+        isSessionActive: false,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'User has been kicked successfully',
+    };
+  } catch (error) {
+    logger.error('Error kicking user:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};

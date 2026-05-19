@@ -1,0 +1,853 @@
+/* ============================================
+   SIONYX App-Specific Styles v2.0
+   Enhanced animations and premium aesthetics
+   ============================================ */
+
+.app {
+  min-height: 100vh;
+}
+
+/* ==========================================
+   LANDING PAGE ANIMATIONS
+   ========================================== */
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================
+   LANDING PAGE COMPONENTS
+   ========================================== */
+
+.landing-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 20px;
+}
+
+.landing-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+}
+
+.landing-button {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
+}
+
+.landing-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
+}
+
+.landing-input {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px !important;
+}
+
+.landing-input:focus {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.12) !important;
+}
+
+/* ==========================================
+   PREMIUM LANDING PAGE v2.0 STYLES
+   ========================================== */
+
+/* Enhanced feature cards */
+.feature-card-premium {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 32px 28px;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.feature-card-premium:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-8px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+}
+
+/* Icon container styles */
+.icon-container-premium {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.icon-container-premium:hover {
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* Stats counter animation */
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-value-animated {
+  animation: countUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Premium CTA card */
+.cta-card-premium {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.35s ease;
+}
+
+.cta-card-premium:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 25px 60px rgba(102, 126, 234, 0.4);
+}
+
+.cta-card-premium::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.cta-card-premium:hover::before {
+  opacity: 1;
+}
+
+/* Enhanced scroll indicator */
+.scroll-indicator {
+  width: 28px;
+  height: 44px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.scroll-dot {
+  width: 4px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 2px;
+  animation: scrollDot 1.5s ease-in-out infinite;
+}
+
+@keyframes scrollDot {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(12px);
+    opacity: 0.2;
+  }
+}
+
+/* Trust badges */
+.trust-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.trust-badge:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Version tag animation */
+@keyframes tagPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(102, 126, 234, 0);
+  }
+}
+
+.version-tag-animated {
+  animation: tagPulse 2s ease-in-out infinite;
+}
+
+/* Registration modal premium styles */
+.registration-modal .ant-modal-content {
+  border-radius: 24px !important;
+  overflow: hidden;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25) !important;
+}
+
+.registration-modal .ant-modal-close {
+  display: none;
+}
+
+.registration-modal .ant-form-item-label > label {
+  font-weight: 600;
+  color: #444;
+}
+
+.registration-modal .ant-input,
+.registration-modal .ant-input-password {
+  border-radius: 12px !important;
+  height: 50px !important;
+  border: 1.5px solid #e8e8e8 !important;
+  transition: all 0.2s ease !important;
+}
+
+.registration-modal .ant-input:hover,
+.registration-modal .ant-input-password:hover {
+  border-color: #667eea !important;
+}
+
+.registration-modal .ant-input:focus,
+.registration-modal .ant-input-password:focus,
+.registration-modal .ant-input-affix-wrapper-focused {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+}
+
+/* Footer links */
+.footer-link {
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+.footer-link:hover {
+  color: #8b9df0;
+}
+
+/* Responsive enhancements for landing */
+@media (max-width: 768px) {
+  .cta-card-premium {
+    border-radius: 20px;
+  }
+  
+  .feature-card-premium {
+    padding: 24px 20px;
+  }
+  
+  .registration-modal .ant-modal-content {
+    border-radius: 20px !important;
+  }
+}
+
+/* ==========================================
+   GLASS MORPHISM EFFECTS
+   ========================================== */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.glass-card-dark {
+  background: rgba(26, 31, 54, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================
+   ENHANCED CARD HOVER EFFECTS
+   ========================================== */
+
+.ant-card-hoverable {
+  transition: 
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s !important;
+}
+
+.ant-card-hoverable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08) !important;
+  border-color: #d1d5db !important;
+}
+
+/* ==========================================
+   GRADIENT TEXT EFFECT
+   ========================================== */
+
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-animated {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 4s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ==========================================
+   LOADING STATES
+   ========================================== */
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  gap: 20px;
+}
+
+.loading-skeleton {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ==========================================
+   SIDEBAR MENU ENHANCEMENTS
+   ========================================== */
+
+.ant-menu-dark {
+  background: transparent !important;
+}
+
+.ant-menu-dark .ant-menu-item {
+  margin: 4px 8px !important;
+  border-radius: 10px !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-menu-dark .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-menu-dark .ant-menu-item-selected {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%) !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.ant-menu-dark .ant-menu-item-selected:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 1) 0%, rgba(118, 75, 162, 1) 100%) !important;
+}
+
+.ant-menu-dark .ant-menu-item .anticon {
+  font-size: 18px !important;
+}
+
+/* ==========================================
+   MESSAGE ANIMATIONS
+   ========================================== */
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-bubble {
+  animation: messageSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================
+   NOTIFICATION ENHANCEMENTS
+   ========================================== */
+
+.ant-notification-notice {
+  border-radius: 14px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-message-notice-content {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ==========================================
+   POPOVER & TOOLTIP ENHANCEMENTS
+   ========================================== */
+
+.ant-popover-inner {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-tooltip-inner {
+  border-radius: 8px !important;
+}
+
+/* ==========================================
+   DROPDOWN MENU ENHANCEMENTS
+   ========================================== */
+
+.ant-dropdown-menu {
+  border-radius: 12px !important;
+  padding: 6px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid #e8eaed;
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 8px !important;
+  margin: 2px 0 !important;
+  padding: 10px 14px !important;
+  transition: all 0.15s !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: #f4f5f7 !important;
+}
+
+.ant-dropdown-menu-item-danger:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ==========================================
+   SEARCH INPUT ENHANCEMENTS
+   ========================================== */
+
+.ant-input-search .ant-input-affix-wrapper {
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+  border: 1px solid #e8eaed !important;
+  transition: all 0.2s !important;
+}
+
+.ant-input-search .ant-input-affix-wrapper:hover {
+  border-color: #667eea !important;
+}
+
+.ant-input-search .ant-input-affix-wrapper-focused {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1) !important;
+}
+
+.ant-input-search .ant-input-group-addon {
+  display: none;
+}
+
+/* ==========================================
+   MODAL ENHANCEMENTS
+   ========================================== */
+
+.ant-modal-content {
+  border-radius: 18px !important;
+  overflow: hidden;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 20px 24px !important;
+}
+
+.ant-modal-body {
+  padding: 24px !important;
+}
+
+.ant-modal-footer {
+  border-top: 1px solid #f0f0f0;
+  padding: 16px 24px !important;
+}
+
+/* ==========================================
+   DRAWER ENHANCEMENTS
+   ========================================== */
+
+.ant-drawer-content {
+  border-radius: 0;
+}
+
+.ant-drawer-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 18px 24px !important;
+}
+
+.ant-drawer-body {
+  padding: 24px !important;
+}
+
+.ant-drawer-title {
+  font-weight: 600 !important;
+  font-size: 18px !important;
+}
+
+/* ==========================================
+   STATUS PULSE ANIMATION
+   ========================================== */
+
+@keyframes statusPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* ==========================================
+   RESPONSIVE TABLE STYLES
+   ========================================== */
+
+.ant-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+}
+
+.ant-table {
+  font-size: 14px;
+}
+
+.ant-table-thead > tr > th {
+  background: #fafbfc !important;
+  font-weight: 600;
+  color: #4b5563;
+  border-bottom: 1px solid #e8eaed !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+.ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(102, 126, 234, 0.04) !important;
+}
+
+/* Fixed columns for RTL */
+.ant-table-cell-fix-right,
+.ant-table-cell-fix-left {
+  background: #fff !important;
+}
+
+/* ==========================================
+   RESPONSIVE BREAKPOINTS
+   ========================================== */
+
+/* Tablet and below */
+@media (max-width: 992px) {
+  .ant-table {
+    font-size: 13px;
+  }
+  
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 12px 10px !important;
+  }
+  
+  .ant-menu-dark .ant-menu-item {
+    height: 42px !important;
+    line-height: 42px !important;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  .ant-layout-sider {
+    position: fixed !important;
+    z-index: 999;
+  }
+
+  .ant-layout-content {
+    margin: 16px !important;
+    padding: 16px !important;
+  }
+
+  .ant-layout-header {
+    padding: 0 16px !important;
+    min-height: 60px !important;
+  }
+
+  /* Mobile table responsiveness */
+  .ant-table {
+    font-size: 12px;
+  }
+  
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 10px 8px !important;
+  }
+
+  /* Mobile card adjustments */
+  .ant-card {
+    border-radius: 14px !important;
+  }
+
+  .ant-card-body {
+    padding: 16px !important;
+  }
+
+  /* Mobile typography */
+  .ant-typography h2 {
+    font-size: 22px !important;
+  }
+
+  .ant-typography h3 {
+    font-size: 18px !important;
+  }
+  
+  /* Mobile menu */
+  .ant-menu-dark .ant-menu-item {
+    margin: 4px 6px !important;
+    height: 44px !important;
+    line-height: 44px !important;
+  }
+  
+  /* Mobile search */
+  .ant-input-search {
+    max-width: 100% !important;
+  }
+  
+  .ant-input-search .ant-input-affix-wrapper {
+    padding: 8px 14px !important;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .ant-layout-content {
+    margin: 12px !important;
+    padding: 12px !important;
+  }
+
+  .ant-card-body {
+    padding: 14px !important;
+  }
+
+  .ant-drawer-body {
+    padding: 16px !important;
+  }
+  
+  .ant-drawer-header {
+    padding: 14px 18px !important;
+  }
+  
+  /* Compact table */
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 8px 6px !important;
+    font-size: 12px;
+  }
+  
+  /* Page header responsive */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 14px;
+  }
+  
+  /* Compact modal */
+  .ant-modal-content {
+    border-radius: 14px !important;
+  }
+  
+  .ant-modal-header {
+    padding: 16px 18px !important;
+  }
+  
+  .ant-modal-body {
+    padding: 18px !important;
+  }
+}
+
+/* ==========================================
+   REGISTRATION MODAL STYLES
+   ========================================== */
+
+.registration-modal .ant-modal-content {
+  max-width: 700px;
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.registration-modal .ant-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.registration-modal .ant-modal-close {
+  top: 14px;
+  right: 14px;
+}
+
+@media (max-width: 576px) {
+  .registration-modal .ant-modal-content {
+    border-radius: 14px;
+    margin: 12px;
+  }
+  
+  .registration-modal .ant-modal-header {
+    padding: 14px 18px;
+  }
+  
+  .registration-modal .ant-modal-title {
+    font-size: 16px;
+  }
+  
+  .registration-modal .ant-form-item {
+    margin-bottom: 14px;
+  }
+  
+  .registration-modal .ant-input,
+  .registration-modal .ant-input-password {
+    height: 44px !important;
+    font-size: 15px !important;
+    border-radius: 10px !important;
+  }
+  
+  .registration-modal .ant-divider {
+    margin: 18px 0 !important;
+  }
+  
+  .registration-modal .ant-btn {
+    height: 44px !important;
+    border-radius: 10px !important;
+  }
+}
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+
+.shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+}
+
+.rounded-lg {
+  border-radius: 14px;
+}
+
+.rounded-xl {
+  border-radius: 18px;
+}
+
+/* Smooth page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-transition-exit {
+  opacity: 1;
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}

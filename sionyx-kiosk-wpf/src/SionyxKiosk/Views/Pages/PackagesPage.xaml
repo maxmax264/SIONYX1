@@ -1,0 +1,217 @@
+<Page x:Class="SionyxKiosk.Views.Pages.PackagesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:SionyxKiosk.Views.Controls"
+      Title="חבילות" FlowDirection="RightToLeft">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:PageHeader Grid.Row="0" AutomationProperties.AutomationId="PackagesPageHeader" Title="חבילות" Subtitle="בחר את החבילה המתאימה לך"
+                             HeaderBrush="{StaticResource PackagesHeaderGradient}" Icon="📦"
+                             Margin="0,0,0,20" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0">
+            <StackPanel Margin="0,0,0,24">
+                <!-- Skeleton loading -->
+                <WrapPanel HorizontalAlignment="Center"
+                           Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+                    <controls:SkeletonCard Margin="12"
+                        Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=Page}}" />
+                    <controls:SkeletonCard Margin="12"
+                        Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=Page}}" />
+                    <controls:SkeletonCard Margin="12"
+                        Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=Page}}" />
+                </WrapPanel>
+
+                <!-- Empty state -->
+                <controls:EmptyState Message="אין חבילות זמינות"
+                                     Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}" />
+
+                <!-- Responsive package grid -->
+                <ItemsControl AutomationProperties.AutomationId="PackagesList" ItemsSource="{Binding Packages}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel HorizontalAlignment="Center" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="CardRoot" Background="White"
+                                    CornerRadius="18" Margin="12" Padding="0" Cursor="Hand"
+                                    BorderBrush="#E8ECF4" BorderThickness="1.5"
+                                    Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=Page}}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270"
+                                                      Color="#0F172A" Opacity="0.06" />
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Card header with price -->
+                                    <Border Grid.Row="0" Padding="24,20,24,16"
+                                            CornerRadius="18,18,0,0">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#EFF6FF" Offset="0" />
+                                                <GradientStop Color="#E0F2FE" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                                <TextBlock Text="{Binding Name}" FontSize="21" FontWeight="Bold"
+                                                           Foreground="#1E293B" VerticalAlignment="Center" />
+                                                <Border CornerRadius="8" Padding="8,3" Margin="10,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="{Binding HasDiscount, Converter={StaticResource BoolToVis}}">
+                                                    <Border.Background>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                            <GradientStop Color="#EF4444" Offset="0" />
+                                                            <GradientStop Color="#DC2626" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </Border.Background>
+                                                    <TextBlock Text="{Binding DiscountPercent, StringFormat='הנחה {0:F0}%'}"
+                                                               FontSize="12" FontWeight="Bold" Foreground="White" />
+                                                </Border>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="1" Orientation="Horizontal"
+                                                        VerticalAlignment="Bottom">
+                                                <TextBlock FontSize="42" FontWeight="ExtraBold" Margin="0,0,0,-4">
+                                                    <TextBlock.Foreground>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                            <GradientStop Color="#6366F1" Offset="0" />
+                                                            <GradientStop Color="#8B5CF6" Offset="1" />
+                                                        </LinearGradientBrush>
+                                                    </TextBlock.Foreground>
+                                                    <Run Text="₪" FontSize="22" /><Run Text="{Binding DisplayPrice, StringFormat='{}{0:F0}', Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Price, StringFormat='₪{0:F0}'}"
+                                                           FontSize="18" Foreground="#94A3B8"
+                                                           TextDecorations="Strikethrough"
+                                                           VerticalAlignment="Center" Margin="12,0,0,4"
+                                                           Visibility="{Binding HasDiscount, Converter={StaticResource BoolToVis}}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Feature list -->
+                                    <StackPanel Grid.Row="1" Margin="24,16,24,8">
+                                        <Border Padding="0,10" BorderBrush="#F1F5F9" BorderThickness="0,0,0,1"
+                                                Visibility="{Binding Minutes, Converter={StaticResource NonZeroToVis}}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="8"
+                                                        Background="#EEF2FF" Margin="0,0,12,0">
+                                                    <TextBlock Text="⏱" FontSize="16"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Grid.Column="1" Text="זמן שימוש"
+                                                           FontSize="15" Foreground="#64748B"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Minutes, StringFormat='{}{0} דקות'}"
+                                                           FontSize="15" FontWeight="Bold" Foreground="#1E293B"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border Padding="0,10" BorderBrush="#F1F5F9" BorderThickness="0,0,0,1"
+                                                Visibility="{Binding Prints, Converter={StaticResource NonZeroToVis}}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="8"
+                                                        Background="#F0FDF4" Margin="0,0,12,0">
+                                                    <TextBlock Text="🖨" FontSize="16"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Grid.Column="1" Text="תקציב הדפסות"
+                                                           FontSize="15" Foreground="#64748B"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding Prints, StringFormat='{}{0}₪'}"
+                                                           FontSize="15" FontWeight="Bold" Foreground="#1E293B"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border Padding="0,10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="8"
+                                                        Background="#FFF7ED" Margin="0,0,12,0">
+                                                    <TextBlock Text="📅" FontSize="16"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Grid.Column="1" Text="תוקף"
+                                                           FontSize="15" Foreground="#64748B"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding ValidityDisplay}"
+                                                           FontSize="15" FontWeight="Bold" Foreground="#1E293B"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- Buy button -->
+                                    <Border Grid.Row="2" Padding="24,8,24,20">
+                                        <Button Content="רכוש עכשיו" Style="{StaticResource BtnPrimary}"
+                                                Command="{Binding DataContext.SelectPackageCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                CommandParameter="{Binding}" HorizontalAlignment="Stretch"
+                                                Height="48" FontSize="16" />
+                                    </Border>
+                                </Grid>
+
+                                <Border.Triggers>
+                                    <EventTrigger RoutedEvent="MouseEnter">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <ThicknessAnimation Storyboard.TargetName="CardRoot"
+                                                                    Storyboard.TargetProperty="BorderThickness"
+                                                                    To="2" Duration="0:0:0.15" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                    <EventTrigger RoutedEvent="MouseLeave">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <ThicknessAnimation Storyboard.TargetName="CardRoot"
+                                                                    Storyboard.TargetProperty="BorderThickness"
+                                                                    To="1.5" Duration="0:0:0.15" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Border.Triggers>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

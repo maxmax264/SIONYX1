@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366F1;
+            --primary-dark: #4F46E5;
+            --primary-light: #EEF2FF;
+            --success: #10B981;
+            --success-dark: #059669;
+            --success-light: #ECFDF5;
+            --error: #EF4444;
+            --error-light: #FEF2F2;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --border: #E2E8F0;
+            --border-light: #F1F5F9;
+            --bg: #FFFFFF;
+            --radius: 14px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Assistant', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 24px 28px;
+        }
+
+        /* ── FORM ───────────────────────────── */
+        .form-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 13px 18px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-family: inherit;
+            font-weight: 500;
+            color: var(--text-primary);
+            background: #FAFBFC;
+            transition: all 0.2s ease;
+            outline: none;
+            margin-bottom: 18px;
+        }
+
+        .input-field::placeholder {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .input-field:focus {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        /* ── IFRAME CARD ────────────────────── */
+        .iframe-card {
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: white;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .iframe-card:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        .iframe-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: var(--primary-light);
+            border-bottom: 1px solid #E0E7FF;
+            flex-shrink: 0;
+        }
+
+        .iframe-header .lock { font-size: 14px; }
+
+        .iframe-header span {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        #NedarimFrame {
+            width: 100%;
+            border: none;
+            flex: 1;
+            min-height: 180px;
+            display: block;
+        }
+
+        .loading-iframe {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+            gap: 12px;
+        }
+
+        .dot-loader {
+            display: flex;
+            gap: 7px;
+        }
+
+        .dot-loader span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation: dot-pulse 1.2s ease-in-out infinite;
+        }
+
+        .dot-loader span:nth-child(2) { animation-delay: 0.2s; }
+        .dot-loader span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dot-pulse {
+            0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1.1); }
+        }
+
+        .loading-iframe p {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* ── BOTTOM AREA ──────────────────────── */
+        .bottom-area {
+            flex-shrink: 0;
+            padding-top: 16px;
+        }
+
+        /* ── PAY BUTTON ─────────────────────── */
+        .btn-pay {
+            width: 100%;
+            padding: 15px 24px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 17px;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            letter-spacing: 0.02em;
+        }
+
+        .btn-pay:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-pay:active:not(:disabled) { transform: translateY(0); }
+
+        .btn-pay:disabled {
+            background: #CBD5E1;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .btn-pay .ico { font-size: 16px; line-height: 1; }
+
+        /* ── CANCEL ─────────────────────────── */
+        .btn-cancel {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-muted);
+            transition: all 0.15s ease;
+        }
+
+        .btn-cancel:hover {
+            background: var(--border-light);
+            color: var(--text-secondary);
+        }
+
+        /* ── TRUST BAR ──────────────────────── */
+        .trust-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .trust-item .t-ico {
+            font-size: 12px;
+            color: var(--success);
+            line-height: 1;
+        }
+
+        /* ── ERROR ──────────────────────────── */
+        .error-toast {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            border-radius: var(--radius);
+            background: var(--error-light);
+            border: 1.5px solid #FECACA;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--error);
+        }
+
+        .error-toast.show { display: flex; }
+        .error-toast .err-ico { font-size: 18px; flex-shrink: 0; }
+
+        /* ── STATES ─────────────────────────── */
+        .state-overlay {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 24px;
+        }
+
+        .state-overlay.active { display: flex; }
+
+        .spinner {
+            width: 52px;
+            height: 52px;
+            border: 4px solid var(--border);
+            border-top-color: var(--success);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            margin-bottom: 24px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .state-title {
+            font-size: 21px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .state-subtitle {
+            font-size: 16px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* ── SUCCESS ────────────────────────── */
+        .success-card {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 56px 24px;
+        }
+
+        .success-card.show { display: flex; }
+
+        .success-ring {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: var(--success-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 28px;
+            animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes pop-in {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .success-ring .check {
+            font-size: 40px;
+            color: var(--success);
+            font-weight: 800;
+        }
+
+        .success-card .s-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .success-card .s-sub {
+            font-size: 16px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ── FORM ──────────────────────── -->
+        <div id="formSection" class="form-section">
+            <div>
+                <label class="input-label" for="clientName">שם מלא</label>
+                <input type="text" id="clientName" class="input-field"
+                       placeholder="שם מלא כפי שמופיע בכרטיס האשראי"
+                       required autocomplete="off">
+            </div>
+
+            <div class="iframe-card">
+                <div class="iframe-header">
+                    <span class="lock">🔒</span>
+                    <span>פרטי כרטיס אשראי — חיבור מוצפן</span>
+                </div>
+                <div class="loading-iframe" id="loadingIframe">
+                    <div class="dot-loader">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <p>מתחבר לשרת תשלומים מאובטח...</p>
+                </div>
+                <iframe id="NedarimFrame" scrolling="no"></iframe>
+            </div>
+
+            <div class="bottom-area">
+                <div id="errorMessage" class="error-toast">
+                    <span class="err-ico">⚠</span>
+                    <span id="errorText"></span>
+                </div>
+
+                <button id="payButton" class="btn-pay" onclick="handlePayment()">
+                    <span class="ico">🔒</span>
+                    <span>בצע תשלום מאובטח</span>
+                </button>
+
+                <button class="btn-cancel" onclick="cancelPayment()">ביטול</button>
+
+                <div class="trust-bar">
+                    <div class="trust-item">
+                        <span class="t-ico">🔒</span>
+                        <span>SSL 256-bit</span>
+                    </div>
+                    <div class="trust-item">
+                        <span class="t-ico">✓</span>
+                        <span>PCI DSS</span>
+                    </div>
+                    <div class="trust-item">
+                        <span class="t-ico">🛡</span>
+                        <span>Nedarim Plus</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── PROCESSING ────────────────── -->
+        <div id="loadingPayment" class="state-overlay">
+            <div class="spinner"></div>
+            <div class="state-title">מעבד תשלום...</div>
+            <div class="state-subtitle">אנא המתן, אל תסגור את החלון</div>
+        </div>
+
+        <!-- ── VERIFYING ─────────────────── -->
+        <div id="processingMessage" class="state-overlay">
+            <div class="spinner"></div>
+            <div class="state-title">מאמת תשלום...</div>
+            <div class="state-subtitle">ממתין לאישור מהשרת</div>
+        </div>
+
+        <!-- ── SUCCESS ───────────────────── -->
+        <div id="successMessage" class="success-card">
+            <div class="success-ring">
+                <span class="check">✓</span>
+            </div>
+            <div class="s-title">התשלום בוצע בהצלחה!</div>
+            <div class="s-sub">הזמן נוסף לחשבונך</div>
+        </div>
+    </div>
+
+    <script>
+        let CONFIG = {};
+
+        window.chrome.webview.addEventListener('message', function(event) {
+            const msg = event.data;
+            if (msg.action === 'setConfig') {
+                CONFIG = msg.config;
+                if (CONFIG.userName) {
+                    document.getElementById('clientName').value = CONFIG.userName;
+                }
+            }
+            else if (msg.action === 'purchaseCreated') {
+                onPurchaseCreated(msg.purchaseId);
+            }
+            else if (msg.action === 'purchaseError') {
+                document.getElementById('formSection').style.display = 'flex';
+                document.getElementById('loadingPayment').classList.remove('active');
+                showError(msg.error || 'שגיאה ביצירת רכישה');
+            }
+            else if (msg.action === 'showSuccess') {
+                showSuccess();
+            }
+            else if (msg.action === 'showTimeout') {
+                showTimeout();
+            }
+        });
+
+        window.onload = function() {
+            window.addEventListener("message", handlePostMessage, false);
+            document.getElementById('NedarimFrame').onload = function() {
+                postToNedarim({'Name': 'GetHeight'});
+            };
+            document.getElementById('NedarimFrame').src =
+                "https://matara.pro/nedarimplus/iframe?language=he";
+        };
+
+        function postToNedarim(data) {
+            var iframe = document.getElementById('NedarimFrame');
+            if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(data, "*");
+        }
+
+        function handlePostMessage(event) {
+            if (!event.data || !event.data.Name) return;
+            switch (event.data.Name) {
+                case 'Height':
+                    document.getElementById('NedarimFrame').style.height =
+                        (parseInt(event.data.Value) + 15) + "px";
+                    document.getElementById('loadingIframe').style.display = 'none';
+                    break;
+                case 'TransactionResponse':
+                    handleTransactionResponse(event.data.Value);
+                    break;
+            }
+        }
+
+        function handlePayment() {
+            var name = document.getElementById('clientName').value.trim();
+            if (!name) { showError('נא להזין שם מלא'); return; }
+
+            hideError();
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('loadingPayment').classList.add('active');
+
+            window.chrome.webview.postMessage({ action: 'createPendingPurchase' });
+        }
+
+        function onPurchaseCreated(purchaseId) {
+            var name = document.getElementById('clientName').value.trim();
+            postToNedarim({
+                'Name': 'FinishTransaction2',
+                'Value': {
+                    'Mosad': CONFIG.mosadId,
+                    'ApiValid': CONFIG.apiValid,
+                    'PaymentType': 'Ragil',
+                    'Currency': '1',
+                    'Zeout': '',
+                    'FirstName': name,
+                    'LastName': '',
+                    'Street': '',
+                    'City': '',
+                    'Phone': '',
+                    'Mail': '',
+                    'Amount': CONFIG.amount,
+                    'Tashlumim': '1',
+                    'Groupe': '',
+                    'Comment': 'רכישת חבילה: ' + CONFIG.packageName,
+                    'Param1': purchaseId,
+                    'Param2': CONFIG.orgId || '',
+                    'ForceUpdateMatching': '0',
+                    'CallBack': CONFIG.callbackUrl || '',
+                    'CallBackMailError': ''
+                }
+            });
+        }
+
+        function handleTransactionResponse(response) {
+            document.getElementById('loadingPayment').classList.remove('active');
+            if (response.Status === 'Error') {
+                document.getElementById('formSection').style.display = 'flex';
+                showError(response.Message || 'התשלום נכשל. נסה שוב.');
+            } else {
+                document.getElementById('processingMessage').classList.add('active');
+                window.chrome.webview.postMessage({
+                    action: 'paymentSuccess',
+                    response: response
+                });
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+
+        function showSuccess() {
+            document.getElementById('loadingPayment').classList.remove('active');
+            var pm = document.getElementById('processingMessage');
+            if (pm) pm.classList.remove('active');
+            document.getElementById('successMessage').classList.add('show');
+            setTimeout(function() {
+                window.chrome.webview.postMessage({ action: 'close', success: true });
+            }, 2500);
+        }
+
+        function showTimeout() {
+            document.getElementById('loadingPayment').classList.remove('active');
+            var pm = document.getElementById('processingMessage');
+            if (pm) pm.classList.remove('active');
+            document.getElementById('formSection').style.display = 'flex';
+            showError('לא התקבל אישור מהשרת. אם חויבת, נא לפנות לתמיכה.');
+        }
+
+        function cancelPayment() {
+            window.chrome.webview.postMessage({ action: 'close', success: false });
+        }
+    </script>
+</body>
+</html>
