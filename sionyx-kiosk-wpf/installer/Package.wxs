@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <!-- ================================================================
+       SIONYX Kiosk Installer — WiX 6 (MSI, 64-bit)
+       Clean rewrite: no host-machine registry hacks.
+       ================================================================ -->
+
+  <Package Name="SIONYX"
+           Manufacturer="SIONYX Technologies"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="8B5E2C3A-F4D1-4E7B-9A6C-2D8F5E1B3C4A"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Compressed="yes">
+
+    <SummaryInformation Description="SIONYX Kiosk Management System" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of SIONYX is already installed."
+                  Schedule="afterInstallInitialize" />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Public property for Organization ID (set by custom dialog) -->
+    <Property Id="ORGID" Secure="yes" />
+
+    <!-- ================================================================
+         DIRECTORY STRUCTURE
+         ================================================================ -->
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="SIONYX">
+        <Directory Id="AssetsDir" Name="Assets">
+          <Directory Id="TemplatesDir" Name="templates" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder" />
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuDir" Name="SIONYX" />
+    </StandardDirectory>
+
+    <!-- ================================================================
+         FILE COMPONENTS
+         ================================================================ -->
+
+    <ComponentGroup Id="MainFiles" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="*">
+        <File Id="SionyxKiosk.exe"
+              Source="$(var.PublishDir)\SionyxKiosk.exe"
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="AppIconFile" Guid="*">
+        <File Id="AppIconIco"
+              Source="$(var.SourceDir)\app-logo.ico"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="Shortcuts" Directory="INSTALLFOLDER">
+      <Component Id="DesktopShortcutComp" Guid="*">
+        <Shortcut Id="DesktopShortcut"
+                  Directory="DesktopFolder"
+                  Name="SIONYX"
+                  Target="[INSTALLFOLDER]SionyxKiosk.exe"
+                  Icon="AppIcon"
+                  IconIndex="0"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\SIONYX" Name="DesktopShortcut"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <Component Id="StartMenuShortcutComp" Guid="*">
+        <Shortcut Id="StartMenuShortcut"
+                  Directory="ProgramMenuDir"
+                  Name="SIONYX"
+                  Target="[INSTALLFOLDER]SionyxKiosk.exe"
+                  Icon="AppIcon"
+                  IconIndex="0"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\SIONYX" Name="StartMenuShortcut"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="TemplateFiles" Directory="TemplatesDir">
+      <Component Id="PaymentTemplate" Guid="*">
+        <File Id="PaymentHtml"
+              Source="$(var.PublishDir)\Assets\templates\payment.html"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="UninstallShortcut" Directory="ProgramMenuDir">
+      <Component Id="UninstallShortcutComp" Guid="*">
+        <Shortcut Id="UninstallLink"
+                  Name="Uninstall SIONYX"
+                  Target="[SystemFolder]msiexec.exe"
+                  Arguments="/x [ProductCode]" />
+        <RemoveFolder Id="CleanProgramMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\SIONYX"
+                       Name="StartMenuInstalled"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ================================================================
+         REGISTRY CONFIGURATION
+         All keys under HKLM\SOFTWARE\SIONYX (64-bit view, native)
+         ================================================================ -->
+
+    <ComponentGroup Id="RegistryConfig" Directory="INSTALLFOLDER">
+      <Component Id="RegInstallInfo" Guid="*">
+        <RegistryKey Root="HKLM" Key="SOFTWARE\SIONYX">
+          <RegistryValue Name="Install_Dir"  Type="string" Value="[INSTALLFOLDER]" />
+          <RegistryValue Name="Version"      Type="string" Value="$(var.ProductVersion)" />
+          <RegistryValue Name="OrgId"        Type="string" Value="[ORGID]" />
+          <RegistryValue Name="KioskUsername" Type="string" Value="SionyxUser" />
+        </RegistryKey>
+        <RegistryValue Root="HKLM" Key="SOFTWARE\SIONYX" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <Component Id="RegFirebase" Guid="*">
+        <RegistryKey Root="HKLM" Key="SOFTWARE\SIONYX">
+          <RegistryValue Name="FirebaseApiKey"            Type="string" Value="$(var.FirebaseApiKey)" />
+          <RegistryValue Name="FirebaseAuthDomain"        Type="string" Value="$(var.FirebaseAuthDomain)" />
+          <RegistryValue Name="FirebaseProjectId"         Type="string" Value="$(var.FirebaseProjectId)" />
+          <RegistryValue Name="FirebaseDatabaseUrl"       Type="string" Value="$(var.FirebaseDatabaseUrl)" />
+          <RegistryValue Name="FirebaseStorageBucket"     Type="string" Value="$(var.FirebaseStorageBucket)" />
+          <RegistryValue Name="FirebaseMessagingSenderId" Type="string" Value="$(var.FirebaseMessagingSenderId)" />
+          <RegistryValue Name="FirebaseAppId"             Type="string" Value="$(var.FirebaseAppId)" />
+          <RegistryValue Name="FirebaseMeasurementId"     Type="string" Value="$(var.FirebaseMeasurementId)" />
+        </RegistryKey>
+        <RegistryValue Root="HKLM" Key="SOFTWARE\SIONYX" Name="firebaseConfigured" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+
+      <Component Id="RegPaymentAndSecurity" Guid="*">
+        <RegistryKey Root="HKLM" Key="SOFTWARE\SIONYX">
+          <RegistryValue Name="NedarimCallbackUrl" Type="string" Value="$(var.NedarimCallbackUrl)" />
+          <RegistryValue Name="AdminExitPassword"  Type="string" Value="$(var.AdminExitPassword)" />
+        </RegistryKey>
+        <RegistryValue Root="HKLM" Key="SOFTWARE\SIONYX" Name="paymentConfigured" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ================================================================
+         FEATURE
+         ================================================================ -->
+
+    <Feature Id="ProductFeature" Title="SIONYX Kiosk" Level="1">
+      <ComponentGroupRef Id="MainFiles" />
+      <ComponentGroupRef Id="TemplateFiles" />
+      <ComponentGroupRef Id="Shortcuts" />
+      <ComponentGroupRef Id="UninstallShortcut" />
+      <ComponentGroupRef Id="RegistryConfig" />
+    </Feature>
+
+    <!-- ================================================================
+         ICON (for Add/Remove Programs)
+         ================================================================ -->
+
+    <Icon Id="AppIcon" SourceFile="$(var.SourceDir)\app-logo.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPHELPLINK" Value="https://sionyx.app" />
+    <Property Id="ARPURLINFOABOUT" Value="https://sionyx.app" />
+    <Property Id="ARPNOREPAIR" Value="yes" Secure="yes" />
+
+    <!-- ================================================================
+         UI — WixUI_InstallDir + custom Org Name dialog + finish text
+         ================================================================ -->
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf" />
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT"
+              Value="Setup complete! Next steps:&#13;&#10;&#13;&#10;1. Press Win+L to lock your PC (or sign out)&#13;&#10;2. Click 'SionyxUser' on the login screen&#13;&#10;&#13;&#10;The kiosk app starts automatically when SionyxUser signs in.&#13;&#10;To return to your admin account, press Ctrl+Alt+Q in the kiosk app." />
+
+    <ui:WixUI Id="WixUI_InstallDir" />
+
+    <UI>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="OrgNameDlg" Order="5" />
+
+      <Publish Dialog="OrgNameDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
+      <Publish Dialog="OrgNameDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg"
+               Condition="ORGID" />
+      <Publish Dialog="OrgNameDlg" Control="Next" Event="SpawnDialog" Value="InvalidOrgDlg"
+               Condition="NOT ORGID" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="OrgNameDlg" Order="5"
+               Condition="NOT Installed" />
+    </UI>
+
+    <!-- ================================================================
+         CUSTOM ACTIONS — C# (deferred, elevated)
+         ================================================================ -->
+
+    <Binary Id="CustomActionsDll" SourceFile="$(var.CustomActions.TargetDir)\CustomActions.CA.dll" />
+
+    <!-- INSTALL: data-setters (immediate) + actions (deferred) -->
+    <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
+    <SetProperty Id="CA_InitializeProfile"  Before="CA_InitializeProfile"  Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
+    <SetProperty Id="CA_VerifyInstallation" Before="CA_VerifyInstallation" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER];UILEVEL=[UILevel]" />
+
+    <CustomAction Id="CA_CreateKioskUser"          BinaryRef="CustomActionsDll" DllEntry="CreateKioskUser"          Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="CA_ApplySecurityRestrictions" BinaryRef="CustomActionsDll" DllEntry="ApplySecurityRestrictions" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="CA_SetupAutoStart"           BinaryRef="CustomActionsDll" DllEntry="SetupAutoStart"           Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="CA_InitializeProfile"        BinaryRef="CustomActionsDll" DllEntry="InitializeProfile"        Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="CA_VerifyInstallation"       BinaryRef="CustomActionsDll" DllEntry="VerifyInstallation"       Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <!-- UNINSTALL -->
+    <CustomAction Id="CA_StopProcesses"       BinaryRef="CustomActionsDll" DllEntry="StopProcesses"       Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="CA_RemoveScheduledTask" BinaryRef="CustomActionsDll" DllEntry="RemoveScheduledTask" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="CA_RevertSecurity"      BinaryRef="CustomActionsDll" DllEntry="RevertSecurity"      Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="CA_RemoveKioskUser"     BinaryRef="CustomActionsDll" DllEntry="RemoveKioskUser"     Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <!-- INSTALL -->
+      <Custom Action="CA_CreateKioskUser"          After="InstallFiles"                 Condition="NOT Installed AND NOT REMOVE" />
+      <Custom Action="CA_ApplySecurityRestrictions" After="CA_CreateKioskUser"           Condition="NOT Installed AND NOT REMOVE" />
+      <Custom Action="CA_SetupAutoStart"           After="CA_ApplySecurityRestrictions"  Condition="NOT Installed AND NOT REMOVE" />
+      <Custom Action="CA_InitializeProfile"        After="CA_SetupAutoStart"            Condition="NOT Installed AND NOT REMOVE" />
+      <Custom Action="CA_VerifyInstallation"       After="WriteRegistryValues"          Condition="NOT Installed AND NOT REMOVE" />
+
+      <!-- UNINSTALL -->
+      <Custom Action="CA_StopProcesses"       Before="RemoveFiles"         Condition="REMOVE = &quot;ALL&quot;" />
+      <Custom Action="CA_RemoveScheduledTask" After="CA_StopProcesses"     Condition="REMOVE = &quot;ALL&quot;" />
+      <Custom Action="CA_RevertSecurity"      After="CA_RemoveScheduledTask" Condition="REMOVE = &quot;ALL&quot;" />
+      <Custom Action="CA_RemoveKioskUser"     After="CA_RevertSecurity"    Condition="REMOVE = &quot;ALL&quot;" />
+    </InstallExecuteSequence>
+
+  </Package>
+</Wix>

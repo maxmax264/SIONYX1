@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow public read access to release files (installer + metadata)
+    // so unauthenticated users can download from the landing page.
+    // Files are stored at the bucket root: latest.json, sionyx-installer-vX.Y.Z.exe
+    match /{file} {
+      allow read: if file == 'latest.json'
+                  || file.matches('sionyx-installer.*\\.exe');
+      allow write: if false; // Only admin SDK (build script) can write
+    }
+
+    // Default: require authentication for everything else
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

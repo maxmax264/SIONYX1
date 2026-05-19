@@ -1,0 +1,200 @@
+<Page x:Class="SionyxKiosk.Views.Pages.HomePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:SionyxKiosk.Views.Controls"
+      Title="דף הבית" FlowDirection="RightToLeft">
+
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Pinned: Page header -->
+        <controls:PageHeader Grid.Row="0" Title="שלום! 👋" Subtitle="{Binding WelcomeMessage}"
+                             HeaderBrush="{StaticResource HomeHeaderGradient}"
+                             Margin="0,0,0,24" />
+
+        <!-- Pinned: Stats row -->
+        <UniformGrid Grid.Row="1" Rows="1" Margin="0,0,0,24">
+            <controls:StatCard AutomationProperties.AutomationId="StatTimeRemaining" Title="זמן נותר" Value="{Binding RemainingTime}" Icon="⏱"
+                               AccentColor="{StaticResource StatOrangeColor}"
+                               AccentBgColor="{StaticResource StatOrangeBgColor}"
+                               Margin="0,0,8,0" />
+            <controls:StatCard AutomationProperties.AutomationId="StatExpiry" Title="בתוקף עד" Value="{Binding TimeExpiry}" Icon="📅"
+                               AccentColor="{StaticResource StatGreenColor}"
+                               AccentBgColor="{StaticResource StatGreenBgColor}"
+                               Margin="4,0" />
+            <controls:StatCard x:Name="StatPrintBalance" AutomationProperties.AutomationId="StatPrintBalance"
+                               Title="יתרת הדפסות" Value="{Binding PrintBalance}" Icon="🖨"
+                               AccentColor="{StaticResource StatRedColor}"
+                               AccentBgColor="{StaticResource StatRedBgColor}"
+                               Margin="4,0" />
+            <controls:StatCard AutomationProperties.AutomationId="StatMessages" Title="הודעות" Value="{Binding UnreadMessages}" Icon="💬"
+                               AccentColor="{StaticResource StatPurpleColor}"
+                               AccentBgColor="{StaticResource StatPurpleBgColor}"
+                               Margin="8,0,0,0" />
+        </UniformGrid>
+
+        <!-- Scrollable: Everything else -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="0">
+            <StackPanel Margin="0,0,0,32">
+
+                <!-- Global announcements section -->
+                <Border x:Name="AnnouncementsSection" AutomationProperties.AutomationId="AnnouncementsPanel" Background="White" CornerRadius="{StaticResource RadiusLg}"
+                        Padding="28,24" Margin="0,0,0,24" Visibility="Collapsed">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Color="#0F172A" Opacity="0.06" />
+                    </Border.Effect>
+                    <StackPanel>
+                        <Grid Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="🔔" FontSize="20" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <TextBlock Text="עדכוני מערכת" FontSize="19" FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                <Border x:Name="AnnouncementBadge" CornerRadius="10" Padding="8,2" Margin="10,0,0,0"
+                                        VerticalAlignment="Center" Background="{StaticResource PrimaryBrush}">
+                                    <TextBlock x:Name="AnnouncementCountText" Text="0" FontSize="12"
+                                               FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <ItemsControl x:Name="AnnouncementsList" ItemsSource="{Binding GlobalAnnouncements}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="12" Padding="20,16" Margin="0,0,0,10"
+                                            Background="{Binding BackgroundColor}"
+                                            BorderThickness="1">
+                                        <Border.BorderBrush>
+                                            <SolidColorBrush Color="{Binding BorderColor}" />
+                                        </Border.BorderBrush>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Body}" FontSize="14" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Margin="0,6,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Unread direct messages card -->
+                <Border x:Name="MessageCard" CornerRadius="{StaticResource RadiusLg}"
+                        Padding="24,20" Margin="0,0,0,20" Cursor="Hand"
+                        MouseLeftButtonUp="MessageCard_Click"
+                        Visibility="Collapsed">
+                    <Border.Background>
+                        <SolidColorBrush Color="{StaticResource StatBlueBgColor}" />
+                    </Border.Background>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="💬" FontSize="28" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="הודעות אישיות" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="MessageCountText" Text="" FontSize="15"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="צפה בהודעות →" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <!-- Session controls -->
+                <Border Background="White" CornerRadius="{StaticResource RadiusLg}" Padding="40,32" Margin="0,0,0,28">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="270" Color="#0F172A" Opacity="0.07" />
+                    </Border.Effect>
+                    <StackPanel>
+                        <!-- Session inactive -->
+                        <StackPanel Visibility="{Binding IsSessionInactive, Converter={StaticResource BoolToVis}}">
+                            <!-- No time: show buy prompt -->
+                            <StackPanel HorizontalAlignment="Center"
+                                        Visibility="{Binding HasNoTime, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="🎯" FontSize="40" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                                <TextBlock Text="הזמן שלך נגמר" FontSize="20" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           HorizontalAlignment="Center" Margin="0,0,0,6" />
+                                <TextBlock Text="רכוש חבילה חדשה כדי להמשיך ליהנות מהשירותים שלנו"
+                                           FontSize="15" Foreground="{StaticResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" Margin="0,0,0,20" />
+                                <Button AutomationProperties.AutomationId="BuyPackageButton" Style="{StaticResource BtnPrimary}"
+                                        Command="{Binding BuyPackageCommand}"
+                                        Width="240" Height="52" FontSize="18">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="🛒" FontSize="18" Foreground="White"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <TextBlock Text="קנה חבילה" FontSize="18" FontWeight="SemiBold"
+                                                   Foreground="White" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Has time: show start session -->
+                            <StackPanel HorizontalAlignment="Center"
+                                        Visibility="{Binding HasNoTime, Converter={StaticResource InverseBoolToVis}}">
+                                <Button x:Name="StartSessionButton" AutomationProperties.AutomationId="StartSessionButton"
+                                        Content="{Binding PrimaryButtonText}" Style="{StaticResource BtnPrimary}"
+                                        Command="{Binding StartSessionCommand}"
+                                        Width="260" Height="56" FontSize="19"
+                                        IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBool}}" />
+                                <controls:LoadingSpinner HorizontalAlignment="Center" Margin="0,12,0,0"
+                                                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Session active: show Resume + End buttons -->
+                        <StackPanel HorizontalAlignment="Center"
+                                    Visibility="{Binding IsSessionActive, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="ההפעלה פעילה" FontSize="17" FontWeight="SemiBold"
+                                       Foreground="{StaticResource SuccessBrush}"
+                                       HorizontalAlignment="Center" Margin="0,0,0,16" />
+                            <Button AutomationProperties.AutomationId="ResumeSessionButton" Content="▶  חזור להפעלה" Style="{StaticResource BtnPrimary}"
+                                    Click="ResumeSession_Click"
+                                    Width="260" Height="52" FontSize="18" Margin="0,0,0,12" />
+                            <Button AutomationProperties.AutomationId="EndSessionButton" Content="⏹  סיים הפעלה" Style="{StaticResource BtnDanger}"
+                                    Click="EndSession_Click"
+                                    IsEnabled="{Binding IsEndingSession, Converter={StaticResource InverseBool}}"
+                                    Width="260" Height="52" FontSize="18" />
+                            <controls:LoadingSpinner HorizontalAlignment="Center" Margin="0,12,0,0"
+                                                     Visibility="{Binding IsEndingSession, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Error / warning banner -->
+                <Border Background="{StaticResource ErrorLightBrush}" CornerRadius="14" Padding="24,20" Margin="0,8,0,0"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVis}}"
+                        BorderBrush="{StaticResource ErrorBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="⚠" FontSize="24" VerticalAlignment="Center" Margin="0,0,14,0" />
+                        <TextBlock Text="{Binding ErrorMessage}" FontSize="17" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" VerticalAlignment="Center">
+                            <TextBlock.Foreground>
+                                <SolidColorBrush Color="{StaticResource ErrorDarkColor}" />
+                            </TextBlock.Foreground>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
