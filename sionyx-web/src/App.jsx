@@ -22,114 +22,85 @@ const SupervisorOrgDetailPage = lazy(() => import('./supervisor/pages/Supervisor
 const SupervisorBlockedUsersPage = lazy(() => import('./supervisor/pages/SupervisorBlockedUsersPage'));
 const SupervisorMessagesPage = lazy(() => import('./supervisor/pages/SupervisorMessagesPage'));
 const SupervisorSettingsPage = lazy(() => import('./supervisor/pages/SupervisorSettingsPage'));
+
+// Admin Pages
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const PackagesPage = lazy(() => import('./pages/PackagesPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const ComputersPage = lazy(() => import('./pages/ComputersPage'));
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 function App() {
-  const { setUser, setLoading, isAuthenticated, darkMode } = useAuthStore();
-  const {
-    setSupervisor,
-    setLoading: setSupervisorLoading,
-    isAuthenticated: isSupervisorAuthenticated,
-  } = useSupervisorAuthStore();
+  const { setAuth, setAdmin, setLoading } = useAuthStore();
+  const { setSupervisorAuth, setSupervisor, setSupervisorLoading } = useSupervisorAuthStore();
 
   useEffect(() => {
-    setLoading(true);
-
-    const unsubscribe = onAuthChange(async firebaseUser => {
-      if (firebaseUser) {
-        const result = await getCurrentAdminData();
-        if (result.success) {
-          setUser(result.admin);
-        } else {
-          setUser(null);
+    // Listen for regular Admin Auth Changes
+    const unsubscribeAdmin = onAuthChange(async (user) => {
+      setAuth(user);
+      if (user) {
+        try {
+          const adminData = await getCurrentAdminData(user.uid);
+          setAdmin(adminData);
+        } catch (error) {
+          console.error('Error fetching admin data:', error);
         }
       } else {
-        setUser(null);
+        setAdmin(null);
       }
-
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [setUser, setLoading]);
-
-  useEffect(() => {
-    setSupervisorLoading(true);
-
-    const unsubscribe = onSupervisorAuthChange(async firebaseUser => {
-      if (firebaseUser) {
-        const result = await getCurrentSupervisorData();
-        if (result.success) {
-          setSupervisor(result.supervisor);
-        } else {
-          setSupervisor(null);
+    // Listen for Supervisor Auth Changes
+    const unsubscribeSupervisor = onSupervisorAuthChange(async (user) => {
+      setSupervisorAuth(user);
+      if (user) {
+        try {
+          const supervisorData = await getCurrentSupervisorData(user.uid);
+          setSupervisor(supervisorData);
+        } catch (error) {
+          console.error('Error fetching supervisor data:', error);
         }
       } else {
         setSupervisor(null);
       }
-
       setSupervisorLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [setSupervisor, setSupervisorLoading]);
-
-  const LoadingFallback = () => (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        direction: 'rtl',
-      }}
-    >
-      <Spin size='large' />
-    </div>
-  );
+    return () => {
+      unsubscribeAdmin();
+      unsubscribeSupervisor();
+    };
+  }, [setAuth, setAdmin, setLoading, setSupervisorAuth, setSupervisor, setSupervisorLoading]);
 
   return (
     <ConfigProvider
       theme={{
-        algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        algorithm: theme.defaultAlgorithm,
         token: {
           colorPrimary: '#667eea',
-          borderRadius: 6,
+          borderRadius: 8,
+          fontFamily: 'Rubik, system-ui, sans-serif',
         },
       }}
-      direction='rtl'
     >
       <AntApp>
-        <Router>
-          <Suspense fallback={<LoadingFallback />}>
+        <Router basename="/SIONYX1">
+          <Suspense
+            fallback={
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fafbfc' }}>
+                <Spin size="large" tip="טוען מערכת..." />
+              </div>
+            }
+          >
             <Routes>
-              {/* Landing Page */}
+              {/* Public Routes */}
               <Route path='/' element={<LandingPage />} />
-
-              {/* Admin Login */}
-              <Route
-                path='/admin/login'
-                element={isAuthenticated ? <Navigate to='/admin' replace /> : <LoginPage />}
-              />
-
-              {/* Supervisor Login */}
-              <Route
-                path='/supervisor/login'
-                element={
-                  isSupervisorAuthenticated ? (
-                    <Navigate to='/supervisor' replace />
-                  ) : (
-                    <SupervisorLoginPage />
-                  )
-                }
-              />
+              <Route path='/login' element={<LoginPage />} />
+              <Route path='/supervisor/login' element={<SupervisorLoginPage />} />
 
               {/* Protected Supervisor Routes */}
               <Route
