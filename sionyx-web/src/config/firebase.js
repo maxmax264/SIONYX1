@@ -3,14 +3,15 @@ import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 import { getFunctions } from 'firebase/functions';
 
+// הגדרות ה-Firebase האמיתיות שלך מתוך קובץ ה-env
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyBcL4wpFbFDgQ4l0AXNADw3D9ht70lpJe4",
+  authDomain: "pc-sion.firebaseapp.com",
+  databaseURL: "https://pc-sion-default-rtdb.firebaseio.com",
+  projectId: "pc-sion",
+  storageBucket: "pc-sion.appspot.com",
+  messagingSenderId: "53784185799",
+  appId: "1:53784185799:web:3e6e7651a021a868de9a98"
 };
 
 // Initialize Firebase
