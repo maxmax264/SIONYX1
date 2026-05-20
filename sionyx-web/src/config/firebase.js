@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 import { getFunctions } from 'firebase/functions';
 
-// הגדרות ה-Firebase האמיתיות שלך מתוך קובץ ה-env
+// הגדרות ה-Firebase המלאות והמדויקות של פרויקט pc-sion
 const firebaseConfig = {
   apiKey: "AIzaSyBcL4wpFbFDgQ4l0AXNADw3D9ht70lpJe4",
   authDomain: "pc-sion.firebaseapp.com",
