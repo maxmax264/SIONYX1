@@ -5,6 +5,7 @@ import path from 'path';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/SIONYX1/',
   // Load .env from repo root (parent directory) for monorepo support
   envDir: path.resolve(__dirname, '..'),
   build: {
