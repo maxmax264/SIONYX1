@@ -1,0 +1,1 @@
+const n=r=>{if(!r||r<=0)return"0 דקות";const o=Math.floor(r/3600),t=Math.floor(r%3600/60),e=r%60;return o>0&&t>0?`${o} שעות ו-${t} דקות`:o>0?`${o} שעות`:t>0&&e>0?`${t} דקות ו-${e} שניות`:t>0?`${t} דקות`:`${e} שניות`},f=r=>{if(!r||r<=0)return"0 דקות";const o=Math.floor(r/60),t=r%60;return o>0&&t>0?`${o} שעות ו-${t} דקות`:o>0?`${o} שעות`:`${t} דקות`},i=f,u=n;export{i as a,u as f};

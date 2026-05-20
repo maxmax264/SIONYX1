@@ -1,0 +1,750 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Detect which areas of the codebase changed ──────────────
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      functions: ${{ steps.filter.outputs.functions }}
+      kiosk: ${{ steps.filter.outputs.kiosk }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'sionyx-web/**'
+            functions:
+              - 'functions/**'
+            kiosk:
+              - 'sionyx-kiosk-wpf/**'
+
+  # ── Web: Lint ────────────────────────────────────────────────
+  web-lint:
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.web == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: sionyx-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: sionyx-web
+        run: npm ci
+
+      - name: Lint
+        working-directory: sionyx-web
+        run: npm run lint
+
+  # ── Web: Build ───────────────────────────────────────────────
+  web-build:
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.web == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: sionyx-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: sionyx-web
+        run: npm ci
+
+      - name: Build
+        working-directory: sionyx-web
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_DATABASE_URL: ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: npm run build
+
+  # ── Web: Test ────────────────────────────────────────────────
+  web-test:
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.web == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: sionyx-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: sionyx-web
+        run: npm ci
+
+      - name: Test with coverage
+        working-directory: sionyx-web
+        run: npx vitest run --coverage --reporter=default
+
+  # ── Web: Deploy to Firebase Hosting ──────────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, web-lint, web-build, web-test]
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.web == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: sionyx-web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: sionyx-web
+        run: npm ci
+
+      - name: Build for production
+        working-directory: sionyx-web
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_DATABASE_URL: ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: npm run build
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy to Firebase Hosting
+        run: firebase deploy --only hosting --project sionyx-19636
+
+  # ── Functions: Test ──────────────────────────────────────────
+  functions-tests:
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.functions == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Test
+        working-directory: functions
+        run: npm test
+
+  # ── Kiosk: Unit Tests ───────────────────────────────────────
+  kiosk-tests:
+    runs-on: windows-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.kiosk == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Test
+        working-directory: sionyx-kiosk-wpf
+        run: dotnet test --filter "Category!=E2E"
+
+  # ── Kiosk: E2E ──────────────────────────────────────────────
+  kiosk-e2e:
+    runs-on: windows-latest
+    needs: [kiosk-tests]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+    env:
+      FUNCTIONS_BASE: https://us-central1-sionyx-19636.cloudfunctions.net
+      E2E_ORG_ID: cie2etest
+      E2E_ORG_NAME: "CI E2E Test"
+      E2E_ADMIN_PHONE: "0500000001"
+      E2E_ADMIN_PASSWORD: "CiTest123456"
+      E2E_ADMIN_FIRST: CI
+      E2E_ADMIN_LAST: Test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Cleanup previous test org
+        shell: pwsh
+        run: |
+          $body = @{ data = @{ orgId = $env:E2E_ORG_ID } } | ConvertTo-Json -Depth 3
+          try {
+            $resp = Invoke-RestMethod -Uri "$env:FUNCTIONS_BASE/cleanupTestOrganization" `
+              -Method Post -ContentType "application/json" -Body $body
+            Write-Host "Cleanup: $($resp.result.message)"
+          } catch {
+            Write-Host "Cleanup skipped (org may not exist): $($_.Exception.Message)"
+          }
+
+      - name: Create test organization
+        shell: pwsh
+        run: |
+          $body = @{
+            data = @{
+              organizationName = $env:E2E_ORG_NAME
+              nedarimMosadId   = "ci-test-mosad"
+              nedarimApiValid  = "ci-test-api-key"
+              adminPhone       = $env:E2E_ADMIN_PHONE
+              adminPassword    = $env:E2E_ADMIN_PASSWORD
+              adminFirstName   = $env:E2E_ADMIN_FIRST
+              adminLastName    = $env:E2E_ADMIN_LAST
+            }
+          } | ConvertTo-Json -Depth 3
+          $resp = Invoke-RestMethod -Uri "$env:FUNCTIONS_BASE/registerOrganization" `
+            -Method Post -ContentType "application/json" -Body $body
+          Write-Host "Created org: $($resp.result.orgId)"
+
+      - name: Verify login credentials
+        shell: pwsh
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        run: |
+          $email = "$($env:E2E_ADMIN_PHONE)@sionyx.app"
+          $body = @{
+            email = $email
+            password = $env:E2E_ADMIN_PASSWORD
+            returnSecureToken = $true
+          } | ConvertTo-Json
+          Write-Host "Testing login for $email ..."
+          try {
+            $apiKey = $env:FIREBASE_API_KEY
+            $url = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$apiKey"
+            $resp = Invoke-RestMethod -Uri $url -Method Post -ContentType "application/json" -Body $body
+            Write-Host "Login verified OK: uid=$($resp.localId)"
+          } catch {
+            Write-Host "LOGIN VERIFICATION FAILED: $($_.Exception.Message)"
+            $stream = $_.Exception.Response.GetResponseStream()
+            $reader = [System.IO.StreamReader]::new($stream)
+            $errBody = $reader.ReadToEnd()
+            Write-Host "Response body: $errBody"
+            throw "Firebase login verification failed - user may not have been created properly"
+          }
+
+      - name: Generate .env for E2E
+        working-directory: sionyx-kiosk-wpf
+        shell: pwsh
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          NEDARIM_CALLBACK_URL: ${{ secrets.NEDARIM_CALLBACK_URL }}
+        run: |
+          @"
+          ORG_ID=$($env:E2E_ORG_ID)
+          FIREBASE_API_KEY=$($env:FIREBASE_API_KEY)
+          FIREBASE_AUTH_DOMAIN=$($env:FIREBASE_AUTH_DOMAIN)
+          FIREBASE_PROJECT_ID=$($env:FIREBASE_PROJECT_ID)
+          FIREBASE_DATABASE_URL=$($env:FIREBASE_DATABASE_URL)
+          FIREBASE_STORAGE_BUCKET=$($env:FIREBASE_STORAGE_BUCKET)
+          NEDARIM_CALLBACK_URL=$($env:NEDARIM_CALLBACK_URL)
+          "@ | Set-Content .env
+
+      - name: Build kiosk app
+        working-directory: sionyx-kiosk-wpf
+        run: dotnet build src/SionyxKiosk/SionyxKiosk.csproj
+
+      - name: Run E2E smoke tests
+        working-directory: sionyx-kiosk-wpf
+        env:
+          SIONYX_E2E_PHONE: ${{ env.E2E_ADMIN_PHONE }}
+          SIONYX_E2E_PASSWORD: ${{ env.E2E_ADMIN_PASSWORD }}
+        run: dotnet test tests/SionyxKiosk.E2E --verbosity normal
+
+      - name: Cleanup test org
+        if: always()
+        shell: pwsh
+        run: |
+          $body = @{ data = @{ orgId = $env:E2E_ORG_ID } } | ConvertTo-Json -Depth 3
+          try {
+            $resp = Invoke-RestMethod -Uri "$env:FUNCTIONS_BASE/cleanupTestOrganization" `
+              -Method Post -ContentType "application/json" -Body $body
+            Write-Host "Cleanup: $($resp.result.message)"
+          } catch {
+            Write-Host "Cleanup failed (non-fatal): $($_.Exception.Message)"
+          }
+
+  # ── Kiosk: Installer Test ───────────────────────────────────
+  installer-test:
+    runs-on: windows-latest
+    needs: [detect-changes]
+    if: >
+      needs.detect-changes.outputs.kiosk == 'true' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Publish app
+        working-directory: sionyx-kiosk-wpf
+        run: >-
+          dotnet publish src/SionyxKiosk/SionyxKiosk.csproj
+          -c Release -r win-x64 --self-contained true
+          /p:PublishSingleFile=true
+          /p:IncludeNativeLibrariesForSelfExtract=true
+          /p:EnableCompressionInSingleFile=true
+          /p:DebugType=none /p:DebugSymbols=false
+          -o dist
+
+      - name: Build MSI installer
+        working-directory: sionyx-kiosk-wpf
+        shell: pwsh
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          NEDARIM_CALLBACK_URL: ${{ secrets.NEDARIM_CALLBACK_URL }}
+          ADMIN_EXIT_PASSWORD: ${{ secrets.ADMIN_EXIT_PASSWORD }}
+        run: |
+          $publishDir = (Resolve-Path dist).Path
+          $sourceDir  = (Resolve-Path .).Path
+          dotnet build installer/SionyxInstaller.wixproj `
+            -c Release -p:Platform=x64 `
+            "-p:ProductVersion=0.0.1" `
+            "-p:PublishDir=$publishDir" `
+            "-p:SourceDir=$sourceDir"
+
+      - name: Disable password complexity (Server default blocks blank passwords)
+        shell: pwsh
+        run: |
+          secedit /export /cfg C:\secpol.cfg
+          (Get-Content C:\secpol.cfg) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' `
+            -replace 'MinimumPasswordLength = \d+', 'MinimumPasswordLength = 0' |
+            Set-Content C:\secpol.cfg
+          secedit /configure /db C:\Windows\security\local.db /cfg C:\secpol.cfg /areas SECURITYPOLICY
+          Remove-Item C:\secpol.cfg
+
+      - name: Install MSI (silent)
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem sionyx-kiosk-wpf/installer/bin/x64/Release/*.msi)[0]
+          Write-Host "Installing: $($msi.FullName)"
+          $logFile = Join-Path $env:RUNNER_TEMP "msi-install.log"
+          $proc = Start-Process msiexec.exe `
+            -ArgumentList "/i `"$($msi.FullName)`" /qn ORGID=ci-test-org /l*v `"$logFile`"" `
+            -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "`n=== CUSTOM ACTION LOG (errors & actions) ==="
+            if (Test-Path $logFile) {
+              Get-Content $logFile | Select-String -Pattern '\[ERROR\]|\[FAIL\]|Return value 3|ActionStart|failed|exception' -SimpleMatch:$false |
+                Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
+              Write-Host "`n=== MSI install log (last 40 lines) ==="
+              Get-Content $logFile | Select-Object -Last 40
+            }
+            throw "MSI install failed with exit code $($proc.ExitCode)"
+          }
+          Write-Host "MSI installed successfully"
+
+      - name: Verify installation
+        shell: pwsh
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          NEDARIM_CALLBACK_URL: ${{ secrets.NEDARIM_CALLBACK_URL }}
+          ADMIN_EXIT_PASSWORD: ${{ secrets.ADMIN_EXIT_PASSWORD }}
+        run: |
+          $pass = 0; $fail = 0; $warn = 0
+          function Assert-Pass($msg)  { $script:pass++; Write-Host "[PASS] $msg" }
+          function Assert-Fail($msg)  { $script:fail++; Write-Host "[FAIL] $msg" }
+          function Assert-Warn($msg)  { $script:warn++; Write-Host "[WARN] $msg" }
+          function Assert-Equal($name, $actual, $expected) {
+            if ("$actual" -eq "$expected") { Assert-Pass "$name = '$expected'" }
+            else { Assert-Fail "$name = '$actual' (expected '$expected')" }
+          }
+          function Assert-Exists($path) {
+            if (Test-Path $path) { Assert-Pass "Exists: $path" }
+            else { Assert-Fail "Missing: $path" }
+          }
+
+          $installDir = "C:\Program Files\SIONYX"
+
+          Write-Host "`n=== FILES & DIRECTORIES ==="
+          Assert-Exists "$installDir"
+          Assert-Exists "$installDir\SionyxKiosk.exe"
+          Assert-Exists "$installDir\app-logo.ico"
+          Assert-Exists "$installDir\Assets"
+          Assert-Exists "$installDir\Assets\templates"
+          Assert-Exists "$installDir\Assets\templates\payment.html"
+          Assert-Exists "$installDir\install.log"
+
+          Write-Host "`n=== REGISTRY: INSTALL INFO ==="
+          $reg = Get-ItemProperty "HKLM:\SOFTWARE\SIONYX" -ErrorAction SilentlyContinue
+          if (-not $reg) { Assert-Fail "Registry key HKLM:\SOFTWARE\SIONYX missing"; exit 1 }
+          Assert-Pass "Registry key HKLM:\SOFTWARE\SIONYX exists"
+          Assert-Equal "Install_Dir" $reg.Install_Dir "$installDir\"
+          Assert-Equal "Version" $reg.Version "0.0.1"
+          Assert-Equal "OrgId" $reg.OrgId "ci-test-org"
+          Assert-Equal "KioskUsername" $reg.KioskUsername "SionyxUser"
+          Assert-Equal "installed" $reg.installed 1
+
+          Write-Host "`n=== REGISTRY: FIREBASE CONFIG ==="
+          Assert-Equal "FirebaseApiKey" $reg.FirebaseApiKey $env:FIREBASE_API_KEY
+          Assert-Equal "FirebaseAuthDomain" $reg.FirebaseAuthDomain $env:FIREBASE_AUTH_DOMAIN
+          Assert-Equal "FirebaseProjectId" $reg.FirebaseProjectId $env:FIREBASE_PROJECT_ID
+          Assert-Equal "FirebaseDatabaseUrl" $reg.FirebaseDatabaseUrl $env:FIREBASE_DATABASE_URL
+          Assert-Equal "FirebaseStorageBucket" $reg.FirebaseStorageBucket $env:FIREBASE_STORAGE_BUCKET
+          Assert-Equal "FirebaseMessagingSenderId" $reg.FirebaseMessagingSenderId $env:FIREBASE_MESSAGING_SENDER_ID
+          Assert-Equal "FirebaseAppId" $reg.FirebaseAppId $env:FIREBASE_APP_ID
+          Assert-Equal "FirebaseMeasurementId" $reg.FirebaseMeasurementId $env:FIREBASE_MEASUREMENT_ID
+          Assert-Equal "firebaseConfigured" $reg.firebaseConfigured 1
+
+          Write-Host "`n=== REGISTRY: PAYMENT & SECURITY ==="
+          Assert-Equal "NedarimCallbackUrl" $reg.NedarimCallbackUrl $env:NEDARIM_CALLBACK_URL
+          Assert-Equal "AdminExitPassword" $reg.AdminExitPassword $env:ADMIN_EXIT_PASSWORD
+          Assert-Equal "paymentConfigured" $reg.paymentConfigured 1
+
+          Write-Host "`n=== REGISTRY: SHORTCUT MARKERS (HKCU) ==="
+          $hkcu = Get-ItemProperty "HKCU:\Software\SIONYX" -ErrorAction SilentlyContinue
+          if ($hkcu) {
+            Assert-Equal "DesktopShortcut" $hkcu.DesktopShortcut 1
+            Assert-Equal "StartMenuShortcut" $hkcu.StartMenuShortcut 1
+            Assert-Equal "StartMenuInstalled" $hkcu.StartMenuInstalled 1
+          } else {
+            Assert-Fail "HKCU:\Software\SIONYX key missing"
+          }
+
+          Write-Host "`n=== SHORTCUTS ==="
+          $userMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SIONYX"
+          $machineMenu = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\SIONYX"
+          $menuDir = if (Test-Path $userMenu) { $userMenu } elseif (Test-Path $machineMenu) { $machineMenu } else { $null }
+          if ($menuDir) {
+            Assert-Exists (Join-Path $menuDir "SIONYX.lnk")
+            Assert-Exists (Join-Path $menuDir "Uninstall SIONYX.lnk")
+          } else {
+            Assert-Warn "Start Menu folder not found at per-user or per-machine path"
+          }
+
+          Write-Host "`n=== USER ACCOUNT: SionyxUser ==="
+          $user = Get-LocalUser -Name "SionyxUser" -ErrorAction SilentlyContinue
+          if (-not $user) { Assert-Fail "SionyxUser account NOT created" }
+          else {
+            Assert-Pass "SionyxUser account exists"
+            Assert-Equal "Enabled" $user.Enabled $true
+            if ($user.PasswordExpires -eq $false -or $null -eq $user.PasswordExpires) {
+              Assert-Pass "PasswordExpires = False (or null)"
+            } else {
+              Assert-Warn "PasswordExpires = '$($user.PasswordExpires)' (wmic may be unavailable on Server)"
+            }
+
+            $inUsers = (Get-LocalGroupMember -Group "Users" -ErrorAction SilentlyContinue) |
+              Where-Object { $_.Name -like "*\SionyxUser" }
+            if ($inUsers) { Assert-Pass "SionyxUser is in 'Users' group" }
+            else { Assert-Fail "SionyxUser NOT in 'Users' group" }
+
+            $inAdmins = (Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue) |
+              Where-Object { $_.Name -like "*\SionyxUser" }
+            if (-not $inAdmins) { Assert-Pass "SionyxUser is NOT in 'Administrators'" }
+            else { Assert-Fail "SionyxUser IS in 'Administrators' (should not be)" }
+          }
+
+          Write-Host "`n=== USER PROFILE ==="
+          $profile = "C:\Users\SionyxUser"
+          if (Test-Path $profile) {
+            Assert-Pass "Profile directory exists"
+            Assert-Exists "$profile\.sionyx"
+            Assert-Exists "$profile\AppData\Local\SIONYX\logs"
+            $startup = "$profile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\SIONYX.lnk"
+            Assert-Exists $startup
+          } else {
+            Assert-Warn "Profile directory not created (deferred to first logon)"
+          }
+
+          Write-Host "`n=== SCHEDULED TASK ==="
+          $task = Get-ScheduledTask -TaskName "SIONYX Kiosk" -ErrorAction SilentlyContinue
+          if (-not $task) { Assert-Fail "Scheduled task 'SIONYX Kiosk' NOT found" }
+          else {
+            Assert-Pass "Scheduled task 'SIONYX Kiosk' exists"
+
+            $action = $task.Actions[0]
+            if ($action.Execute -like "*SionyxKiosk.exe") { Assert-Pass "Task action = SionyxKiosk.exe" }
+            else { Assert-Fail "Task action = '$($action.Execute)' (expected SionyxKiosk.exe)" }
+            Assert-Equal "Task argument" $action.Arguments "--kiosk"
+
+            $trigger = $task.Triggers[0]
+            Assert-Equal "Task trigger type" $trigger.CimClass.CimClassName "MSFT_TaskLogonTrigger"
+
+            $principal = $task.Principal
+            if ($principal.UserId -like "*SionyxUser") { Assert-Pass "Task principal = SionyxUser" }
+            else { Assert-Fail "Task principal = '$($principal.UserId)' (expected SionyxUser)" }
+            Assert-Equal "Task LogonType" $principal.LogonType "Interactive"
+            Assert-Equal "Task RunLevel" $principal.RunLevel "Limited"
+          }
+
+          Write-Host "`n=== BLANK PASSWORD LOGON ==="
+          $lsa = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -ErrorAction SilentlyContinue
+          Assert-Equal "LimitBlankPasswordUse" $lsa.LimitBlankPasswordUse 0
+
+          Write-Host "`n=== PER-USER KIOSK LOCKDOWN (SionyxUser hive) ==="
+          $ntuser = "C:\Users\SionyxUser\ntuser.dat"
+          if (Test-Path $ntuser) {
+            $hiveLoaded = $false
+            try {
+              reg load "HKU\CI_VERIFY" $ntuser 2>$null
+              if ($LASTEXITCODE -eq 0) { $hiveLoaded = $true }
+            } catch {}
+
+            if ($hiveLoaded) {
+              try {
+                $explorer = Get-ItemProperty "Registry::HKU\CI_VERIFY\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -ErrorAction SilentlyContinue
+                $system = Get-ItemProperty "Registry::HKU\CI_VERIFY\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -ErrorAction SilentlyContinue
+
+                $policies = @(
+                  @{ Name="NoRun"; Actual=$explorer.NoRun; Expected=1 },
+                  @{ Name="DisableRegistryTools"; Actual=$system.DisableRegistryTools; Expected=1 },
+                  @{ Name="DisableCMD"; Actual=$system.DisableCMD; Expected=2 },
+                  @{ Name="DisableTaskMgr"; Actual=$system.DisableTaskMgr; Expected=1 }
+                )
+                foreach ($p in $policies) {
+                  if ($p.Actual -eq $p.Expected) { Assert-Pass "SionyxUser $($p.Name) = $($p.Expected)" }
+                  else { Assert-Warn "SionyxUser $($p.Name) = '$($p.Actual)' (expected $($p.Expected), hive may not have flushed)" }
+                }
+              } finally {
+                [GC]::Collect(); [GC]::WaitForPendingFinalizers()
+                reg unload "HKU\CI_VERIFY" 2>$null
+              }
+            } else {
+              Assert-Warn "Could not load SionyxUser hive for policy check"
+            }
+          } else {
+            Assert-Warn "ntuser.dat not found — cannot verify per-user policies"
+          }
+
+          Write-Host "`n=== NO MACHINE-WIDE LOCKDOWN POLICIES ==="
+          $polSys = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -ErrorAction SilentlyContinue
+          $polExp = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -ErrorAction SilentlyContinue
+
+          foreach ($p in @("DisableRegistryTools","DisableCMD","DisableTaskMgr")) {
+            $v = $polSys.$p
+            if ($null -eq $v -or $v -eq 0) { Assert-Pass "No machine-wide $p" }
+            else { Assert-Fail "Machine-wide $p = $v (should not be set!)" }
+          }
+          $noRun = $polExp.NoRun
+          if ($null -eq $noRun -or $noRun -eq 0) { Assert-Pass "No machine-wide NoRun" }
+          else { Assert-Fail "Machine-wide NoRun = $noRun" }
+
+          Write-Host "`n=== ADD/REMOVE PROGRAMS ==="
+          $arp = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
+            Where-Object { $_.DisplayName -eq "SIONYX" }
+          if ($arp) {
+            Assert-Pass "SIONYX listed in Add/Remove Programs"
+            Assert-Equal "ARP Manufacturer" $arp.Publisher "SIONYX Technologies"
+          } else {
+            Assert-Fail "SIONYX NOT listed in Add/Remove Programs"
+          }
+
+          Write-Host "`n=========================================="
+          Write-Host "  PASS: $pass  |  FAIL: $fail  |  WARN: $warn"
+          Write-Host "=========================================="
+          if ($fail -gt 0) { throw "Installation verification failed with $fail failure(s)" }
+          Write-Host "ALL CHECKS PASSED"
+
+      - name: Dump install.log (custom action output)
+        if: always()
+        shell: pwsh
+        run: |
+          $log = "C:\Program Files\SIONYX\install.log"
+          if (Test-Path $log) {
+            Write-Host "=== install.log ==="
+            Get-Content $log
+          } else {
+            Write-Host "install.log not found (install may have failed before verification)"
+          }
+
+      - name: Uninstall MSI (silent)
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem sionyx-kiosk-wpf/installer/bin/x64/Release/*.msi)[0]
+          $logFile = Join-Path $env:RUNNER_TEMP "msi-uninstall.log"
+          $proc = Start-Process msiexec.exe `
+            -ArgumentList "/x `"$($msi.FullName)`" /qn /l*v `"$logFile`"" `
+            -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "`n=== UNINSTALL LOG (errors & actions) ==="
+            if (Test-Path $logFile) {
+              Get-Content $logFile | Select-String -Pattern '\[ERROR\]|\[FAIL\]|Return value 3|ActionStart|failed|exception' -SimpleMatch:$false |
+                Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
+              Write-Host "`n=== MSI uninstall log (last 40 lines) ==="
+              Get-Content $logFile | Select-Object -Last 40
+            }
+            throw "MSI uninstall failed with exit code $($proc.ExitCode)"
+          }
+          Write-Host "MSI uninstalled successfully"
+
+      - name: Verify uninstall cleanup
+        shell: pwsh
+        run: |
+          $pass = 0; $fail = 0; $warn = 0
+          function Assert-Pass($msg)  { $script:pass++; Write-Host "[PASS] $msg" }
+          function Assert-Fail($msg)  { $script:fail++; Write-Host "[FAIL] $msg" }
+          function Assert-Warn($msg)  { $script:warn++; Write-Host "[WARN] $msg" }
+          function Assert-Gone($path) {
+            if (-not (Test-Path $path)) { Assert-Pass "Removed: $path" }
+            else { Assert-Fail "Still exists: $path" }
+          }
+
+          $installDir = "C:\Program Files\SIONYX"
+
+          Write-Host "`n=== FILES REMOVED ==="
+          Assert-Gone "$installDir\SionyxKiosk.exe"
+          Assert-Gone "$installDir\app-logo.ico"
+          Assert-Gone "$installDir\Assets\templates\payment.html"
+
+          Write-Host "`n=== REGISTRY CLEANED ==="
+          $reg = Get-ItemProperty "HKLM:\SOFTWARE\SIONYX" -ErrorAction SilentlyContinue
+          if (-not $reg) {
+            Assert-Pass "HKLM:\SOFTWARE\SIONYX key removed"
+          } else {
+            $remaining = ($reg.PSObject.Properties | Where-Object { $_.Name -notlike "PS*" }).Name -join ", "
+            Assert-Fail "HKLM:\SOFTWARE\SIONYX still has values: $remaining"
+          }
+
+          $hkcu = Get-ItemProperty "HKCU:\Software\SIONYX" -ErrorAction SilentlyContinue
+          if (-not $hkcu) {
+            Assert-Pass "HKCU:\Software\SIONYX key removed"
+          } else {
+            Assert-Warn "HKCU:\Software\SIONYX still present (WiX removes per-user on uninstall)"
+          }
+
+          Write-Host "`n=== SHORTCUTS REMOVED ==="
+          $userMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SIONYX"
+          $machineMenu = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\SIONYX"
+          Assert-Gone (Join-Path $userMenu "SIONYX.lnk")
+          Assert-Gone (Join-Path $machineMenu "SIONYX.lnk")
+
+          Write-Host "`n=== USER ACCOUNT ==="
+          $user = Get-LocalUser -Name "SionyxUser" -ErrorAction SilentlyContinue
+          if (-not $user) { Assert-Pass "SionyxUser account removed" }
+          else { Assert-Fail "SionyxUser still exists" }
+
+          Write-Host "`n=== USER PROFILE ==="
+          if (-not (Test-Path "C:\Users\SionyxUser")) {
+            Assert-Pass "Profile directory C:\Users\SionyxUser removed"
+          } else {
+            Assert-Warn "Profile directory still exists (may require reboot)"
+          }
+
+          Write-Host "`n=== SCHEDULED TASK ==="
+          $task = Get-ScheduledTask -TaskName "SIONYX Kiosk" -ErrorAction SilentlyContinue
+          if (-not $task) { Assert-Pass "Scheduled task 'SIONYX Kiosk' removed" }
+          else { Assert-Fail "Scheduled task still exists" }
+
+          Write-Host "`n=== NO LEFTOVER POLICIES ==="
+          $polSys = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -ErrorAction SilentlyContinue
+          $polExp = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -ErrorAction SilentlyContinue
+          foreach ($p in @("DisableRegistryTools","DisableCMD","DisableTaskMgr")) {
+            $v = $polSys.$p
+            if ($null -eq $v -or $v -eq 0) { Assert-Pass "No leftover $p" }
+            else { Assert-Fail "Leftover $p = $v" }
+          }
+          $noRun = $polExp.NoRun
+          if ($null -eq $noRun -or $noRun -eq 0) { Assert-Pass "No leftover NoRun" }
+          else { Assert-Fail "Leftover NoRun = $noRun" }
+
+          Write-Host "`n=== ADD/REMOVE PROGRAMS ==="
+          $arp = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -eq "SIONYX" }
+          if (-not $arp) { Assert-Pass "SIONYX removed from Add/Remove Programs" }
+          else { Assert-Fail "SIONYX still listed in Add/Remove Programs" }
+
+          Write-Host "`n=========================================="
+          Write-Host "  PASS: $pass  |  FAIL: $fail  |  WARN: $warn"
+          Write-Host "=========================================="
+          if ($fail -gt 0) { throw "Uninstall verification failed with $fail failure(s)" }
+          Write-Host "ALL CHECKS PASSED"
+
+      - name: Upload MSI logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-logs
+          path: |
+            ${{ runner.temp }}/msi-install.log
+            ${{ runner.temp }}/msi-uninstall.log
+
+  # ── CI Gate (single required check for branch protection) ───
+  ci-gate:
+    runs-on: ubuntu-latest
+    needs: [web-lint, web-build, web-test, functions-tests, kiosk-tests, installer-test]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Job results: $results"
+          for r in $results; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "::error::One or more required jobs failed or were cancelled"
+              exit 1
+            fi
+          done
+          echo "All required jobs passed or were skipped"

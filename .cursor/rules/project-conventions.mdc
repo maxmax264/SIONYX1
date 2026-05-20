@@ -1,0 +1,57 @@
+---
+description: SIONYX project conventions - release workflow, shell, testing, and Makefile commands
+alwaysApply: true
+---
+
+# SIONYX Project Conventions
+
+## Repository Structure
+- `sionyx-web/` -- React web admin dashboard (Firebase Hosting)
+- `sionyx-kiosk-wpf/` -- C# WPF kiosk desktop app (.NET 8, WiX MSI installer)
+- `functions/` -- Firebase Cloud Functions (payment callback)
+- `Makefile` -- All build/test/deploy commands (run from repo root)
+
+## Shell Environment
+- User runs **PowerShell on Windows**. Do NOT use bash syntax.
+- No `&&` chaining -- use `;` or separate commands
+- No `head`/`tail` -- use `Select-Object -First N` / `Select-Object -Last N`
+- Git commit messages: use `$msg = @"..."@` then `git commit -m $msg`
+- For `firebase deploy --only`, quote the argument: `--only "hosting,database"`
+
+## Makefile Commands
+
+### Kiosk
+- `make run` -- Run desktop app (dotnet run)
+- `make test` -- Run all kiosk tests (dotnet test)
+
+### Web Admin
+- `make web-dev` -- Run dev server
+- `make web-test` -- Run tests
+- `make web-deploy` -- Build + deploy to Firebase (hosting, rules, functions)
+
+### Release (automated semver from conventional commits)
+- `make release` -- Auto-detect bump type from commits (recommended)
+- `make release-dry` -- Preview release without changes
+- `make release-patch` -- Force bug fix release (3.0.0 -> 3.0.1)
+- `make release-minor` -- Force feature release (3.0.0 -> 3.1.0)
+- `make release-major` -- Force breaking release (3.0.0 -> 4.0.0)
+- **NEVER bump version.json manually** -- `scripts/release/` handles it
+- Use **Conventional Commits**: `fix:`, `feat:`, `feat!:` / `BREAKING CHANGE`
+
+## Versioning Rules
+- **Version tags are ONLY for the kiosk app** (e.g., `v3.4.0`)
+- **Web app has NO version tags** -- auto-deploys on push to main via CI
+- Never create version tags manually -- `make release` or CI handles it
+- See `RELEASE.md` for full documentation
+
+## Testing
+- **Bug fixes follow TDD:** write failing test first, then implement fix, then commit
+- Each bug fix gets its own commit with clear explanation
+- Kiosk tests in `sionyx-kiosk-wpf/tests/SionyxKiosk.Tests/` using xUnit + FluentAssertions
+- Web tests use Vitest + @testing-library/react
+
+## Code Patterns
+- Web state management: Zustand stores
+- Web org context: always use `useOrgId()` hook, include `orgId` in `useEffect` deps
+- Kiosk architecture: MVVM with CommunityToolkit.Mvvm, DI via Microsoft.Extensions.Hosting
+- Kiosk services: singleton lifetime, reinitialize per user via `.Reinitialize(userId)`
