@@ -525,6 +525,12 @@ public class PrintMonitorService : BaseService, IDisposable
             Thread.Sleep(SPOOL_WAIT_INTERVAL_MS);
         }
 
+        // If copies still 1, do one final read to catch fast jobs (e.g. Notepad)
+        if (latest.Copies == 1)
+        {
+            var final = ReadJobDetails(printerName, jobId);
+            if (final.Copies > 1) latest = final;
+        }
         // Timeout — return best known, at least 1 page
         return latest with { Pages = Math.Max(1, latest.Pages) };
     }
