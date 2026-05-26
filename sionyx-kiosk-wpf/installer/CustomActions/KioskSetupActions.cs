@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
@@ -136,6 +136,13 @@ namespace SionyxInstaller
                         @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System",
                         "DisableTaskMgr", 1);
 
+                    // Ensure .txt ShellNew exists so "New > Text Document" appears in context menu
+                    using (var hku = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Registry64))
+                    using (var shellNewKey = hku.CreateSubKey($@"{tempHiveKey}\SOFTWARE\Classes\.txt\ShellNew"))
+                    {
+                        shellNewKey.SetValue("NullFile", "", RegistryValueKind.String);
+                        session.Log("[OK] .txt ShellNew NullFile set for SionyxUser");
+                    }
                     session.Log($"[OK] Security restrictions applied to {KioskUsername} only");
                 }
                 finally
@@ -238,6 +245,30 @@ namespace SionyxInstaller
                 else
                 {
                     session.Log("[INFO] Profile already exists");
+                }
+
+                // Ensure ProfileList registry entry exists regardless
+                string profileSid = GetUserSid(KioskUsername);
+                if (profileSid != null)
+                {
+                    string profileRegPath = $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{profileSid}";
+                    using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                    using (var profileKey = baseKey.CreateSubKey(profileRegPath, true))
+                    {
+                        if (profileKey.GetValue("ProfileImagePath") == null)
+                        {
+                            profileKey.SetValue("ProfileImagePath", $@"C:\Users\{KioskUsername}", RegistryValueKind.ExpandString);
+                            profileKey.SetValue("Flags", 0, RegistryValueKind.DWord);
+                            profileKey.SetValue("State", 0, RegistryValueKind.DWord);
+                            session.Log($"[OK] ProfileList registry entry created for SID {profileSid}");
+                            profileKey.SetValue("FullProfile", 1, RegistryValueKind.DWord);
+                            profileKey.SetValue("RunLogonScriptSync", 0, RegistryValueKind.DWord);
+                        }
+                        else
+                        {
+                            session.Log($"[OK] ProfileList registry entry already exists for SID {profileSid}");
+                        }
+                    }
                 }
 
                 string startupPath = Path.Combine(profilePath,
@@ -771,3 +802,6 @@ namespace SionyxInstaller
         }
     }
 }
+
+
+
