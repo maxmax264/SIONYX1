@@ -248,6 +248,33 @@ namespace SionyxInstaller
                 }
 
                 // Ensure ProfileList registry entry exists regardless
+                // Clean up stale ProfileList entries before creating new one
+                using (var baseKeyClean = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                using (var profileListKey = baseKeyClean.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList", true))
+                {
+                    if (profileListKey != null)
+                    {
+                        foreach (var subKeyName in profileListKey.GetSubKeyNames())
+                        {
+                            if (subKeyName.EndsWith(".bak"))
+                            {
+                                profileListKey.DeleteSubKeyTree(subKeyName, false);
+                                session.Log($"[OK] Removed stale ProfileList entry: {subKeyName}");
+                            }
+                            else
+                            {
+                                using (var sk = profileListKey.OpenSubKey(subKeyName))
+                                {
+                                    if (sk != null && sk.GetValue("ProfileImagePath") == null)
+                                    {
+                                        profileListKey.DeleteSubKeyTree(subKeyName, false);
+                                        session.Log($"[OK] Removed empty ProfileList entry: {subKeyName}");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 string profileSid = GetUserSid(KioskUsername);
                 if (profileSid != null)
                 {
