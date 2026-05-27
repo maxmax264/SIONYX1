@@ -576,7 +576,7 @@ public class PrintMonitorService : BaseService, IDisposable
 
             // XPS spool files start with "PK" (ZIP magic bytes 0x50 0x4B)
             bool isXps = header[0] == 0x50 && header[1] == 0x4B;
-            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} format={( isXps ? "XPS" : "EMF")} header={BitConverter.ToString(header)}{Environment.NewLine}");
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} format={(isXps ? "XPS" : "EMF")} header={BitConverter.ToString(header)} first64={BitConverter.ToString(System.IO.File.ReadAllBytes(splFile).Take(64).ToArray())}{Environment.NewLine}");
 
             if (isXps)
                 return ReadCopiesFromXpsSpl(splFile, jobId, logPath);
@@ -683,6 +683,28 @@ public class PrintMonitorService : BaseService, IDisposable
                 fs.Seek(sk, SeekOrigin.Current);
             }
             File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF records: {recordLog}{Environment.NewLine}");
+            // Samsung/PJL fallback: search for @PJL SET COPIES= in file
+            for (int _pjlRetry = 0; _pjlRetry < 5; _pjlRetry++)
+            {
+                try
+                {
+                    using var pjlFs = new FileStream(splFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var pjlSr = new System.IO.StreamReader(pjlFs, System.Text.Encoding.ASCII);
+                    var text = pjlSr.ReadToEnd();
+                    var match = System.Text.RegularExpressions.Regex.Match(text, @"@PJL\s+SET\s+COPIES\s*=\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int pjlCopies) && pjlCopies > 1)
+                    {
+                        File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} PJL COPIES={pjlCopies}{Environment.NewLine}");
+                        return pjlCopies;
+                    }
+                    break;
+                }
+                catch (IOException)
+                {
+                    File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} PJL retry {_pjlRetry+1}{Environment.NewLine}");
+                    System.Threading.Thread.Sleep(200);
+                }
+            }
             File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF: DEVMODE record not found. FileSize={fs.Length}{Environment.NewLine}");
         }
         catch (Exception ex)
