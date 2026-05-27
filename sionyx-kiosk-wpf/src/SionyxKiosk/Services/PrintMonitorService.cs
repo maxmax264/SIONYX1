@@ -667,7 +667,23 @@ public class PrintMonitorService : BaseService, IDisposable
                 if (fs.Position + skip > fs.Length) break;
                 fs.Seek(skip, SeekOrigin.Current);
             }
-            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF: DEVMODE record not found{Environment.NewLine}");
+            // Log all record IDs for debugging
+            fs.Seek(8, SeekOrigin.Begin);
+            var recordLog = new System.Text.StringBuilder();
+            int recCount = 0;
+            while (fs.Position <= fs.Length - 8 && recCount < 20)
+            {
+                var rID = br.ReadUInt32();
+                var rSize = br.ReadUInt32();
+                recordLog.Append($"ID=0x{rID:X8} Size={rSize} | ");
+                recCount++;
+                if (rID == 0) break;
+                var sk = (long)((rSize + 3) & ~3u);
+                if (sk < 1 || fs.Position + sk > fs.Length) break;
+                fs.Seek(sk, SeekOrigin.Current);
+            }
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF records: {recordLog}{Environment.NewLine}");
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF: DEVMODE record not found. FileSize={fs.Length}{Environment.NewLine}");
         }
         catch (Exception ex)
         {

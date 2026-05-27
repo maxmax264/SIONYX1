@@ -161,7 +161,7 @@ public partial class App : Application
                     sp.GetRequiredService<AuthService>(),
                     sp.GetRequiredService<OrganizationMetadataService>()));
                 services.AddTransient<MainViewModel>();
-                services.AddTransient<HomeViewModel>(sp =>
+                services.AddSingleton<HomeViewModel>(sp =>
                 {
                     var session = sp.GetRequiredService<SessionService>();
                     var chat = sp.GetRequiredService<ChatService>();
@@ -590,5 +590,6 @@ public partial class App : Application
         }
     }
 }
+
 
 
