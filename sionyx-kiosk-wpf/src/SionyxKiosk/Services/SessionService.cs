@@ -102,33 +102,22 @@ public class SessionService : BaseService, ISessionService
     {
         if (IsActive) return Error("Session already active");
 
-        // Fetch fresh user data from Firebase to get the latest remaining time
-        var freshTime = await FetchFreshRemainingTimeAsync();
-        if (freshTime.HasValue)
-            initialRemainingTime = freshTime.Value;
-
-        // Check time expiration
-        var expired = await CheckTimeExpirationAsync();
-        if (expired) return Error("הזמן שלך פג תוקף. אנא רכוש חבילה חדשה.");
-
-        if (initialRemainingTime <= 0) return Error("No time remaining");
-
-        // Clean up previous processes
-        await Task.Run(() =>
-        {
-            _processCleanup.CleanupUserProcesses();
-        });
-
-        // Mark session active in Firebase
+        // Run Firebase fetch and process cleanup in parallel
         var now = DateTime.Now.ToString("o");
-        var result = await Firebase.DbUpdateAsync($"users/{_userId}", new
+        var fetchTask = FetchAndValidateUserAsync(initialRemainingTime);
+        var cleanupTask = Task.Run(() => _processCleanup.CleanupUserProcesses());
+        await Task.WhenAll(fetchTask, cleanupTask);
+        var userCheck = fetchTask.Result;
+        if (!userCheck.Valid) return Error(userCheck.ErrorMessage!);
+        initialRemainingTime = userCheck.RemainingTime;
+
+        // Fire-and-forget session active update - dont block startup
+        _ = Firebase.DbUpdateAsync($"users/{_userId}", new
         {
             isSessionActive = true,
             sessionStartTime = now,
             updatedAt = now,
         });
-
-        if (!result.Success) return Error("Failed to start session");
 
         // Initialize local state
         SessionId = Guid.NewGuid().ToString("N");
@@ -275,54 +264,41 @@ public class SessionService : BaseService, ISessionService
         });
     }
 
-    private async Task<int?> FetchFreshRemainingTimeAsync()
+    private record UserValidationResult(bool Valid, int RemainingTime, string? ErrorMessage);
+    private async Task<UserValidationResult> FetchAndValidateUserAsync(int fallbackTime)
     {
         try
         {
             var result = await Firebase.DbGetAsync($"users/{_userId}");
-            if (!result.Success || result.Data is not JsonElement data || data.ValueKind == JsonValueKind.Null)
-                return null;
-
+            if (!result.Success || result.Data is not System.Text.Json.JsonElement data || data.ValueKind == System.Text.Json.JsonValueKind.Null)
+                return new(fallbackTime > 0, fallbackTime, fallbackTime <= 0 ? "No time remaining" : null);
+            var remainingTime = fallbackTime;
             if (data.TryGetProperty("remainingTime", out var rt) && rt.TryGetInt32(out var seconds))
             {
                 Logger.Information("Fresh remainingTime from Firebase: {Seconds}s", seconds);
-                return seconds;
+                remainingTime = seconds;
             }
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "Failed to fetch fresh remaining time, using local value");
-        }
-        return null;
-    }
-
-    private async Task<bool> CheckTimeExpirationAsync()
-    {
-        try
-        {
-            var result = await Firebase.DbGetAsync($"users/{_userId}");
-            if (!result.Success || result.Data is not JsonElement data || data.ValueKind == JsonValueKind.Null)
-                return false;
-
             var expiresAtStr = data.TryGetProperty("timeExpiresAt", out var te) ? te.GetString() : null;
-            if (string.IsNullOrEmpty(expiresAtStr)) return false;
-            if (!DateTime.TryParse(expiresAtStr, out var expiresAt)) return false;
-
-            if (DateTime.Now <= expiresAt) return false;
-
-            // Time expired - reset to 0
-            await Firebase.DbUpdateAsync($"users/{_userId}", new Dictionary<string, object?>
+            if (!string.IsNullOrEmpty(expiresAtStr) &&
+                DateTime.TryParse(expiresAtStr, out var expiresAt) &&
+                DateTime.Now > expiresAt)
             {
-                ["remainingTime"] = 0,
-                ["timeExpiresAt"] = null,
-                ["updatedAt"] = DateTime.Now.ToString("o"),
-            });
-            return true;
+                _ = Firebase.DbUpdateAsync($"users/{_userId}", new Dictionary<string, object?>
+                {
+                    ["remainingTime"] = 0,
+                    ["timeExpiresAt"] = null,
+                    ["updatedAt"] = DateTime.Now.ToString("o"),
+                });
+                return new(false, 0, "הזמן שלך פג תוקף. אנא רכוש חבילה חדשה.");
+            }
+            if (remainingTime <= 0)
+                return new(false, 0, "No time remaining");
+            return new(true, remainingTime, null);
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Error checking time expiration");
-            return false;
+            Logger.Warning(ex, "Failed to fetch user data, using local value");
+            return new(fallbackTime > 0, fallbackTime, fallbackTime <= 0 ? "No time remaining" : null);
         }
     }
 
