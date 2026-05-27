@@ -938,6 +938,11 @@ public class PrintMonitorService : BaseService, IDisposable
             {
                 _knownJobs[printer] = new HashSet<int>(jobIds);
             }
+            lock (_processedJobs)
+            {
+                foreach (var id in jobIds)
+                    _processedJobs.Add($"{printer}:{id}");
+            }
         }
     }
 
