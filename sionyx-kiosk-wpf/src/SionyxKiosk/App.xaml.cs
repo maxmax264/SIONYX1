@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -171,7 +171,8 @@ public partial class App : Application
                     var currentUser = auth.CurrentUser;
                     if (currentUser == null)
                         throw new InvalidOperationException("HomeViewModel requires a logged-in user. CurrentUser is null.");
-                    return new HomeViewModel(session, chat, hours, currentUser, announcements);
+                    var printMonitor = sp.GetRequiredService<PrintMonitorService>();
+                    return new HomeViewModel(session, chat, hours, currentUser, announcements, printMonitor);
                 });
                 services.AddTransient<PackagesViewModel>(sp =>
                 {
@@ -589,3 +590,4 @@ public partial class App : Application
         }
     }
 }
+

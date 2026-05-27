@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SionyxKiosk.Models;
@@ -14,6 +14,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     private readonly OperatingHoursService _operatingHours;
     private readonly AnnouncementService? _announcements;
     private readonly UserData _user;
+    private readonly PrintMonitorService? _printMonitor;
     private bool _disposed;
 
     [ObservableProperty] private string _remainingTime = "00:00:00";
@@ -53,7 +54,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
             PrimaryButtonText = value ? "מתחיל..." : "▶  התחל הפעלה";
     }
 
-    public HomeViewModel(SessionService session, ChatService chat, OperatingHoursService operatingHours, UserData user,
+    public HomeViewModel(SessionService session, ChatService chat, OperatingHoursService operatingHours, UserData user, PrintMonitorService? printMonitor = null,
         AnnouncementService? announcements = null)
     {
         _session = session;
@@ -61,6 +62,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         _operatingHours = operatingHours;
         _announcements = announcements;
         _user = user;
+        _printMonitor = printMonitor;
 
         WelcomeMessage = $"שלום, {_user.FullName}!";
         IsSessionActive = _session.IsActive;
@@ -69,6 +71,8 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         _session.TimeUpdated += OnTimeUpdated;
         _session.SessionStarted += OnSessionStarted;
         _session.SessionEnded += OnSessionEnded;
+        if (_printMonitor != null) _printMonitor.JobAllowed += OnPrintJobAllowed;
+        if (_printMonitor != null) _printMonitor.BudgetUpdated += OnPrintBudgetUpdated;
         _chat.MessagesReceived += OnMessagesReceived;
 
         _ = LoadUnreadCountAsync();
@@ -261,7 +265,19 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         _session.SessionStarted -= OnSessionStarted;
         _session.SessionEnded -= OnSessionEnded;
         _chat.MessagesReceived -= OnMessagesReceived;
+        if (_printMonitor != null) _printMonitor.JobAllowed -= OnPrintJobAllowed;
+        if (_printMonitor != null) _printMonitor.BudgetUpdated -= OnPrintBudgetUpdated;
 
         GC.SuppressFinalize(this);
     }
+    private void OnPrintJobAllowed(string doc, int pages, double cost, double remaining)
+    {
+        Application.Current?.Dispatcher.InvokeAsync(() => PrintBalance = remaining > 0 ? $"{remaining:F2} ₪" : "—");
+    }
+    private void OnPrintBudgetUpdated(double balance)
+    {
+        Application.Current?.Dispatcher.InvokeAsync(() => PrintBalance = balance > 0 ? $"{balance:F2} ₪" : "—");
+    }
 }
+
+

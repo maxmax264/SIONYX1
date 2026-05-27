@@ -511,10 +511,12 @@ public class PrintMonitorService : BaseService, IDisposable
         int lastPages = 0;
         int stableCount = 0;
         JobDetails latest = new("Unknown", 0, 1, false);
+        int bestCopies = 1;
 
         while (sw.ElapsedMilliseconds < SPOOL_WAIT_MAX_MS)
         {
             latest = ReadJobDetails(printerName, jobId);
+            if (latest.Copies > bestCopies) bestCopies = latest.Copies;
 
             if (latest.Pages > 0)
             {
@@ -541,7 +543,7 @@ public class PrintMonitorService : BaseService, IDisposable
             if (final.Copies > 1) latest = final;
         }
         // Timeout — return best known, at least 1 page
-        return latest with { Pages = Math.Max(1, latest.Pages) };
+        return latest with { Pages = Math.Max(1, latest.Pages), Copies = bestCopies };
     }
 
     // ==================== SPL COPIES READER ====================
