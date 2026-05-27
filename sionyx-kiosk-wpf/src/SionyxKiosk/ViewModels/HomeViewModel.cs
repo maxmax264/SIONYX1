@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SionyxKiosk.Models;
+using System.Windows;
 using SionyxKiosk.Services;
 
 namespace SionyxKiosk.ViewModels;
@@ -279,5 +280,6 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         Application.Current?.Dispatcher.InvokeAsync(() => PrintBalance = balance > 0 ? $"{balance:F2} ₪" : "—");
     }
 }
+
 
 

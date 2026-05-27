@@ -172,7 +172,7 @@ public partial class App : Application
                     if (currentUser == null)
                         throw new InvalidOperationException("HomeViewModel requires a logged-in user. CurrentUser is null.");
                     var printMonitor = sp.GetRequiredService<PrintMonitorService>();
-                    return new HomeViewModel(session, chat, hours, currentUser, announcements, printMonitor);
+                    return new HomeViewModel(session, chat, hours, currentUser, printMonitor, announcements);
                 });
                 services.AddTransient<PackagesViewModel>(sp =>
                 {
@@ -590,4 +590,5 @@ public partial class App : Application
         }
     }
 }
+
 
