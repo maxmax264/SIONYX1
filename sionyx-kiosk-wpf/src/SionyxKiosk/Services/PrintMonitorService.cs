@@ -444,13 +444,22 @@ public class PrintMonitorService : BaseService, IDisposable
                         var devMode = Marshal.PtrToStructure<DEVMODEW>(info.pDevMode);
                         File.AppendAllText(@"C:\Users\Public\SIONYX_DEBUG.txt",
                             $"[{DateTime.Now:HH:mm:ss}] job={jobId} dmCopies={devMode.dmCopies} TotalPages={info.TotalPages} Status={info.Status}{Environment.NewLine}");
-                        if (devMode.dmCopies > 1)
+                        // Windows 11 XPS driver bug: dmCopies sometimes contains
+                        // page count instead of copy count (e.g. Notepad sends dmCopies=51
+                        // for a 1-copy job). If dmCopies seems unreasonably large relative
+                        // to TotalPages, fall back to SPL file which is always accurate.
+                        var splCopies = ReadCopiesFromSpl(jobId);
+                        if (devMode.dmCopies > 1 && (info.TotalPages == 0 || devMode.dmCopies <= info.TotalPages * 100))
                         {
-                            copies = devMode.dmCopies;
+                            copies = splCopies > 1 ? splCopies : devMode.dmCopies;
+                        }
+                        else if (splCopies > 1)
+                        {
+                            copies = splCopies;
                         }
                         else
                         {
-                            copies = ReadCopiesFromSpl(jobId);
+                            copies = 1;
                         }
 
                         // Color detection: only trust dmColor when dmFields
