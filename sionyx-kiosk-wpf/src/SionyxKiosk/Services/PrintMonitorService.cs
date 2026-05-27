@@ -1,3 +1,4 @@
+﻿using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -440,8 +441,16 @@ public class PrintMonitorService : BaseService, IDisposable
                     try
                     {
                         var devMode = Marshal.PtrToStructure<DEVMODEW>(info.pDevMode);
-                        if (devMode.dmCopies > 0)
+                        File.AppendAllText(@"C:\Users\Public\SIONYX_DEBUG.txt",
+                            $"[{DateTime.Now:HH:mm:ss}] job={jobId} dmCopies={devMode.dmCopies} TotalPages={info.TotalPages} Status={info.Status}{Environment.NewLine}");
+                        if (devMode.dmCopies > 1)
+                        {
                             copies = devMode.dmCopies;
+                        }
+                        else
+                        {
+                            copies = ReadCopiesFromSpl(jobId);
+                        }
 
                         // Color detection: only trust dmColor when dmFields
                         // explicitly includes DM_COLOR. Many drivers leave
@@ -533,6 +542,136 @@ public class PrintMonitorService : BaseService, IDisposable
         }
         // Timeout — return best known, at least 1 page
         return latest with { Pages = Math.Max(1, latest.Pages) };
+    }
+
+    // ==================== SPL COPIES READER ====================
+
+    /// <summary>
+    /// Read copies from SPL file — supports both EMF and XPS formats.
+    /// EMF: reads dmCopies from EMRI_DEVMODE record.
+    /// XPS: reads JobCopiesAllDocuments from PrintTicket XML inside ZIP.
+    /// Workaround for Word bug where GetJob always returns dmCopies=1.
+    /// </summary>
+    private static int ReadCopiesFromSpl(int jobId)
+    {
+        var logPath = "C:\\Users\\Public\\SIONYX_DEBUG.txt";
+        try
+        {
+            var spoolDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                @"spool\PRINTERS");
+            var splFile = Path.Combine(spoolDir, $"{jobId:D5}.SPL");
+            if (!File.Exists(splFile))
+            {
+                File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} SPL not found{Environment.NewLine}");
+                return 1;
+            }
+
+            // Detect format by reading first 4 bytes
+            byte[] header = new byte[4];
+            using (var fs = new FileStream(splFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                fs.Read(header, 0, 4);
+
+            // XPS spool files start with "PK" (ZIP magic bytes 0x50 0x4B)
+            bool isXps = header[0] == 0x50 && header[1] == 0x4B;
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} format={( isXps ? "XPS" : "EMF")} header={BitConverter.ToString(header)}{Environment.NewLine}");
+
+            if (isXps)
+                return ReadCopiesFromXpsSpl(splFile, jobId, logPath);
+            else
+                return ReadCopiesFromEmfSpl(splFile, jobId, logPath);
+        }
+        catch (Exception ex)
+        {
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} ERROR: {ex.Message}{Environment.NewLine}");
+            Log.Debug("ReadCopiesFromSpl failed job {J}: {E}", jobId, ex.Message);
+        }
+        return 1;
+    }
+
+    private static int ReadCopiesFromXpsSpl(string splFile, int jobId, string logPath)
+    {
+        try
+        {
+            using var zip = System.IO.Compression.ZipFile.OpenRead(splFile);
+            foreach (var entry in zip.Entries)
+            {
+                // PrintTicket is usually in a file ending with .xml or containing "PrintTicket"
+                if (!entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) continue;
+                using var stream = entry.Open();
+                using var reader = new System.IO.StreamReader(stream);
+                var xml = reader.ReadToEnd();
+                if (!xml.Contains("JobCopiesAllDocuments")) continue;
+
+                // Parse <psf:Value ...>7</psf:Value> after JobCopiesAllDocuments
+                var idx = xml.IndexOf("JobCopiesAllDocuments");
+                if (idx < 0) continue;
+                var valueStart = xml.IndexOf("<psf:Value", idx);
+                if (valueStart < 0) continue;
+                var valueEnd = xml.IndexOf("</psf:Value>", valueStart);
+                if (valueEnd < 0) continue;
+                var inner = xml.Substring(valueStart, valueEnd - valueStart);
+                var gt = inner.LastIndexOf('>');
+                if (gt < 0) continue;
+                var numStr = inner.Substring(gt + 1).Trim();
+                if (int.TryParse(numStr, out int copies) && copies > 1)
+                {
+                    File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} XPS JobCopiesAllDocuments={copies} entry={entry.FullName}{Environment.NewLine}");
+                    return copies;
+                }
+            }
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} XPS: JobCopiesAllDocuments not found{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} XPS parse error: {ex.Message}{Environment.NewLine}");
+        }
+        return 1;
+    }
+
+    private static int ReadCopiesFromEmfSpl(string splFile, int jobId, string logPath)
+    {
+        try
+        {
+            using var fs = new FileStream(splFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var br = new BinaryReader(fs);
+            if (fs.Length < 16) return 1;
+
+            // Skip EMF-SPL header (8 bytes: signature + version)
+            br.ReadUInt32();
+            br.ReadUInt32();
+
+            while (fs.Position <= fs.Length - 8)
+            {
+                var ulID   = br.ReadUInt32();
+                var cjSize = br.ReadUInt32();
+                if (ulID == 0x00000000) break;
+
+                if (ulID == 0x00000003 && cjSize >= 88)
+                {
+                    int toRead = (int)Math.Min(cjSize, 128);
+                    var dm = br.ReadBytes(toRead);
+                    if (dm.Length >= 88)
+                    {
+                        var copies = BitConverter.ToInt16(dm, 86);
+                        File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF dmCopies[86]={copies}{Environment.NewLine}");
+                        Log.Debug("EMF SPL dmCopies={C} for job {J}", copies, jobId);
+                        return copies > 1 ? copies : 1;
+                    }
+                    break;
+                }
+
+                var skip = (long)((cjSize + 3) & ~3u);
+                if (fs.Position + skip > fs.Length) break;
+                fs.Seek(skip, SeekOrigin.Current);
+            }
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF: DEVMODE record not found{Environment.NewLine}");
+        }
+        catch (Exception ex)
+        {
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF parse error: {ex.Message}{Environment.NewLine}");
+        }
+        return 1;
     }
 
     // ==================== JOB CONTROL (P/Invoke) ====================
@@ -831,7 +970,28 @@ public class PrintMonitorService : BaseService, IDisposable
 
         // STEP 2: Wait for spooling, then read accurate details from DEVMODE
         var details = WaitForJobDetails(printerName, jobId);
+        // If DocName is Unknown, DEVMODE was not ready — retry up to 3 times
+        var initialCopies = details.Copies;
+        for (int _retry = 0; _retry < 3 && details.DocName == "Unknown" && details.Copies == 1; _retry++)
+        {
+            Thread.Sleep(300);
+            var retryDetails = ReadJobDetails(printerName, jobId);
+            if (retryDetails.Copies > 1 || retryDetails.DocName != "Unknown")
+                details = retryDetails;
+        }
+        if (details.Copies == 1 && initialCopies > 1) details = details with { Copies = initialCopies };
 
+        File.AppendAllText(@"C:\Users\Public\SIONYX_DEBUG.txt",
+            $"[{DateTime.Now:HH:mm:ss}] *** JOB SUMMARY ***{Environment.NewLine}" +
+            $"  JobId      : {jobId}{Environment.NewLine}" +
+            $"  Document   : {details.DocName}{Environment.NewLine}" +
+            $"  Printer    : {printerName}{Environment.NewLine}" +
+            $"  Pages      : {details.Pages}{Environment.NewLine}" +
+            $"  Copies     : {details.Copies}{Environment.NewLine}" +
+            $"  Billable   : {details.Pages * details.Copies}{Environment.NewLine}" +
+            $"  Color      : {details.IsColor}{Environment.NewLine}" +
+            $"  Paused     : {paused}{Environment.NewLine}" +
+            $"-------------------{Environment.NewLine}");
         var billablePages = details.Pages * details.Copies;
         var cost = CalculateCost(details.Pages, details.Copies, details.IsColor);
 
@@ -896,3 +1056,13 @@ public class PrintMonitorService : BaseService, IDisposable
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
