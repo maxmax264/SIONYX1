@@ -698,7 +698,7 @@ public class PrintMonitorService : BaseService, IDisposable
                     using var pjlFs = new FileStream(splFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var pjlSr = new System.IO.StreamReader(pjlFs, System.Text.Encoding.ASCII);
                     var text = pjlSr.ReadToEnd();
-                    var match = System.Text.RegularExpressions.Regex.Match(text, @"@PJL\s+SET\s+COPIES\s*=\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    var match = System.Text.RegularExpressions.Regex.Match(text, @"@PJL\s+SET\s+(?:COPIES|QTY)\s*=\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                     if (match.Success && int.TryParse(match.Groups[1].Value, out int pjlCopies) && pjlCopies > 1)
                     {
                         File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} PJL COPIES={pjlCopies}{Environment.NewLine}");
@@ -1103,6 +1103,7 @@ public class PrintMonitorService : BaseService, IDisposable
         }
     }
 }
+
 
 
 
