@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <ComponentGroup Id="PublishFiles" Directory="INSTALLFOLDER">
+      <Component Id="PF1" Guid="*"><File Source="$(var.PublishDir)\Microsoft.Web.WebView2.Core.xml" /></Component>
+      <Component Id="PF2" Guid="*"><File Source="$(var.PublishDir)\Microsoft.Web.WebView2.WinForms.xml" /></Component>
+      <Component Id="PF3" Guid="*"><File Source="$(var.PublishDir)\Microsoft.Web.WebView2.Wpf.xml" /></Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

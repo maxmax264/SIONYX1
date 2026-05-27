@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Serilog;
 using SionyxKiosk.ViewModels;
 using SionyxKiosk.Views.Dialogs;
 using SionyxKiosk.Views.Windows;
@@ -11,6 +12,7 @@ public partial class HomePage : Page
 {
     private readonly HomeViewModel _vm;
     private readonly IServiceProvider _services;
+    private System.ComponentModel.PropertyChangedEventHandler? _propChangedHandler;
 
     public HomePage(HomeViewModel viewModel, IServiceProvider services)
     {
@@ -22,21 +24,34 @@ public partial class HomePage : Page
         Resources["InverseBoolToVis"] = new InverseBoolToVisibilityConverter();
         InitializeComponent();
 
-        viewModel.PropertyChanged += (_, e) =>
+        _propChangedHandler = (_, e) =>
         {
             if (e.PropertyName == nameof(HomeViewModel.UnreadMessages))
                 UpdateMessageCard(viewModel.UnreadMessages);
             if (e.PropertyName == nameof(HomeViewModel.HasAnnouncements))
                 UpdateAnnouncementsSection();
         };
+        viewModel.PropertyChanged += _propChangedHandler;
 
         viewModel.ViewMessagesRequested += OpenMessageDialog;
         viewModel.NavigateToPackagesRequested += NavigateToPackages;
         viewModel.SessionStartedSuccessfully += OnSessionStarted;
         viewModel.ResumeSessionRequested += OnResumeSession;
 
+        Unloaded += OnPageUnloaded;
+
         UpdateMessageCard(viewModel.UnreadMessages);
         UpdateAnnouncementsSection();
+    }
+
+    private void OnPageUnloaded(object sender, RoutedEventArgs e)
+    {
+        Log.Debug("[HOME] HomePage.Unloaded — unsubscribing events from HomeViewModel");
+        _vm.PropertyChanged -= _propChangedHandler;
+        _vm.ViewMessagesRequested -= OpenMessageDialog;
+        _vm.NavigateToPackagesRequested -= NavigateToPackages;
+        _vm.SessionStartedSuccessfully -= OnSessionStarted;
+        _vm.ResumeSessionRequested -= OnResumeSession;
     }
 
     private void UpdateMessageCard(int count)

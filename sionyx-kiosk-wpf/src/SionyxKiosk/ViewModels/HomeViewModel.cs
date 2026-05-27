@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SionyxKiosk.Models;
 using System.Windows;
+using Serilog;
 using SionyxKiosk.Services;
 
 namespace SionyxKiosk.ViewModels;
@@ -115,10 +116,15 @@ public partial class HomeViewModel : ObservableObject, IDisposable
             if (result.IsSuccess)
             {
                 IsSessionActive = true;
+                Log.Information("[SESSION] Session STARTED successfully for user={User} remainingTime={Time}",
+                    _user.FullName, _user.RemainingTime);
                 SessionStartedSuccessfully?.Invoke();
             }
             else
+            {
+                Log.Warning("[SESSION] Session START failed: {Error}", result.Error);
                 ErrorMessage = result.Error ?? "שגיאה";
+            }
         }
         catch (Exception ex)
         {
@@ -140,12 +146,13 @@ public partial class HomeViewModel : ObservableObject, IDisposable
 
         try
         {
+            Log.Information("[SESSION] Ending session for user={User}", _user.FullName);
             await _session.EndSessionAsync("user");
             IsSessionActive = false;
 
-            // Use the session's authoritative remaining time (synced to Firebase)
-            // instead of _user.RemainingTime which may be stale from login
             _user.RemainingTime = Math.Max(0, _session.RemainingTime);
+            Log.Information("[SESSION] Session ENDED - remainingTime={Time} printBalance={Balance}",
+                _user.RemainingTime, _user.PrintBalance);
             UpdateStats();
         }
         catch (Exception ex)
@@ -261,6 +268,8 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        Log.Warning("[HVM] HomeViewModel.Dispose() called — caller: {Caller}",
+            new System.Diagnostics.StackTrace(1, false).ToString().Split('\n')[0].Trim());
 
         _session.TimeUpdated -= OnTimeUpdated;
         _session.SessionStarted -= OnSessionStarted;
@@ -273,10 +282,15 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     }
     private void OnPrintJobAllowed(string doc, int pages, double cost, double remaining)
     {
+        Log.Debug("[HVM] OnPrintJobAllowed doc={Doc} pages={Pages} cost={Cost} remaining={Remaining}",
+            doc, pages, cost, remaining);
+        _user.PrintBalance = remaining;
         Application.Current?.Dispatcher.InvokeAsync(() => PrintBalance = remaining > 0 ? $"{remaining:F2} ₪" : "—");
     }
     private void OnPrintBudgetUpdated(double balance)
     {
+        Log.Debug("[HVM] OnPrintBudgetUpdated balance={Balance}", balance);
+        _user.PrintBalance = balance;
         Application.Current?.Dispatcher.InvokeAsync(() => PrintBalance = balance > 0 ? $"{balance:F2} ₪" : "—");
     }
 }
