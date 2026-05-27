@@ -73,6 +73,7 @@ public class SystemServicesManager
         });
 
         _ = _operatingHours.LoadSettingsAsync();
+        _ = _printMonitor.PreloadPricingAsync();
 
         if (isKiosk)
         {

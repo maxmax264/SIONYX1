@@ -213,6 +213,7 @@ public class PrintMonitorService : BaseService, IDisposable
 
     // Pricing
     private double _bwPrice = 1.0;
+    private bool _isPricingLoaded;
     private double _colorPrice = 3.0;
 
     // Budget cache
@@ -747,8 +748,10 @@ public class PrintMonitorService : BaseService, IDisposable
 
     // ==================== PRICING ====================
 
+    public Task PreloadPricingAsync() => LoadPricingAsync();
     private async Task LoadPricingAsync()
     {
+        if (_isPricingLoaded) return;
         try
         {
             var result = await Firebase.DbGetAsync("metadata");
@@ -756,6 +759,7 @@ public class PrintMonitorService : BaseService, IDisposable
             {
                 _bwPrice = data.TryGetProperty("blackAndWhitePrice", out var bw) && bw.TryGetDouble(out var bwVal) ? bwVal : 1.0;
                 _colorPrice = data.TryGetProperty("colorPrice", out var c) && c.TryGetDouble(out var cVal) ? cVal : 3.0;
+                _isPricingLoaded = true;
                 Logger.Information("Pricing loaded from DB: B&W={Bw}₪/page, Color={Color}₪/page", _bwPrice, _colorPrice);
             }
             else
