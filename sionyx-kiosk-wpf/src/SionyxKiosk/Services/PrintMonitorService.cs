@@ -683,6 +683,13 @@ public class PrintMonitorService : BaseService, IDisposable
                 fs.Seek(sk, SeekOrigin.Current);
             }
             File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} EMF records: {recordLog}{Environment.NewLine}");
+            // Log full PJL content for debugging
+            try
+            {
+                var fullText = System.IO.File.ReadAllText(splFile, System.Text.Encoding.ASCII);
+                File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} PJL_CONTENT={fullText.Replace(Environment.NewLine, "|")}{Environment.NewLine}");
+            }
+            catch (Exception pjlEx) { File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] job={jobId} PJL_READ_ERR={pjlEx.Message}{Environment.NewLine}"); }
             // Samsung/PJL fallback: search for @PJL SET COPIES= in file
             for (int _pjlRetry = 0; _pjlRetry < 5; _pjlRetry++)
             {
