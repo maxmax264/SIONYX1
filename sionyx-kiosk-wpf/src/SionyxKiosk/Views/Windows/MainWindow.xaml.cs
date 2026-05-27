@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using SionyxKiosk.ViewModels;
 using SionyxKiosk.Views.Pages;
+using Serilog;
 
 namespace SionyxKiosk.Views.Windows;
 
@@ -72,10 +73,17 @@ public partial class MainWindow : Window
 
         try
         {
-            // Dispose previous page's ViewModel if it implements IDisposable.
-            // This prevents event subscription leaks on singleton services.
-            if (_currentPage?.DataContext is IDisposable disposableVm)
+            // Dispose previous page's ViewModel if it implements IDisposable,
+            // BUT skip HomeViewModel — it is a singleton and must stay alive.
+            if (_currentPage?.DataContext is IDisposable disposableVm
+                && _currentPage.DataContext is not HomeViewModel)
+            {
+                Log.Debug("[NAV] Disposing ViewModel {Type}", disposableVm.GetType().Name);
                 disposableVm.Dispose();
+            }
+
+            Log.Information("[NAV] NavigateTo={Page} prev={Prev}", page,
+                _currentPage?.GetType().Name ?? "none");
 
             var pageInstance = page switch
             {
@@ -90,6 +98,8 @@ public partial class MainWindow : Window
             if (pageInstance is Page p)
             {
                 _currentPage = p;
+                Log.Debug("[NAV] Navigated to {Page} VM={VM}", page,
+                    p.DataContext?.GetType().Name ?? "null");
                 // Set Content directly instead of Navigate() to avoid
                 // WPF Frame journal accumulation (keeps all old pages in memory).
                 ContentFrame.Content = p;
