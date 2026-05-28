@@ -43,7 +43,6 @@ public class SessionService : BaseService, ISessionService
     private bool _warned1Min;
     // Live sync from Firebase
     private SseListener? _remainingTimeListener;
-    private SseListener? _idleRemainingTimeListener;
     private bool _isFirstRemainingTimeEvent = true;
 
     // Events (replace PyQt signals)
@@ -99,13 +98,6 @@ public class SessionService : BaseService, ISessionService
     {
         _userId = userId;
         Logger.Information("Session service re-initialized for user: {UserId}", userId);
-        // Start idle listener so dashboard updates show immediately even without active session
-        _idleRemainingTimeListener?.Stop();
-        _isFirstRemainingTimeEvent = true;
-        _idleRemainingTimeListener = Firebase.DbListen(
-            $"users/{_userId}/remainingTime",
-            OnRemainingTimeUpdated);
-        Logger.Information("[SSE] Started idle remainingTime listener for user {UserId}", userId);
     }
 
     /// <summary>Start a new session with the user's remaining time.</summary>
@@ -150,9 +142,7 @@ public class SessionService : BaseService, ISessionService
 
         // Start operating hours
         OperatingHours.StartMonitoring();
-        // Stop idle listener and start session listener
-        _idleRemainingTimeListener?.Stop();
-        _idleRemainingTimeListener = null;
+        // Listen for live remainingTime updates from Firebase
         _isFirstRemainingTimeEvent = true;
         _remainingTimeListener = Firebase.DbListen(
             $"users/{_userId}/remainingTime",
@@ -176,11 +166,6 @@ public class SessionService : BaseService, ISessionService
         _syncTimer.Stop();
         _remainingTimeListener?.Stop();
         _remainingTimeListener = null;
-        // Restart idle listener so dashboard updates show after session ends
-        _isFirstRemainingTimeEvent = true;
-        _idleRemainingTimeListener = Firebase.DbListen(
-            $"users/{_userId}/remainingTime",
-            OnRemainingTimeUpdated);
 
         // Stop operating hours monitoring
         OperatingHours.StopMonitoring();
