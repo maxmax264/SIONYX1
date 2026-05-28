@@ -214,7 +214,7 @@ public partial class App : Application
                     var vm = sp.GetRequiredService<MainViewModel>();
                     return new MainWindow(vm, sp);
                 });
-                services.AddSingleton<HomePage>(sp =>
+                services.AddTransient<HomePage>(sp =>
                 {
                     var vm = sp.GetRequiredService<HomeViewModel>();
                     return new HomePage(vm, sp);
