@@ -30,7 +30,6 @@ public class ProcessRestrictionService : IDisposable
     private readonly HashSet<string> _blacklist;
     private readonly DispatcherTimer _checkTimer;
     private readonly HashSet<int> _recentlyBlocked = new();
-    private readonly HashSet<int> _permanentlyFailed = new();
 
     public bool Enabled { get; set; }
     public bool IsActive => _checkTimer.IsEnabled && Enabled;
@@ -95,7 +94,6 @@ public class ProcessRestrictionService : IDisposable
                     var pid = proc.Id;
 
                     if (_recentlyBlocked.Contains(pid)) continue;
-                    if (_permanentlyFailed.Contains(pid)) continue;
                     if (!_blacklist.Contains(name)) continue;
 
                     TerminateProcess(proc, name);
@@ -141,14 +139,12 @@ public class ProcessRestrictionService : IDisposable
         catch (System.ComponentModel.Win32Exception)
         {
             _recentlyBlocked.Add(proc.Id);
-            _permanentlyFailed.Add(proc.Id);
-            Logger.Warning("Access denied terminating {Name} (PID:{Pid}) — will not retry.", name, proc.Id);
+            Logger.Warning("Access denied terminating {Name}. User may be admin.", name);
             ErrorOccurred?.Invoke($"Cannot terminate {name} - access denied");
         }
         catch (Exception ex)
         {
-            _permanentlyFailed.Add(proc.Id);
-            Logger.Error("Error terminating {Name} (PID:{Pid}) — will not retry: {Error}", name, proc.Id, ex.Message);
+            Logger.Error("Error terminating {Name}: {Error}", name, ex.Message);
             ErrorOccurred?.Invoke($"Error blocking {name}");
         }
     }
