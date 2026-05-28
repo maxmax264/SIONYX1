@@ -280,7 +280,17 @@ public class SessionService : BaseService, ISessionService
         {
             if (_isFirstRemainingTimeEvent) { _isFirstRemainingTimeEvent = false; return; }
             if (data.Value.ValueKind == JsonValueKind.Null) return;
-            if (!data.Value.TryGetInt32(out var newTime)) return;
+            int newTime;
+            if (data.Value.ValueKind == JsonValueKind.Number)
+            {
+                if (!data.Value.TryGetInt32(out newTime)) return;
+            }
+            else if (data.Value.ValueKind == JsonValueKind.Object &&
+                     data.Value.TryGetProperty("remainingTime", out var rt))
+            {
+                if (!rt.TryGetInt32(out newTime)) return;
+            }
+            else return;
             if (newTime == RemainingTime) return;
             Logger.Information("[SESSION] Live remainingTime update: {Old}s -> {New}s", RemainingTime, newTime);
             _initialRemainingTime = newTime;

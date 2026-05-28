@@ -220,9 +220,6 @@ public class PrintMonitorService : BaseService, IDisposable
     private double? _cachedBudget;
     private DateTime? _budgetCacheTime;
     private const int BudgetCacheTtlSec = 30;
-    // Live budget sync from Firebase
-    private SseListener? _budgetListener;
-    private bool _isFirstBudgetEvent = true;
 
     // Events
     public event Action<string, int, double, double>? JobAllowed;   // doc, pages, cost, remaining
@@ -281,11 +278,6 @@ public class PrintMonitorService : BaseService, IDisposable
         };
         _pollThread.Start();
 
-        // Listen for live printBalance updates from Firebase (e.g. admin tops up)
-        _isFirstBudgetEvent = true;
-        _budgetListener = Firebase.DbListen(
-            $"users/{_userId}/printBalance",
-            OnPrintBalanceUpdated);
         Logger.Information("Print monitor started");
     }
 
@@ -296,8 +288,6 @@ public class PrintMonitorService : BaseService, IDisposable
         Logger.Information("Stopping print monitor");
         _isMonitoring = false;
         _stopRequested = true;
-        _budgetListener?.Stop();
-        _budgetListener = null;
 
         _notificationThread?.Join(TimeSpan.FromSeconds(3));
         _notificationThread = null;
@@ -799,23 +789,6 @@ public class PrintMonitorService : BaseService, IDisposable
         return pages * copies * (isColor ? _colorPrice : _bwPrice);
     }
 
-    private void OnPrintBalanceUpdated(string eventType, JsonElement? data)
-    {
-        if (eventType != "put" || data == null) return;
-        try
-        {
-            if (_isFirstBudgetEvent) { _isFirstBudgetEvent = false; return; }
-            if (data.Value.ValueKind == JsonValueKind.Null) return;
-            if (!data.Value.TryGetDouble(out var newBalance)) return;
-            if (_cachedBudget.HasValue && Math.Abs(_cachedBudget.Value - newBalance) < 0.001) return;
-            Logger.Information("[PRINT] Live printBalance update from Firebase: {Old} -> {New}",
-                _cachedBudget, newBalance);
-            _cachedBudget = newBalance;
-            _budgetCacheTime = DateTime.UtcNow;
-            DispatchEvent(() => BudgetUpdated?.Invoke(newBalance));
-        }
-        catch (Exception ex) { Logger.Error(ex, "OnPrintBalanceUpdated error"); }
-    }
     // ==================== BUDGET ====================
 
     private async Task<double> GetUserBudgetAsync(bool forceRefresh = false)
