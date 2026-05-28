@@ -41,6 +41,9 @@ public class SessionService : BaseService, ISessionService
     // Warning flags
     private bool _warned5Min;
     private bool _warned1Min;
+    // Live sync from Firebase
+    private SseListener? _remainingTimeListener;
+    private bool _isFirstRemainingTimeEvent = true;
 
     // Events (replace PyQt signals)
     public event Action? SessionStarted;
@@ -155,6 +158,8 @@ public class SessionService : BaseService, ISessionService
         // Stop timers first (prevents re-entry from countdown tick)
         _countdownTimer.Stop();
         _syncTimer.Stop();
+        _remainingTimeListener?.Stop();
+        _remainingTimeListener = null;
 
         // Stop operating hours monitoring
         OperatingHours.StopMonitoring();
@@ -268,6 +273,24 @@ public class SessionService : BaseService, ISessionService
         });
     }
 
+    private void OnRemainingTimeUpdated(string eventType, JsonElement? data)
+    {
+        if (eventType != "put" || data == null) return;
+        try
+        {
+            if (_isFirstRemainingTimeEvent) { _isFirstRemainingTimeEvent = false; return; }
+            if (data.Value.ValueKind == JsonValueKind.Null) return;
+            if (!data.Value.TryGetInt32(out var newTime)) return;
+            if (newTime == RemainingTime) return;
+            Logger.Information("[SESSION] Live remainingTime update: {Old}s -> {New}s", RemainingTime, newTime);
+            _initialRemainingTime = newTime;
+            StartTime = DateTime.UtcNow;
+            TimeUsed = 0;
+            RemainingTime = newTime;
+            TimeUpdated?.Invoke(RemainingTime);
+        }
+        catch (Exception ex) { Logger.Error(ex, "OnRemainingTimeUpdated error"); }
+    }
     private record UserValidationResult(bool Valid, int RemainingTime, string? ErrorMessage);
     private async Task<UserValidationResult> FetchAndValidateUserAsync(int fallbackTime)
     {
