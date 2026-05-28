@@ -804,17 +804,13 @@ public class PrintMonitorService : BaseService, IDisposable
         {
             if (_isFirstBudgetEvent) { _isFirstBudgetEvent = false; return; }
             if (data.Value.ValueKind == JsonValueKind.Null) return;
-            var payload = data.Value;
-            if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("data", out var inner))
-                payload = inner;
-            if (payload.ValueKind == JsonValueKind.Null) return;
             double newBalance;
-            if (payload.ValueKind == JsonValueKind.Number)
+            if (data.Value.ValueKind == JsonValueKind.Number)
             {
-                if (!payload.TryGetDouble(out newBalance)) return;
+                if (!data.Value.TryGetDouble(out newBalance)) return;
             }
-            else if (payload.ValueKind == JsonValueKind.Object &&
-                     payload.TryGetProperty("printBalance", out var pb))
+            else if (data.Value.ValueKind == JsonValueKind.Object &&
+                     data.Value.TryGetProperty("printBalance", out var pb))
             {
                 if (!pb.TryGetDouble(out newBalance)) return;
             }
