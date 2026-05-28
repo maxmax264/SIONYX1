@@ -142,12 +142,6 @@ public class SessionService : BaseService, ISessionService
 
         // Start operating hours
         OperatingHours.StartMonitoring();
-        // Listen for live remainingTime updates from Firebase
-        _isFirstRemainingTimeEvent = true;
-        _remainingTimeListener = Firebase.DbListen(
-            $"users/{_userId}/remainingTime",
-            OnRemainingTimeUpdated);
-        Logger.Information("[SSE] Started remainingTime listener for user {UserId}", _userId);
 
         Logger.Information("Session started (remaining: {Time}s)", initialRemainingTime);
         SessionStarted?.Invoke();
