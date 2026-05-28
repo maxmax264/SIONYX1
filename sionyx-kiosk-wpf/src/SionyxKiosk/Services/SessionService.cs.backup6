@@ -287,19 +287,16 @@ public class SessionService : BaseService, ISessionService
         if (eventType != "put" || data == null) return;
         try
         {
+            Logger.Information("[SSE-DEBUG] remainingTime event: type={Type} kind={Kind} first={First} data={Data}", eventType, data.Value.ValueKind, _isFirstRemainingTimeEvent, data.Value.ToString());
             if (_isFirstRemainingTimeEvent) { _isFirstRemainingTimeEvent = false; return; }
             if (data.Value.ValueKind == JsonValueKind.Null) return;
-            var payload = data.Value;
-            if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("data", out var inner))
-                payload = inner;
-            if (payload.ValueKind == JsonValueKind.Null) return;
             int newTime;
-            if (payload.ValueKind == JsonValueKind.Number)
+            if (data.Value.ValueKind == JsonValueKind.Number)
             {
-                if (!payload.TryGetInt32(out newTime)) return;
+                if (!data.Value.TryGetInt32(out newTime)) return;
             }
-            else if (payload.ValueKind == JsonValueKind.Object &&
-                     payload.TryGetProperty("remainingTime", out var rt))
+            else if (data.Value.ValueKind == JsonValueKind.Object &&
+                     data.Value.TryGetProperty("remainingTime", out var rt))
             {
                 if (!rt.TryGetInt32(out newTime)) return;
             }
