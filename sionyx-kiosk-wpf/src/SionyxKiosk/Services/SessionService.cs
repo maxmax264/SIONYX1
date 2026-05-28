@@ -299,6 +299,7 @@ public class SessionService : BaseService, ISessionService
 
     private void OnRemainingTimeUpdated(string eventType, JsonElement? data)
     {
+        Logger.Debug("[SSE-TIME] Raw event: type={Type} data={Data}", eventType, data?.ToString() ?? "null");
         if (eventType != "put" || data == null) return;
         try
         {

@@ -799,6 +799,7 @@ public class PrintMonitorService : BaseService, IDisposable
 
     private void OnPrintBalanceUpdated(string eventType, JsonElement? data)
     {
+        Logger.Debug("[PRINT-SSE] Raw event: type={Type} data={Data}", eventType, data?.ToString() ?? "null");
         if (eventType != "put" || data == null) return;
         try
         {
