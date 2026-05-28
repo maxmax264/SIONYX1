@@ -287,6 +287,7 @@ public class SessionService : BaseService, ISessionService
         if (eventType != "put" || data == null) return;
         try
         {
+            Logger.Information("[SSE-DEBUG] remainingTime event: type={Type} kind={Kind} first={First} data={Data}", eventType, data.Value.ValueKind, _isFirstRemainingTimeEvent, data.Value.ToString());
             if (_isFirstRemainingTimeEvent) { _isFirstRemainingTimeEvent = false; return; }
             if (data.Value.ValueKind == JsonValueKind.Null) return;
             int newTime;
