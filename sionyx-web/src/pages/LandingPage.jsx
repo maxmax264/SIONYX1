@@ -266,7 +266,7 @@ const HeroSection = memo(({ onRegisterClick, onAdminLogin }) => {
             boxShadow: '0 8px 30px rgba(102, 126, 234, 0.4)',
           }}
         >
-          התחל עכשיו - חינם
+          התחל עכשיו
         </AnimatedButton>
       </motion.div>
 
@@ -776,7 +776,7 @@ const ActionCardsSection = memo(
                       height: 52,
                     }}
                   >
-                    התחל עכשיו - חינם
+                    התחל עכשיו
                   </AnimatedButton>
                 </div>
               </div>
