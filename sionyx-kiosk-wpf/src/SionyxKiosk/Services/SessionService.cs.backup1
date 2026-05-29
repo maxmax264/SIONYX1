@@ -45,7 +45,6 @@ public class SessionService : BaseService, ISessionService
     private SseListener? _remainingTimeListener;
     private SseListener? _idleRemainingTimeListener;
     private bool _isFirstRemainingTimeEvent = true;
-    private bool _isIdleListener = false;
 
     // Events (replace PyQt signals)
     public event Action? SessionStarted;
@@ -103,7 +102,6 @@ public class SessionService : BaseService, ISessionService
         // Start idle listener so dashboard updates show immediately even without active session
         _idleRemainingTimeListener?.Stop();
         _isFirstRemainingTimeEvent = true;
-        _isIdleListener = true;
         _idleRemainingTimeListener = Firebase.DbListen(
             $"users/{_userId}/remainingTime",
             OnRemainingTimeUpdated);
@@ -156,7 +154,6 @@ public class SessionService : BaseService, ISessionService
         _idleRemainingTimeListener?.Stop();
         _idleRemainingTimeListener = null;
         _isFirstRemainingTimeEvent = true;
-        _isIdleListener = false;
         _remainingTimeListener = Firebase.DbListen(
             $"users/{_userId}/remainingTime",
             OnRemainingTimeUpdated);
@@ -306,8 +303,7 @@ public class SessionService : BaseService, ISessionService
         if (eventType != "put" || data == null) return;
         try
         {
-            if (_isFirstRemainingTimeEvent && !_isIdleListener) { _isFirstRemainingTimeEvent = false; return; }
-        _isFirstRemainingTimeEvent = false;
+            if (_isFirstRemainingTimeEvent) { _isFirstRemainingTimeEvent = false; return; }
             if (data.Value.ValueKind == JsonValueKind.Null) return;
             var payload = data.Value;
             if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("data", out var inner))
