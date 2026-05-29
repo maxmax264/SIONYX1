@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "sionyx-19636"
-  }
+    "default": "sionyx-19636",
+    "default ": "pc-sion"
+  },
+  "targets": {},
+  "etags": {}
 }

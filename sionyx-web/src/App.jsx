@@ -88,7 +88,7 @@ function App() {
       }}
     >
       <AntApp>
-        <Router basename="/SIONYX1">
+        <Router>
           <Suspense
             fallback={
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fafbfc' }}>
