@@ -1,4 +1,4 @@
-import { ref, get, update, remove, getDatabase } from 'firebase/database';
+import { ref, get, update } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
 import { database, functions } from '../config/firebase';
 import { logger } from '../utils/logger';
@@ -245,38 +245,17 @@ export const resetUserPassword = async (orgId, userId, newPassword) => {
  */
 export const deleteUser = async (orgId, userId) => {
   try {
-    const db = getDatabase();
-    const userRef = ref(db, `organizations/${orgId}/users/${userId}`);
-    const userSnap = await get(userRef);
-    if (!userSnap.exists()) {
-      return { success: false, error: 'המשתמש לא נמצא' };
-    }
-    const userData = userSnap.val();
-    const messagesRef = ref(db, `organizations/${orgId}/messages`);
-    const messagesSnap = await get(messagesRef);
-    if (messagesSnap.exists()) {
-      const updates = {};
-      Object.entries(messagesSnap.val()).forEach(([msgId, msg]) => {
-        if (msg.toUserId === userId) {
-          updates[`organizations/${orgId}/messages/${msgId}`] = null;
-        }
-      });
-      if (Object.keys(updates).length > 0) {
-        await update(ref(db), updates);
-      }
-    }
-    if (userData.currentComputerId) {
-      const compRef = ref(db, `organizations/${orgId}/computers/${userData.currentComputerId}`);
-      const compSnap = await get(compRef);
-      if (compSnap.exists() && compSnap.val().currentUserId === userId) {
-        await update(compRef, { currentUserId: null, isActive: false });
-      }
-    }
-    await remove(userRef);
-    return { success: true, message: 'המשתמש נמחק בהצלחה' };
+    const deleteUserFn = httpsCallable(functions, 'deleteUser');
+    const result = await deleteUserFn({ orgId, userId });
+
+    return {
+      success: true,
+      message: result.data.message || 'המשתמש נמחק בהצלחה',
+    };
   } catch (error) {
     logger.error('Error deleting user:', error);
-    return { success: false, error: error.message || 'שגיאה במחיקת המשתמש' };
+    const errorMessage = error.message || 'שגיאה במחיקת המשתמש';
+    return { success: false, error: errorMessage };
   }
 };
 
