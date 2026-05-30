@@ -221,6 +221,7 @@ public class PrintMonitorService : BaseService, IDisposable
     private DateTime? _budgetCacheTime;
     private const int BudgetCacheTtlSec = 30;
     private SseListener? _budgetListener;
+    private bool _isFirstBudgetEvent = true;
 
     // Events
     public event Action<string, int, double, double>? JobAllowed;   // doc, pages, cost, remaining
@@ -279,6 +280,7 @@ public class PrintMonitorService : BaseService, IDisposable
         };
         _pollThread.Start();
 
+        _isFirstBudgetEvent = true;
         _budgetListener = Firebase.DbListen(
             $"users/{_userId}/printBalance",
             OnPrintBalanceUpdated);
@@ -801,6 +803,7 @@ public class PrintMonitorService : BaseService, IDisposable
         if (eventType != "put" || data == null) return;
         try
         {
+            if (_isFirstBudgetEvent) { _isFirstBudgetEvent = false; return; }
             if (data.Value.ValueKind == JsonValueKind.Null) return;
             var payload = data.Value;
             if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("data", out var inner))
