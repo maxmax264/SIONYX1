@@ -236,12 +236,20 @@ public class PrintMonitorService : BaseService, IDisposable
 
     public bool IsMonitoring => _isMonitoring;
 
+    private SseListener? _idleBudgetListener;
+
     public void Reinitialize(string userId)
     {
         StopMonitoring();
         _userId = userId;
         _cachedBudget = null;
         _budgetCacheTime = null;
+        // Start idle listener so dashboard updates show immediately even without active session
+        _idleBudgetListener?.Stop();
+        _idleBudgetListener = Firebase.DbListen(
+            $"users/{_userId}/printBalance",
+            OnPrintBalanceUpdated);
+        Logger.Information("[SSE] Started idle printBalance listener for user {UserId}", userId);
     }
 
     // ==================== PUBLIC API ====================
@@ -257,6 +265,9 @@ public class PrintMonitorService : BaseService, IDisposable
 
     private async Task StartMonitoringAsync()
     {
+        // Stop idle listener - session listener takes over
+        _idleBudgetListener?.Stop();
+        _idleBudgetListener = null;
         await LoadPricingAsync();
         InitializeKnownJobs();
         _processedJobs.Clear();
@@ -297,6 +308,16 @@ public class PrintMonitorService : BaseService, IDisposable
 
         _notificationThread?.Join(TimeSpan.FromSeconds(3));
         _notificationThread = null;
+
+        // Restart idle listener so dashboard updates show after session ends
+        if (!string.IsNullOrEmpty(_userId))
+        {
+            _idleBudgetListener?.Stop();
+            _idleBudgetListener = Firebase.DbListen(
+                $"users/{_userId}/printBalance",
+                OnPrintBalanceUpdated);
+            Logger.Information("[SSE] Restarted idle printBalance listener for user {UserId}", _userId);
+        }
 
         _pollThread?.Join(TimeSpan.FromSeconds(3));
         _pollThread = null;
