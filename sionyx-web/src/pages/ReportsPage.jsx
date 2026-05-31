@@ -41,6 +41,9 @@ import {
   CalendarOutlined,
   RiseOutlined,
   CrownOutlined,
+  HistoryOutlined,
+  PrinterOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useOrgId } from '../hooks/useOrgId';
 import { ref, onValue, off } from 'firebase/database';
