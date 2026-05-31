@@ -269,6 +269,10 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "owners": {
+      ".read": "auth != null",
+      ".write": false
+    },
     "sessionLogs": {
       "$userId": {
         ".read": "auth.uid === $userId || root.child('organizations/sionov/users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations/sionov/users').child(auth.uid).child('role').val() === 'admin'",

@@ -43,7 +43,6 @@ const OwnerDashboardPage = () => {
     } catch (e) {
       console.warn("systemSettings read failed:", e.message);
     }
-    if (sysSnap.exists()) setMaxImageSizeMB(sysSnap.val());
     if (orgsRes.success) setOrgs(orgsRes.orgs);
     if (supRes.success) setSupervisors(supRes.supervisors);
     setLoading(false);
