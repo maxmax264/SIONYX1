@@ -1,0 +1,5 @@
+﻿f=open(r'.\src\SionyxKiosk\Views\Windows\AuthWindow.xaml', encoding='utf-8')
+c=f.read()
+f.close()
+idx=c.find('Name="BrandOverlay"')
+print(c[idx:idx+1500])
