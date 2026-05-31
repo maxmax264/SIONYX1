@@ -185,7 +185,8 @@ const OverviewPage = () => {
           const dateA = new Date(a.lastActivity || a.updatedAt || 0);
           const dateB = new Date(b.lastActivity || b.updatedAt || 0);
           return dateB - dateA;
-        });
+        })
+        .slice(0, 5);
       setRecentUsers(activeUsers);
     } else {
       errors.push('משתמשים פעילים');
@@ -223,7 +224,8 @@ const OverviewPage = () => {
           const dateA = new Date(a.lastActivity || a.updatedAt || 0);
           const dateB = new Date(b.lastActivity || b.updatedAt || 0);
           return dateB - dateA;
-        });
+        })
+        .slice(0, 5);
       setRecentUsers(activeUsers);
     });
 
@@ -931,16 +933,6 @@ const OverviewPage = () => {
                                     <Text type='secondary' style={{ fontSize: 11 }}>
                                       <DesktopOutlined style={{ marginLeft: 4 }} />
                                       {u.currentComputerName}
-                                    </Text>
-                                  )}
-                                  {u.remainingTime != null && (
-                                    <Text style={{ fontSize: 11, color: u.remainingTime < 300 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
-                                      {'⏱ נשאר: ' + Math.floor(u.remainingTime / 60) + ' דק'}
-                                    </Text>
-                                  )}
-                                  {u.sessionStartTime && (
-                                    <Text type='secondary' style={{ fontSize: 11 }}>
-                                      {'התחיל: ' + new Date(u.sessionStartTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
                                     </Text>
                                   )}
                                 </div>
