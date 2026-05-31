@@ -49,7 +49,6 @@ import { useOrgId } from '../hooks/useOrgId';
 import { ref, onValue, off } from 'firebase/database';
 import { database } from '../config/firebase';
 import { getOrganizationStats } from '../services/organizationService';
-import { getAllUsers } from '../services/userService';
 import { exportToCSV, exportToExcel, exportToPDF } from '../utils/csvExport';
 import { logger } from '../utils/logger';
 
@@ -103,8 +102,6 @@ const ReportsPage = () => {
   const [sessionLogsLoading, setSessionLogsLoading] = useState(false);
   const [sessionSearch, setSessionSearch] = useState('');
   const [activeTab, setActiveTab] = useState('revenue');
-  const [usersMap, setUsersMap] = useState({});
-  const [showOperatorTopups, setShowOperatorTopups] = useState(false);
   const [printLogs, setPrintLogs] = useState([]);
   const [printLogsLoading, setPrintLogsLoading] = useState(false);
   const [printSearch, setPrintSearch] = useState('');
@@ -172,19 +169,9 @@ const ReportsPage = () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      const [statsResult, usersResult] = await Promise.all([
-        getOrganizationStats(orgId),
-        getAllUsers(orgId),
-      ]);
-      if (statsResult.success && statsResult.stats?.purchases) {
-        setAllPurchases(statsResult.stats.purchases);
-      }
-      if (usersResult.success && usersResult.users) {
-        const map = {};
-        usersResult.users.forEach(u => {
-          map[u.uid] = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.phoneNumber || u.uid;
-        });
-        setUsersMap(map);
+      const result = await getOrganizationStats(orgId);
+      if (result.success && result.stats?.purchases) {
+        setAllPurchases(result.stats.purchases);
       }
     } catch (err) {
       logger.error('Failed to load reports data:', err);
@@ -201,11 +188,10 @@ const ReportsPage = () => {
     const [start, end] = dateRange;
     return allPurchases.filter(p => {
       if (p.status !== 'completed') return false;
-      if (!showOperatorTopups && p.type === 'admin_charge') return false;
       const d = dayjs(p.createdAt);
       return d.isAfter(start) && d.isBefore(end);
     });
-  }, [allPurchases, dateRange, showOperatorTopups]);
+  }, [allPurchases, dateRange]);
 
   const stats = useMemo(() => {
     const totalRevenue = filteredPurchases.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
@@ -241,18 +227,6 @@ const ReportsPage = () => {
   }, [filteredPurchases, dateRange]);
 
   const columns = [
-    {
-      title: 'משתמש',
-      dataIndex: 'userId',
-      key: 'userId',
-      render: v => usersMap[v] || v || '—',
-    },
-    {
-      title: 'סוג',
-      dataIndex: 'type',
-      key: 'type',
-      render: v => v === 'admin_charge' ? <Tag color='blue'>טעינת מפעיל</Tag> : <Tag color='green'>רכישה</Tag>,
-    },
     {
       title: 'תאריך',
       dataIndex: 'createdAt',
@@ -436,14 +410,6 @@ const ReportsPage = () => {
                 format='DD/MM/YYYY'
               />
             )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-              <input
-                type='checkbox'
-                checked={showOperatorTopups}
-                onChange={e => setShowOperatorTopups(e.target.checked)}
-              />
-              הצג טעינות מפעיל
-            </label>
             <Dropdown menu={{ items: exportMenuItems }} disabled={filteredPurchases.length === 0}>
               <Button icon={<DownloadOutlined />}>ייצוא</Button>
             </Dropdown>
