@@ -220,6 +220,7 @@ public class PrintMonitorService : BaseService, IDisposable
     private double? _cachedBudget;
     private DateTime? _budgetCacheTime;
     private const int BudgetCacheTtlSec = 30;
+    private SseListener? _budgetListener;
 
     // Events
     public event Action<string, int, double, double>? JobAllowed;   // doc, pages, cost, remaining
@@ -235,12 +236,20 @@ public class PrintMonitorService : BaseService, IDisposable
 
     public bool IsMonitoring => _isMonitoring;
 
+    private SseListener? _idleBudgetListener;
+
     public void Reinitialize(string userId)
     {
         StopMonitoring();
         _userId = userId;
         _cachedBudget = null;
         _budgetCacheTime = null;
+        // Start idle listener so dashboard updates show immediately even without active session
+        _idleBudgetListener?.Stop();
+        _idleBudgetListener = Firebase.DbListen(
+            $"users/{_userId}/printBalance",
+            OnPrintBalanceUpdated);
+        Logger.Information("[SSE] Started idle printBalance listener for user {UserId}", userId);
     }
 
     // ==================== PUBLIC API ====================
@@ -256,6 +265,9 @@ public class PrintMonitorService : BaseService, IDisposable
 
     private async Task StartMonitoringAsync()
     {
+        // Stop idle listener - session listener takes over
+        _idleBudgetListener?.Stop();
+        _idleBudgetListener = null;
         await LoadPricingAsync();
         InitializeKnownJobs();
         _processedJobs.Clear();
@@ -278,6 +290,9 @@ public class PrintMonitorService : BaseService, IDisposable
         };
         _pollThread.Start();
 
+        _budgetListener = Firebase.DbListen(
+            $"users/{_userId}/printBalance",
+            OnPrintBalanceUpdated);
         Logger.Information("Print monitor started");
     }
 
@@ -288,9 +303,21 @@ public class PrintMonitorService : BaseService, IDisposable
         Logger.Information("Stopping print monitor");
         _isMonitoring = false;
         _stopRequested = true;
+        _budgetListener?.Stop();
+        _budgetListener = null;
 
         _notificationThread?.Join(TimeSpan.FromSeconds(3));
         _notificationThread = null;
+
+        // Restart idle listener so dashboard updates show after session ends
+        if (!string.IsNullOrEmpty(_userId))
+        {
+            _idleBudgetListener?.Stop();
+            _idleBudgetListener = Firebase.DbListen(
+                $"users/{_userId}/printBalance",
+                OnPrintBalanceUpdated);
+            Logger.Information("[SSE] Restarted idle printBalance listener for user {UserId}", _userId);
+        }
 
         _pollThread?.Join(TimeSpan.FromSeconds(3));
         _pollThread = null;
@@ -789,6 +816,36 @@ public class PrintMonitorService : BaseService, IDisposable
         return pages * copies * (isColor ? _colorPrice : _bwPrice);
     }
 
+    private void OnPrintBalanceUpdated(string eventType, JsonElement? data)
+    {
+        Logger.Debug("[PRINT-SSE] Raw event: type={Type} data={Data}", eventType, data?.ToString() ?? "null");
+        if (eventType != "put" || data == null) return;
+        try
+        {
+            if (data.Value.ValueKind == JsonValueKind.Null) return;
+            var payload = data.Value;
+            if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("data", out var inner))
+                payload = inner;
+            if (payload.ValueKind == JsonValueKind.Null) return;
+            double newBalance;
+            if (payload.ValueKind == JsonValueKind.Number)
+            {
+                if (!payload.TryGetDouble(out newBalance)) return;
+            }
+            else if (payload.ValueKind == JsonValueKind.Object &&
+                     payload.TryGetProperty("printBalance", out var pb))
+            {
+                if (!pb.TryGetDouble(out newBalance)) return;
+            }
+            else return;
+            if (_cachedBudget.HasValue && Math.Abs(_cachedBudget.Value - newBalance) < 0.001) return;
+            Logger.Information("[PRINT] Live printBalance update from Firebase: {Old} -> {New} (delta={Delta})", _cachedBudget, newBalance, newBalance - (_cachedBudget ?? 0));
+            _cachedBudget = newBalance;
+            _budgetCacheTime = DateTime.UtcNow;
+            DispatchEvent(() => BudgetUpdated?.Invoke(newBalance));
+        }
+        catch (Exception ex) { Logger.Error(ex, "OnPrintBalanceUpdated error"); }
+    }
     // ==================== BUDGET ====================
 
     private async Task<double> GetUserBudgetAsync(bool forceRefresh = false)
@@ -938,7 +995,7 @@ public class PrintMonitorService : BaseService, IDisposable
             return;
         }
 
-        Logger.Information("Found {Count} printer(s)", printers.Count);
+        Logger.Information("[PRINT] Found {Count} printer(s) on startup", printers.Count);
 
         foreach (var printer in printers)
         {
@@ -995,7 +1052,7 @@ public class PrintMonitorService : BaseService, IDisposable
 
                     if (shouldProcess)
                     {
-                        Logger.Information("New print job detected: ID={JobId} on '{Printer}'", jobId, printer);
+                        Logger.Information("New print job detected: ID={JobId} on '{Printer}' - processing", jobId, printer);
                         _ = HandleNewJobAsync(printer, jobId);
                     }
                 }
@@ -1075,6 +1132,7 @@ public class PrintMonitorService : BaseService, IDisposable
     private async Task HandlePausedJobAsync(string printerName, int jobId, string docName, int billablePages, double cost)
     {
         var budget = await GetUserBudgetAsync(forceRefresh: true);
+        Logger.Debug("[PRINT] Budget check - need={Cost}x, have={Budget}x, doc={Doc}", cost, budget, docName);
 
         if (budget >= cost)
         {
@@ -1084,6 +1142,28 @@ public class PrintMonitorService : BaseService, IDisposable
                 var remaining = budget - cost;
                 Logger.Information("Job APPROVED: '{Doc}' — {Cost}₪, remaining {Remaining}₪", docName, cost, remaining);
                 DispatchEvent(() => JobAllowed?.Invoke(docName, billablePages, cost, remaining));
+                // Save print log
+                try
+                {
+                    var logKey = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                    var orgId = Firebase.OrgId;
+                    await Firebase.DbUpdateAsync($"printLogs/{_userId}/{logKey}", new Dictionary<string, object?>
+                    {
+                        ["userId"] = _userId,
+                        ["docName"] = docName,
+                        ["pages"] = billablePages,
+                        ["cost"] = cost,
+                        ["remaining"] = remaining,
+                        ["printerName"] = printerName,
+                        ["timestamp"] = DateTime.Now.ToString("o"),
+                        ["computerName"] = Infrastructure.RegistryConfig.ReadValue("ComputerName") ?? Infrastructure.DeviceInfo.GetComputerName(),
+                    });
+                    Logger.Information("[LOG] Print log saved for user {UserId}", _userId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning(ex, "[LOG] Failed to save print log (non-fatal)");
+                }
             }
             else
             {
