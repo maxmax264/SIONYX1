@@ -2,14 +2,17 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:controls="clr-namespace:SionyxKiosk.Views.Controls"
+      xmlns:local="clr-namespace:SionyxKiosk.Views.Pages"
       Title="היסטוריה" FlowDirection="RightToLeft">
 
     <Page.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:ZeroToVisibilityConverter x:Key="ZeroToVisConverter" />
     </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -66,7 +69,13 @@
         </Border>
 
         <!-- Scrollable: Content area -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="0">
+        <!-- Tab buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8">
+            <RadioButton Content="רכישות" IsChecked="{Binding IsPurchasesTab, Mode=TwoWay}" GroupName="HistoryTabs" Margin="0,0,8,0"/>
+            <RadioButton Content="שימוש" IsChecked="{Binding IsSessionsTab, Mode=TwoWay}" GroupName="HistoryTabs" Margin="0,0,8,0"/>
+            <RadioButton Content="הדפסות" IsChecked="{Binding IsPrintsTab, Mode=TwoWay}" GroupName="HistoryTabs"/>
+        </StackPanel>
+        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" Padding="0" Visibility="{Binding IsPurchasesTabVisible, Converter={StaticResource BoolToVis}}">
             <StackPanel>
                 <!-- Skeleton loading -->
                 <StackPanel Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
@@ -95,5 +104,71 @@
                 </ItemsControl>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Tab: Sessions -->
+        <ScrollViewer Grid.Row="4" Visibility="{Binding IsSessionsTabVisible, FallbackValue=Collapsed}">
+            <StackPanel Margin="0,0,0,32">
+                <controls:EmptyState Message="אין היסטוריית שימוש" 
+                    Visibility="{Binding SessionLogs.Count, Converter={StaticResource ZeroToVisConverter}, FallbackValue=Visible}" />
+                <ItemsControl ItemsSource="{Binding SessionLogs}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="White" CornerRadius="12" Margin="0,0,0,10"
+                                    BorderBrush="#E5E7EB" BorderThickness="1" Padding="16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding EndTimeDisplay}" FontWeight="SemiBold" FontSize="14" Foreground="#1F2937"/>
+                                        <TextBlock Text="{Binding ComputerName}" FontSize="12" Foreground="#6B7280" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding UsedMinutesDisplay}" FontWeight="Bold" FontSize="14" Foreground="#667EEA" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{Binding ReasonDisplay}" FontSize="11" Foreground="#9CA3AF" HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Tab: Prints -->
+        <ScrollViewer Grid.Row="4" Visibility="{Binding IsPrintsTabVisible, FallbackValue=Collapsed}">
+            <StackPanel Margin="0,0,0,32">
+                <controls:EmptyState Message="אין היסטוריית הדפסות"
+                    Visibility="{Binding PrintLogs.Count, Converter={StaticResource ZeroToVisConverter}, FallbackValue=Visible}" />
+                <ItemsControl ItemsSource="{Binding PrintLogs}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="White" CornerRadius="12" Margin="0,0,0,10"
+                                    BorderBrush="#E5E7EB" BorderThickness="1" Padding="16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding DocName}" FontWeight="SemiBold" FontSize="14" Foreground="#1F2937" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding TimestampDisplay}" FontSize="12" Foreground="#6B7280" Margin="0,2,0,0"/>
+                                        <TextBlock Text="{Binding PrinterName}" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding CostDisplay}" FontWeight="Bold" FontSize="14" Foreground="#10B981" HorizontalAlignment="Right"/>
+                                        <TextBlock FontSize="12" Foreground="#6B7280" HorizontalAlignment="Right" Margin="0,2,0,0">
+                                            <Run Text="{Binding Pages}"/><Run Text=" עמ'"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
     </Grid>
 </Page>

@@ -192,7 +192,8 @@ public partial class App : Application
                 {
                     var purchase = sp.GetRequiredService<PurchaseService>();
                     var auth = sp.GetRequiredService<AuthService>();
-                    return new HistoryViewModel(purchase, auth.CurrentUser?.Uid ?? "");
+                    var firebase = sp.GetRequiredService<FirebaseClient>();
+                    return new HistoryViewModel(purchase, auth.CurrentUser?.Uid ?? "", firebase);
                 });
                 services.AddTransient(sp => new HelpViewModel(
                     sp.GetRequiredService<OrganizationMetadataService>(),
