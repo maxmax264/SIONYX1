@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { ref, get } from "firebase/database";
-import { database } from "../../config/firebase";
+import { database } from "../config/firebase";
 import { Spin } from "antd";
 
 const OwnerProtectedRoute = ({ children }) => {
