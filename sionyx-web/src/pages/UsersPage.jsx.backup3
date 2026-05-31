@@ -27,7 +27,6 @@ import {
   Segmented,
   DatePicker,
   Select,
-  Tabs,
 } from 'antd';
 import {
   getStatusLabel as getPurchaseStatusLabel,
@@ -115,9 +114,6 @@ const UsersPage = () => {
   const [adjustingUser, setAdjustingUser] = useState(null);
   const [adjusting, setAdjusting] = useState(false);
   const [kicking, setKicking] = useState(false);
-  const [userSessions, setUserSessions] = useState([]);
-  const [userPrints, setUserPrints] = useState([]);
-  const [userHistoryTab, setUserHistoryTab] = useState('purchases');
   const [deleting, setDeleting] = useState(false);
   const [form] = Form.useForm();
 
@@ -167,35 +163,11 @@ const UsersPage = () => {
     loadUsers();
   }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!drawerVisible || !selectedUser || !orgId) return;
-    const sessRef = ref(database, `organizations/${orgId}/sessionLogs/${selectedUser.uid}`);
-    const printRef = ref(database, `organizations/${orgId}/printLogs/${selectedUser.uid}`);
-    const unsubSess = onValue(sessRef, snap => {
-      if (snap.exists()) {
-        const logs = Object.entries(snap.val()).map(([k, v]) => ({ id: k, ...v }));
-        logs.sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
-        setUserSessions(logs);
-      } else setUserSessions([]);
-    });
-    const unsubPrint = onValue(printRef, snap => {
-      if (snap.exists()) {
-        const logs = Object.entries(snap.val()).map(([k, v]) => ({ id: k, ...v }));
-        logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setUserPrints(logs);
-      } else setUserPrints([]);
-    });
-    return () => { off(sessRef, 'value', unsubSess); off(printRef, 'value', unsubPrint); };
-  }, [drawerVisible, selectedUser, orgId]);
-
   const handleViewUser = async record => {
     setSelectedUser(record);
     setDrawerVisible(true);
     setLoadingPurchases(true);
     setLoadingMessages(true);
-    setUserSessions([]);
-    setUserPrints([]);
-    setUserHistoryTab('purchases');
 
     // Load user's purchase history
     const purchaseResult = await getUserPurchaseHistory(orgId, record.uid);
@@ -1616,45 +1588,6 @@ const UsersPage = () => {
               )}
             </Card>
           </Space>
-        )}
-        {selectedUser && (
-          <Tabs activeKey={userHistoryTab} onChange={setUserHistoryTab} style={{ marginTop: 16 }} items={[
-            { key: 'purchases', label: 'רכישות' },
-            { key: 'sessions', label: 'שימוש (' + userSessions.length + ')' },
-            { key: 'prints', label: 'הדפסות (' + userPrints.length + ')' },
-          ]} />
-        )}
-        {userHistoryTab === 'sessions' && selectedUser && (
-          <Table
-            dataSource={userSessions}
-            rowKey='id'
-            size='small'
-            style={{ marginTop: 8 }}
-            pagination={{ pageSize: 10 }}
-            locale={{ emptyText: 'אין נתונים עדיין' }}
-            columns={[
-              { title: 'תאריך', dataIndex: 'endTime', render: v => v ? new Date(v).toLocaleString('he-IL') : '-', sorter: (a,b) => new Date(a.endTime)-new Date(b.endTime), defaultSortOrder: 'descend' },
-              { title: 'מחשב', dataIndex: 'computerName', render: v => v || '-' },
-              { title: 'זמן שימוש', dataIndex: 'usedSeconds', render: v => v ? Math.floor(v/60) + " דק'" : '-' },
-              { title: 'סיבת סיום', dataIndex: 'reason', render: v => { const map = { user: 'יציאה', expired: 'נגמר זמן', idle: 'חוסר פעילות' }; return map[v] || v || '-'; } },
-            ]}
-          />
-        )}
-        {userHistoryTab === 'prints' && selectedUser && (
-          <Table
-            dataSource={userPrints}
-            rowKey='id'
-            size='small'
-            style={{ marginTop: 8 }}
-            pagination={{ pageSize: 10 }}
-            locale={{ emptyText: 'אין נתונים עדיין' }}
-            columns={[
-              { title: 'תאריך', dataIndex: 'timestamp', render: v => v ? new Date(v).toLocaleString('he-IL') : '-', sorter: (a,b) => new Date(a.timestamp)-new Date(b.timestamp), defaultSortOrder: 'descend' },
-              { title: 'מסמך', dataIndex: 'docName', render: v => v || '-', ellipsis: true },
-              { title: 'עמודים', dataIndex: 'pages', render: v => v || 0 },
-              { title: 'עלות', dataIndex: 'cost', render: v => v != null ? parseFloat(v).toFixed(2) + ' ₪' : '-' },
-            ]}
-          />
         )}
       </Drawer>
 
