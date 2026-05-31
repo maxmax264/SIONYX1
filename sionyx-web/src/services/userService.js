@@ -1,4 +1,4 @@
-import { ref, get, update, remove, getDatabase } from 'firebase/database';
+import { ref, get, update, remove, getDatabase, push, set } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
 import { database, functions } from '../config/firebase';
 import { logger } from '../utils/logger';
@@ -125,6 +125,24 @@ export const adjustUserBalance = async (orgId, userId, adjustments) => {
     }
 
     await update(userRef, updates);
+
+    // Log admin charge to purchases
+    const timeDiff = adjustments.timeSeconds || 0;
+    const printsDiff = adjustments.prints || 0;
+    if (timeDiff !== 0 || printsDiff !== 0) {
+      const purchasesRef = ref(database, `organizations/${orgId}/purchases`);
+      const newRef = push(purchasesRef);
+      await set(newRef, {
+        userId,
+        type: 'admin_charge',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        timeSeconds: timeDiff,
+        prints: printsDiff,
+        amount: 0,
+        note: 'טעינת מפעיל',
+      });
+    }
 
     return {
       success: true,

@@ -239,7 +239,7 @@ const ReportsPage = () => {
       title: 'חבילה',
       dataIndex: 'packageName',
       key: 'packageName',
-      render: v => v || 'אחר',
+      render: (v, record) => record.note || v || 'אחר',
     },
     {
       title: 'סכום',
