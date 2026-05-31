@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+﻿content = open(r'.\src\supervisor\SupervisorProtectedRoute.jsx', encoding='utf-8').read()
+
+new = """import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -27,3 +29,7 @@ const SupervisorProtectedRoute = ({ children }) => {
   return children;
 };
 export default SupervisorProtectedRoute;
+"""
+
+open(r'.\src\supervisor\SupervisorProtectedRoute.jsx', 'w', encoding='utf-8').write(new)
+print("OK - file written")
