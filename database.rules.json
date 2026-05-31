@@ -265,6 +265,10 @@
         }
       }
     },
+    "systemSettings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "sessionLogs": {
       "$userId": {
         ".read": "auth.uid === $userId || root.child('organizations/sionov/users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations/sionov/users').child(auth.uid).child('role').val() === 'admin'",
