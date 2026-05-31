@@ -21,18 +21,11 @@ public class ComputerService : BaseService
             var info = DeviceInfo.GetComputerInfo();
             var computerId = info["deviceId"].ToString()!;
 
-            // Priority: 1) passed param, 2) registry custom name, 3) Windows hostname, 4) fallback
             var name = info["computerName"].ToString()!;
             if (!string.IsNullOrEmpty(computerName))
                 name = computerName;
-            else
-            {
-                var registryName = Infrastructure.RegistryConfig.ReadValue("ComputerName");
-                if (!string.IsNullOrEmpty(registryName))
-                    name = registryName;
-                else if (name == "Unknown-PC")
-                    name = $"PC-{computerId[..8].ToUpper()}";
-            }
+            else if (name == "Unknown-PC")
+                name = $"PC-{computerId[..8].ToUpper()}";
 
             var now = DateTime.Now.ToString("o");
             var data = new Dictionary<string, object?>
