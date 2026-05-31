@@ -106,7 +106,7 @@
         </ScrollViewer>
 
         <!-- Tab: Sessions -->
-        <ScrollViewer Grid.Row="4" Visibility="{Binding IsSessionsTabVisible, FallbackValue=Collapsed}">
+        <ScrollViewer Grid.Row="4" Visibility="{Binding IsSessionsTabVisible, Converter={StaticResource BoolToVis}}">
             <StackPanel Margin="0,0,0,32">
                 <controls:EmptyState Message="אין היסטוריית שימוש" 
                     Visibility="{Binding SessionLogs.Count, Converter={StaticResource ZeroToVisConverter}, FallbackValue=Visible}" />
@@ -137,7 +137,7 @@
         </ScrollViewer>
 
         <!-- Tab: Prints -->
-        <ScrollViewer Grid.Row="4" Visibility="{Binding IsPrintsTabVisible, FallbackValue=Collapsed}">
+        <ScrollViewer Grid.Row="4" Visibility="{Binding IsPrintsTabVisible, Converter={StaticResource BoolToVis}}">
             <StackPanel Margin="0,0,0,32">
                 <controls:EmptyState Message="אין היסטוריית הדפסות"
                     Visibility="{Binding PrintLogs.Count, Converter={StaticResource ZeroToVisConverter}, FallbackValue=Visible}" />
