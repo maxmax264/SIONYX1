@@ -22,6 +22,7 @@ const SupervisorOrgDetailPage = lazy(() => import('./supervisor/pages/Supervisor
 const SupervisorBlockedUsersPage = lazy(() => import('./supervisor/pages/SupervisorBlockedUsersPage'));
 const SupervisorMessagesPage = lazy(() => import('./supervisor/pages/SupervisorMessagesPage'));
 const SupervisorSettingsPage = lazy(() => import('./supervisor/pages/SupervisorSettingsPage'));
+import OwnerProtectedRoute from './owner/OwnerProtectedRoute';
 const OwnerLoginPage = lazy(() => import('./owner/pages/OwnerLoginPage'));
 const OwnerDashboardPage = lazy(() => import('./owner/pages/OwnerDashboardPage'));
 
@@ -142,7 +143,7 @@ function App() {
 
               {/* Owner Routes */}
               <Route path='/owner/login' element={<OwnerLoginPage />} />
-              <Route path='/owner' element={<OwnerDashboardPage />} />
+              <Route path='/owner' element={<OwnerProtectedRoute><OwnerDashboardPage /></OwnerProtectedRoute>} />
 
               {/* Catch all - redirect to home */}
               <Route path='*' element={<Navigate to='/' replace />} />
