@@ -43,7 +43,9 @@ public class SessionService : BaseService, ISessionService
     private bool _warned1Min;
     // Live sync from Firebase
     private SseListener? _remainingTimeListener;
+    private SseListener? _idleRemainingTimeListener;
     private bool _isFirstRemainingTimeEvent = true;
+    private bool _isIdleListener = false;
 
     // Events (replace PyQt signals)
     public event Action? SessionStarted;
@@ -98,6 +100,14 @@ public class SessionService : BaseService, ISessionService
     {
         _userId = userId;
         Logger.Information("Session service re-initialized for user: {UserId}", userId);
+        // Start idle listener so dashboard updates show immediately even without active session
+        _idleRemainingTimeListener?.Stop();
+        _isFirstRemainingTimeEvent = true;
+        _isIdleListener = true;
+        _idleRemainingTimeListener = Firebase.DbListen(
+            $"users/{_userId}/remainingTime",
+            OnRemainingTimeUpdated);
+        Logger.Information("[SSE] Started idle remainingTime listener for user {UserId}", userId);
     }
 
     /// <summary>Start a new session with the user's remaining time.</summary>
@@ -142,6 +152,15 @@ public class SessionService : BaseService, ISessionService
 
         // Start operating hours
         OperatingHours.StartMonitoring();
+        // Stop idle listener and start session listener
+        _idleRemainingTimeListener?.Stop();
+        _idleRemainingTimeListener = null;
+        _isFirstRemainingTimeEvent = true;
+        _isIdleListener = false;
+        _remainingTimeListener = Firebase.DbListen(
+            $"users/{_userId}/remainingTime",
+            OnRemainingTimeUpdated);
+        Logger.Information("[SSE] Started remainingTime listener for user {UserId}", _userId);
 
         Logger.Information("Session started (remaining: {Time}s)", initialRemainingTime);
         SessionStarted?.Invoke();
@@ -160,6 +179,11 @@ public class SessionService : BaseService, ISessionService
         _syncTimer.Stop();
         _remainingTimeListener?.Stop();
         _remainingTimeListener = null;
+        // Restart idle listener so dashboard updates show after session ends
+        _isFirstRemainingTimeEvent = true;
+        _idleRemainingTimeListener = Firebase.DbListen(
+            $"users/{_userId}/remainingTime",
+            OnRemainingTimeUpdated);
 
         // Stop operating hours monitoring
         OperatingHours.StopMonitoring();
@@ -243,10 +267,12 @@ public class SessionService : BaseService, ISessionService
 
         if (result.Success)
         {
+            Logger.Debug("[SYNC] Firebase sync OK - remainingTime={Time}s", RemainingTime);
             if (_consecutiveSyncFailures > 0)
             {
                 _consecutiveSyncFailures = 0;
                 IsOnline = true;
+                Logger.Information("[SYNC] Connection restored after {Count} failures", _consecutiveSyncFailures);
                 SyncRestored?.Invoke();
             }
         }
@@ -264,6 +290,7 @@ public class SessionService : BaseService, ISessionService
 
     private async Task FinalSyncAsync(string reason)
     {
+        Logger.Information("[SYNC] Final sync - reason={Reason}, remainingTime={Time}s, timeUsed={Used}s", reason, RemainingTime, TimeUsed);
         await Firebase.DbUpdateAsync($"users/{_userId}", new Dictionary<string, object?>
         {
             ["remainingTime"] = Math.Max(0, RemainingTime),
@@ -271,28 +298,57 @@ public class SessionService : BaseService, ISessionService
             ["sessionStartTime"] = null,
             ["updatedAt"] = DateTime.Now.ToString("o"),
         });
+
+        // Save session log
+        try
+        {
+            var logKey = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            var orgId = Firebase.OrgId;
+            await Firebase.DbUpdateAsync($"sessionLogs/{_userId}/{logKey}", new Dictionary<string, object?>
+            {
+                ["userId"] = _userId,
+                ["startTime"] = StartTime?.ToString("o"),
+                ["endTime"] = DateTime.Now.ToString("o"),
+                ["usedSeconds"] = TimeUsed,
+                ["remainingSeconds"] = Math.Max(0, RemainingTime),
+                ["reason"] = reason,
+                ["computerId"] = DeviceInfo.GetDeviceId(),
+                ["computerName"] = RegistryConfig.ReadValue("ComputerName") ?? DeviceInfo.GetComputerName(),
+            });
+            Logger.Information("[LOG] Session log saved for user {UserId}", _userId);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[LOG] Failed to save session log (non-fatal)");
+        }
     }
 
     private void OnRemainingTimeUpdated(string eventType, JsonElement? data)
     {
+        Logger.Debug("[SSE-TIME] Raw event: type={Type} data={Data}", eventType, data?.ToString() ?? "null");
         if (eventType != "put" || data == null) return;
         try
         {
-            if (_isFirstRemainingTimeEvent) { _isFirstRemainingTimeEvent = false; return; }
+            if (_isFirstRemainingTimeEvent && !_isIdleListener) { _isFirstRemainingTimeEvent = false; return; }
+        _isFirstRemainingTimeEvent = false;
             if (data.Value.ValueKind == JsonValueKind.Null) return;
+            var payload = data.Value;
+            if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("data", out var inner))
+                payload = inner;
+            if (payload.ValueKind == JsonValueKind.Null) return;
             int newTime;
-            if (data.Value.ValueKind == JsonValueKind.Number)
+            if (payload.ValueKind == JsonValueKind.Number)
             {
-                if (!data.Value.TryGetInt32(out newTime)) return;
+                if (!payload.TryGetInt32(out newTime)) return;
             }
-            else if (data.Value.ValueKind == JsonValueKind.Object &&
-                     data.Value.TryGetProperty("remainingTime", out var rt))
+            else if (payload.ValueKind == JsonValueKind.Object &&
+                     payload.TryGetProperty("remainingTime", out var rt))
             {
                 if (!rt.TryGetInt32(out newTime)) return;
             }
             else return;
             if (newTime == RemainingTime) return;
-            Logger.Information("[SESSION] Live remainingTime update: {Old}s -> {New}s", RemainingTime, newTime);
+            Logger.Information("[SESSION] Live remainingTime update: {Old}s -> {New}s (delta={Delta}s)", RemainingTime, newTime, newTime - RemainingTime);
             _initialRemainingTime = newTime;
             StartTime = DateTime.UtcNow;
             TimeUsed = 0;
