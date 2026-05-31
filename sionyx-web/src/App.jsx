@@ -59,13 +59,13 @@ function App() {
 
     // Listen for Supervisor Auth Changes
     const unsubscribeSupervisor = onSupervisorAuthChange(async (user) => {
-      setSupervisor(user ? { uid: user.uid } : null);
       if (user) {
         try {
-          const supervisorData = await getCurrentSupervisorData(user.uid);
-          setSupervisor(supervisorData);
+          const result = await getCurrentSupervisorData(user.uid);
+          setSupervisor(result?.supervisor || { uid: user.uid });
         } catch (error) {
           console.error('Error fetching supervisor data:', error);
+          setSupervisor({ uid: user.uid });
         }
       } else {
         setSupervisor(null);
