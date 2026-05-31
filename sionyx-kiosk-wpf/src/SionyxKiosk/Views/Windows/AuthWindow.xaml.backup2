@@ -43,12 +43,6 @@
     </Window.Resources>
 
     <Grid Background="{StaticResource AuthPageBg}">
-        <!-- Background image - shown only when kioskBackgroundEnabled=true -->
-        <Image x:Name="BgImage"
-               Source="{Binding BackgroundImageUrl}"
-               Stretch="UniformToFill"
-               Visibility="{Binding HasBackgroundImage, Converter={StaticResource BoolToVis}}"
-               Opacity="0.55" Panel.ZIndex="0" />
         <!-- Viewbox scales the auth card on screens smaller than 1000x700 -->
         <Viewbox HorizontalAlignment="Center" VerticalAlignment="Center"
                  Stretch="Uniform" StretchDirection="DownOnly"
