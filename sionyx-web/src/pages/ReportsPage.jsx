@@ -268,6 +268,16 @@ const ReportsPage = () => {
       render: (v, record) => record.note || v || 'אחר',
     },
     {
+      title: 'דקות',
+      dataIndex: 'timeSeconds',
+      key: 'timeSeconds',
+      render: v => {
+        if (!v && v !== 0) return '—';
+        const mins = Math.round(Math.abs(v) / 60);
+        return v >= 0 ? `+${mins} דק` : `-${mins} דק`;
+      },
+    },
+    {
       title: 'סכום',
       dataIndex: 'amount',
       key: 'amount',

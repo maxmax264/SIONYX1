@@ -1,0 +1,5 @@
+﻿f=open(r'.\src\pages\ReportsPage.jsx', encoding='utf-8')
+c=f.read()
+f.close()
+idx=c.find("title: '\u05d7\u05d1\u05d9\u05dc\u05d4'")
+print(repr(c[idx-10:idx+200]))
