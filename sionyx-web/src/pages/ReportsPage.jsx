@@ -41,6 +41,8 @@ import {
   CrownOutlined,
 } from '@ant-design/icons';
 import { useOrgId } from '../hooks/useOrgId';
+import { ref, onValue, off } from 'firebase/database';
+import { database } from '../config/firebase';
 import { getOrganizationStats } from '../services/organizationService';
 import { exportToCSV, exportToExcel, exportToPDF } from '../utils/csvExport';
 import { logger } from '../utils/logger';
@@ -96,11 +98,13 @@ const ReportsPage = () => {
   const [sessionSearch, setSessionSearch] = useState('');
   const [activeTab, setActiveTab] = useState('revenue');
 
-  const loadSessionLogs = useCallback(async () => {
-    if (!orgId) return;
+  const loadSessionLogs = useCallback(() => {}, []);
+
+  useEffect(() => {
+    if (activeTab !== 'sessions' || !orgId) return;
     setSessionLogsLoading(true);
-    try {
-      const snap = await get(ref(database, `organizations/${orgId}/sessionLogs`));
+    const logsRef = ref(database, `organizations/${orgId}/sessionLogs`);
+    const unsub = onValue(logsRef, (snap) => {
       if (snap.exists()) {
         const data = snap.val();
         const logs = [];
@@ -111,16 +115,16 @@ const ReportsPage = () => {
         });
         logs.sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
         setSessionLogs(logs);
+      } else {
+        setSessionLogs([]);
       }
-    } catch (err) {
+      setSessionLogsLoading(false);
+    }, (err) => {
       logger.error('Failed to load session logs:', err);
-    }
-    setSessionLogsLoading(false);
-  }, [orgId]);
-
-  useEffect(() => {
-    if (activeTab === 'sessions') loadSessionLogs();
-  }, [activeTab, loadSessionLogs]);
+      setSessionLogsLoading(false);
+    });
+    return () => off(logsRef, 'value', unsub);
+  }, [activeTab, orgId]);
 
   const dateRange = useMemo(() => {
     if (preset === 'custom' && customRange) return customRange;
