@@ -49,7 +49,6 @@ public static class RegistryConfig
         {
             // Required values
             ["OrgId"] = ReadValue("OrgId"),
-            ["ComputerName"] = ReadValue("ComputerName"),
             ["ApiKey"] = ReadValue("FirebaseApiKey"),
             ["AuthDomain"] = ReadValue("FirebaseAuthDomain"),
             ["ProjectId"] = ReadValue("FirebaseProjectId"),

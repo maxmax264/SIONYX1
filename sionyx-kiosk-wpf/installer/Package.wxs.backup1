@@ -25,8 +25,6 @@
 
     <!-- Public property for Organization ID (set by custom dialog) -->
     <Property Id="ORGID" Secure="yes" />
-    <!-- Public property for Computer Name (set by custom dialog) -->
-    <Property Id="COMPUTERNAME_CUSTOM" Secure="yes" />
 
     <!-- ================================================================
          DIRECTORY STRUCTURE
@@ -124,7 +122,6 @@
           <RegistryValue Name="Install_Dir"  Type="string" Value="[INSTALLFOLDER]" />
           <RegistryValue Name="Version"      Type="string" Value="$(var.ProductVersion)" />
           <RegistryValue Name="OrgId"        Type="string" Value="[ORGID]" />
-          <RegistryValue Name="ComputerName"  Type="string" Value="[COMPUTERNAME_CUSTOM]" />
           <RegistryValue Name="KioskUsername" Type="string" Value="SionyxUser" />
         </RegistryKey>
         <RegistryValue Root="HKLM" Key="SOFTWARE\SIONYX" Name="installed" Type="integer" Value="1" KeyPath="yes" />
