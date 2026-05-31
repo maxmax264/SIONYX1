@@ -304,7 +304,7 @@ public class SessionService : BaseService, ISessionService
         {
             var logKey = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
             var orgId = Firebase.OrgId;
-            await Firebase.DbUpdateAsync($"organizations/{Firebase.OrgId}/sessionLogs/{_userId}/{logKey}", new Dictionary<string, object?>
+            await Firebase.DbUpdateAsync($"sessionLogs/{_userId}/{logKey}", new Dictionary<string, object?>
             {
                 ["userId"] = _userId,
                 ["startTime"] = StartTime?.ToString("o"),
