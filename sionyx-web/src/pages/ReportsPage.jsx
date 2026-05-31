@@ -16,6 +16,8 @@ import {
   Dropdown,
   Tag,
   Statistic,
+  Tabs,
+  Input,
 } from 'antd';
 import dayjs from 'dayjs';
 import 'dayjs/locale/he';
