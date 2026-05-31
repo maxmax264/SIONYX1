@@ -215,6 +215,18 @@
           }
         },
         
+        "sessionLogs": {
+          "$userId": {
+            ".read": "auth.uid === $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
+            ".write": "auth.uid === $userId"
+          }
+        },
+        "printLogs": {
+          "$userId": {
+            ".read": "auth.uid === $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
+            ".write": "auth.uid === $userId"
+          }
+        },
         "metadata": {
           ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
           ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
@@ -250,6 +262,24 @@
           "admin_email": {
             ".validate": "newData.isString() && newData.val().length <= 100"
           }
+        }
+      }
+    },
+    "sessionLogs": {
+      "$userId": {
+        ".read": "auth.uid === $userId || root.child('organizations/sionov/users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations/sionov/users').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "auth.uid === $userId",
+        "$logKey": {
+          ".write": "auth.uid === $userId"
+        }
+      }
+    },
+    "printLogs": {
+      "$userId": {
+        ".read": "auth.uid === $userId || root.child('organizations/sionov/users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations/sionov/users').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "auth.uid === $userId",
+        "$logKey": {
+          ".write": "auth.uid === $userId"
         }
       }
     }
