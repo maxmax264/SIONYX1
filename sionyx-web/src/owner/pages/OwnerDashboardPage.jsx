@@ -35,9 +35,14 @@ const OwnerDashboardPage = () => {
       const unsub = auth.onAuthStateChanged(u => { unsub(); resolve(); });
     });
     const [orgsRes, supRes] = await Promise.all([getAllOrgs(), getAllSupervisors()]);
-    const sysSnap = await get(ref(database, "systemSettings/maxImageSizeMB"));
-    const orgSettingsSnap = await get(ref(database, "systemSettings/orgs"));
-    if (orgSettingsSnap.exists()) setOrgSettings(orgSettingsSnap.val() || {});
+    try {
+      const sysSnap = await get(ref(database, "systemSettings/maxImageSizeMB"));
+      if (sysSnap.exists()) setMaxImageSizeMB(sysSnap.val());
+      const orgSettingsSnap = await get(ref(database, "systemSettings/orgs"));
+      if (orgSettingsSnap.exists()) setOrgSettings(orgSettingsSnap.val() || {});
+    } catch (e) {
+      console.warn("systemSettings read failed:", e.message);
+    }
     if (sysSnap.exists()) setMaxImageSizeMB(sysSnap.val());
     if (orgsRes.success) setOrgs(orgsRes.orgs);
     if (supRes.success) setSupervisors(supRes.supervisors);
