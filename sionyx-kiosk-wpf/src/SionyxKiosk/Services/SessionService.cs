@@ -298,6 +298,29 @@ public class SessionService : BaseService, ISessionService
             ["sessionStartTime"] = null,
             ["updatedAt"] = DateTime.Now.ToString("o"),
         });
+
+        // Save session log
+        try
+        {
+            var logKey = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            var orgId = Firebase.OrgId;
+            await Firebase.DbUpdateAsync($"organizations/{orgId}/sessionLogs/{_userId}/{logKey}", new Dictionary<string, object?>
+            {
+                ["userId"] = _userId,
+                ["startTime"] = StartTime?.ToString("o"),
+                ["endTime"] = DateTime.Now.ToString("o"),
+                ["usedSeconds"] = TimeUsed,
+                ["remainingSeconds"] = Math.Max(0, RemainingTime),
+                ["reason"] = reason,
+                ["computerId"] = DeviceInfo.GetDeviceId(),
+                ["computerName"] = RegistryConfig.ReadValue("ComputerName") ?? DeviceInfo.GetComputerName(),
+            });
+            Logger.Information("[LOG] Session log saved for user {UserId}", _userId);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[LOG] Failed to save session log (non-fatal)");
+        }
     }
 
     private void OnRemainingTimeUpdated(string eventType, JsonElement? data)
