@@ -14,14 +14,12 @@ import {
   Modal,
   message,
   Badge,
-  Input,
 } from 'antd';
 import {
   DesktopOutlined,
   UserOutlined,
   LogoutOutlined,
   DeleteOutlined,
-  EditOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -35,7 +33,6 @@ import {
   getActiveComputerUsers,
   forceLogoutUser,
   deleteComputer,
-  updateComputer,
   deriveFromComputersAndUsers,
 } from '../services/computerService';
 import { subscribeToComputers, subscribeToUsers } from '../services/realtimeService';
@@ -67,10 +64,6 @@ const ComputersPage = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [actionLoading, setActionLoading] = useState({});
-  const [renameModal, setRenameModal] = useState(false);
-  const [renameComputer, setRenameComputer] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [renameLoading, setRenameLoading] = useState(false);
 
   const orgId = useOrgId();
 
@@ -181,31 +174,6 @@ const ComputersPage = () => {
         }
       },
     });
-  };
-
-  const handleRenameComputer = (computer) => {
-    setRenameComputer(computer);
-    setRenameValue(computer.computerName || '');
-    setRenameModal(true);
-  };
-
-  const handleRenameConfirm = async () => {
-    if (!renameValue.trim()) { message.warning('נא להזין שם מחשב'); return; }
-    setRenameLoading(true);
-    try {
-      const computerId = renameComputer.id || renameComputer.computerId;
-      const result = await updateComputer(computerId, { computerName: renameValue.trim() });
-      if (result.success) {
-        message.success('שם המחשב עודכן בהצלחה');
-        setRenameModal(false);
-      } else {
-        message.error('שגיאה בעדכון שם המחשב: ' + result.error);
-      }
-    } catch (err) {
-      message.error('שגיאה: ' + err.message);
-    } finally {
-      setRenameLoading(false);
-    }
   };
 
   const formatDuration = seconds => {
@@ -455,25 +423,16 @@ const ComputersPage = () => {
             </Space>
           </Col>
 
-          {/* Actions */}
+          {/* Delete Button */}
           <Col>
-            <Space>
-              <Button
-                type='text'
-                size='small'
-                icon={<EditOutlined />}
-                onClick={() => handleRenameComputer(computer)}
-                title='שנה שם'
-              />
-              <Button
-                type='text'
-                danger
-                size='small'
-                icon={<DeleteOutlined />}
-                loading={actionLoading[`delete-${computerId}`]}
-                onClick={() => handleDeleteComputer(computerId)}
-              />
-            </Space>
+            <Button
+              type='text'
+              danger
+              size='small'
+              icon={<DeleteOutlined />}
+              loading={actionLoading[`delete-${computerId}`]}
+              onClick={() => handleDeleteComputer(computerId)}
+            />
           </Col>
         </Row>
       </Card>
@@ -598,27 +557,6 @@ const ComputersPage = () => {
   }
 
   return (
-    <>
-    <Modal
-      title="שינוי שם מחשב"
-      open={renameModal}
-      onOk={handleRenameConfirm}
-      onCancel={() => setRenameModal(false)}
-      okText="שמור"
-      cancelText="ביטול"
-      confirmLoading={renameLoading}
-    >
-      <div style={{ direction: 'rtl', marginTop: 16 }}>
-        <p>שם נוכחי: <strong>{renameComputer?.computerName}</strong></p>
-        <Input
-          value={renameValue}
-          onChange={e => setRenameValue(e.target.value)}
-          placeholder="הזן שם חדש למחשב"
-          onPressEnter={handleRenameConfirm}
-          autoFocus
-        />
-      </div>
-    </Modal>
     <motion.div
       style={{ direction: 'rtl' }}
       variants={containerVariants}
@@ -699,7 +637,6 @@ const ComputersPage = () => {
         </motion.div>
       </Space>
     </motion.div>
-    </>
   );
 };
 
