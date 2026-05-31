@@ -63,6 +63,8 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useOrgId } from '../hooks/useOrgId';
+import { ref, onValue, off } from 'firebase/database';
+import { database } from '../config/firebase';
 import {
   getAllUsers,
   getUserPurchaseHistory,
@@ -1618,7 +1620,7 @@ const UsersPage = () => {
           </Space>
         )}
         {selectedUser && (
-          <Tabs activeKey={userHistoryTab} onChange={setUserHistoryTab} style={{ marginTop: 16 }} items={[
+          <Tabs activeKey={userHistoryTab} onChange={setUserHistoryTab} style={{ marginTop: 24, marginBottom: 16 }} items={[
             { key: 'purchases', label: 'רכישות' },
             { key: 'sessions', label: 'שימוש (' + userSessions.length + ')' },
             { key: 'prints', label: 'הדפסות (' + userPrints.length + ')' },
