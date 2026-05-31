@@ -895,7 +895,7 @@ const UsersPage = () => {
       dataIndex: 'type',
       key: 'type',
       render: (type, record) => {
-        if (type === 'admin_charge') return <Tag color='blue'>טעינת מפעיל</Tag>;
+        if (type === 'admin_charge' || record.note === 'טעינת מפעיל') return <Tag color='blue'>טעינת מפעיל</Tag>;
         return <Tag color='green'>רכישה</Tag>;
       },
     },

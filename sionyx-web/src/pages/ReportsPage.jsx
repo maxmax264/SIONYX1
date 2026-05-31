@@ -251,7 +251,7 @@ const ReportsPage = () => {
       title: 'סוג',
       dataIndex: 'type',
       key: 'type',
-      render: v => v === 'admin_charge' ? <Tag color='blue'>טעינת מפעיל</Tag> : <Tag color='green'>רכישה</Tag>,
+      render: (v, record) => (v === 'admin_charge' || record.note === 'טעינת מפעיל') ? <Tag color='blue'>טעינת מפעיל</Tag> : <Tag color='green'>רכישה</Tag>,
     },
     {
       title: 'תאריך',
