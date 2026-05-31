@@ -51,7 +51,7 @@ function App() {
           console.error('Error fetching admin data:', error);
         }
       } else {
-        setAdmin(null);
+        setUser(null);
       }
       setLoading(false);
     });
