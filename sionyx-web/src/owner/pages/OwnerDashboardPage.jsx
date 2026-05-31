@@ -22,6 +22,12 @@ const OwnerDashboardPage = () => {
 
   const load = async () => {
     setLoading(true);
+    const { getAuth } = await import("firebase/auth");
+    const auth = getAuth();
+    await new Promise(resolve => {
+      if (auth.currentUser) return resolve();
+      const unsub = auth.onAuthStateChanged(u => { unsub(); resolve(); });
+    });
     const [orgsRes, supRes] = await Promise.all([getAllOrgs(), getAllSupervisors()]);
     if (orgsRes.success) setOrgs(orgsRes.orgs);
     if (supRes.success) setSupervisors(supRes.supervisors);
