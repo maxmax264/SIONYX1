@@ -72,7 +72,10 @@ public partial class HistoryViewModel : ObservableObject, IDisposable
             var logs = new List<SessionLogItem>();
             try
             {
-                foreach (var entry in data.Value.EnumerateObject())
+                var root = data.Value;
+                var logsEl = root.TryGetProperty("data", out var d) ? d : root;
+                if (logsEl.ValueKind != System.Text.Json.JsonValueKind.Object) return;
+                foreach (var entry in logsEl.EnumerateObject())
                 {
                     var log = entry.Value;
                     logs.Add(new SessionLogItem
@@ -103,7 +106,10 @@ public partial class HistoryViewModel : ObservableObject, IDisposable
             var logs = new List<PrintLogItem>();
             try
             {
-                foreach (var entry in data.Value.EnumerateObject())
+                var root = data.Value;
+                var logsEl = root.TryGetProperty("data", out var d) ? d : root;
+                if (logsEl.ValueKind != System.Text.Json.JsonValueKind.Object) return;
+                foreach (var entry in logsEl.EnumerateObject())
                 {
                     var log = entry.Value;
                     logs.Add(new PrintLogItem
