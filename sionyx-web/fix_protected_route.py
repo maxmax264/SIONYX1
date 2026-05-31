@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿new_content = """import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -38,3 +38,6 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 export default ProtectedRoute;
+"""
+open(r'.\src\components\ProtectedRoute.jsx', 'w', encoding='utf-8').write(new_content)
+print("OK")

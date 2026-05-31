@@ -32,6 +32,7 @@ const LoginPage = () => {
     if (result.success) {
       setUser(result.user);
       setFailedAttempts(0);
+      localStorage.setItem('adminOrgId', values.orgId);
       message.success(`ברוך הבא ל-${values.orgId}!`);
       navigate('/admin');
     } else {
