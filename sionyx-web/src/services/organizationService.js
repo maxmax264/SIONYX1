@@ -176,11 +176,17 @@ export const getOrganizationStats = async orgId => {
         packageDistribution[pkgName] = (packageDistribution[pkgName] || 0) + 1;
 
         purchasesRaw.push({
+          id: purchase.id,
           amount: purchase.amount,
           createdAt: purchase.createdAt,
           status: purchase.status,
-          packageName: pkgName,
+          packageName: purchase.packageName || null,
           minutes: purchase.minutes,
+          type: purchase.type,
+          note: purchase.note,
+          userId: purchase.userId,
+          timeSeconds: purchase.timeSeconds,
+          prints: purchase.prints,
         });
       });
     }

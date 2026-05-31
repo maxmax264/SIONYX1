@@ -201,7 +201,7 @@ const ReportsPage = () => {
     const [start, end] = dateRange;
     return allPurchases.filter(p => {
       if (p.status !== 'completed') return false;
-      if (!showOperatorTopups && p.type === 'admin_charge') return false;
+      if (!showOperatorTopups && (p.type === 'admin_charge' || p.note === 'טעינת מפעיל')) return false;
       const d = dayjs(p.createdAt);
       return d.isAfter(start) && d.isBefore(end);
     });
