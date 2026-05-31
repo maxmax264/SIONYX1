@@ -8,6 +8,7 @@
     },
 
     "supervisors": {
+      ".read": "auth != null",
       "$uid": {
         ".read": "auth.uid === $uid",
         ".write": false,
@@ -27,7 +28,7 @@
     },
 
     "organizations": {
-      ".read": false,
+      ".read": "auth != null",
       ".write": false,
       
       "$orgId": {
