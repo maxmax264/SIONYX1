@@ -2,9 +2,15 @@ import { ref, get } from 'firebase/database';
 import { database, auth } from '../../config/firebase';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
 
+const waitForAuth = () =>
+  new Promise(resolve => {
+    if (auth.currentUser) return resolve(auth.currentUser);
+    const unsub = auth.onAuthStateChanged(user => { unsub(); resolve(user); });
+  });
+
 export const getSupervisorOrgs = async () => {
   try {
-    const user = auth.currentUser;
+    const user = await waitForAuth();
     if (!user) return { success: false, error: 'Not authenticated', organizations: [] };
 
     const orgIds = useSupervisorAuthStore.getState().getOrgIds();
