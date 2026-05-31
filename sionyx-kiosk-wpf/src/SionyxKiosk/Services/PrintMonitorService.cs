@@ -1142,6 +1142,28 @@ public class PrintMonitorService : BaseService, IDisposable
                 var remaining = budget - cost;
                 Logger.Information("Job APPROVED: '{Doc}' — {Cost}₪, remaining {Remaining}₪", docName, cost, remaining);
                 DispatchEvent(() => JobAllowed?.Invoke(docName, billablePages, cost, remaining));
+                // Save print log
+                try
+                {
+                    var logKey = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                    var orgId = Firebase.OrgId;
+                    await Firebase.DbUpdateAsync($"organizations/{orgId}/printLogs/{_userId}/{logKey}", new Dictionary<string, object?>
+                    {
+                        ["userId"] = _userId,
+                        ["docName"] = docName,
+                        ["pages"] = billablePages,
+                        ["cost"] = cost,
+                        ["remaining"] = remaining,
+                        ["printerName"] = printerName,
+                        ["timestamp"] = DateTime.Now.ToString("o"),
+                        ["computerName"] = Infrastructure.RegistryConfig.ReadValue("ComputerName") ?? Infrastructure.DeviceInfo.GetComputerName(),
+                    });
+                    Logger.Information("[LOG] Print log saved for user {UserId}", _userId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning(ex, "[LOG] Failed to save print log (non-fatal)");
+                }
             }
             else
             {
