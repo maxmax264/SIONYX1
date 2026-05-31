@@ -7,7 +7,13 @@ public class SessionLogItem
     public int UsedSeconds { get; set; }
     public string Reason { get; set; } = "";
 
-    public string UsedMinutesDisplay => UsedSeconds > 0 ? $"{UsedSeconds / 60} דק'" : "-";
+    public string UsedMinutesDisplay => UsedSeconds switch
+    {
+        <= 0 => "-",
+        < 60 => $"{UsedSeconds} שנ'",
+        < 3600 => $"{UsedSeconds / 60} דק'",
+        _ => $"{UsedSeconds / 3600}:{(UsedSeconds % 3600) / 60:D2} שע'"
+    };
     public string ReasonDisplay => Reason switch
     {
         "user" => "יציאה רגילה",
