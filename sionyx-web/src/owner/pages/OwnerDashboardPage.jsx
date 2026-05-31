@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input } from "antd";
-import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined } from "@ant-design/icons";
+import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber } from "antd";
+import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, PictureOutlined } from "@ant-design/icons";
 import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision } from "../services/ownerOrgService";
+import { ref, get, set } from "firebase/database";
+import { database } from "../../config/firebase";
 import { changeOwnerPassword, signOutOwner } from "../services/ownerAuthService";
 import { useOwnerAuthStore } from "../store/ownerAuthStore";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +16,8 @@ const OwnerDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [passwordModal, setPasswordModal] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [maxImageSizeMB, setMaxImageSizeMB] = useState(0);
+  const [savingSize, setSavingSize] = useState(false);
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const logout = useOwnerAuthStore((s) => s.logout);
@@ -29,6 +33,8 @@ const OwnerDashboardPage = () => {
       const unsub = auth.onAuthStateChanged(u => { unsub(); resolve(); });
     });
     const [orgsRes, supRes] = await Promise.all([getAllOrgs(), getAllSupervisors()]);
+    const sysSnap = await get(ref(database, "systemSettings/maxImageSizeMB"));
+    if (sysSnap.exists()) setMaxImageSizeMB(sysSnap.val());
     if (orgsRes.success) setOrgs(orgsRes.orgs);
     if (supRes.success) setSupervisors(supRes.supervisors);
     setLoading(false);
@@ -63,6 +69,12 @@ const OwnerDashboardPage = () => {
     setPasswordLoading(false);
   };
 
+  const handleSaveMaxSize = async () => {
+    setSavingSize(true);
+    await set(ref(database, "systemSettings/maxImageSizeMB"), maxImageSizeMB || 0);
+    message.success("הגדרה נשמרה");
+    setSavingSize(false);
+  };
   const handleLogout = async () => {
     await signOutOwner();
     logout();
