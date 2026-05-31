@@ -1,0 +1,5 @@
+﻿f = open(r'.\src\SionyxKiosk\Views\Windows\AuthWindow.xaml', encoding='utf-8')
+c = f.read()
+f.close()
+idx = c.find('BoolToVis')
+print(repr(c[max(0,idx-200):idx+100]))

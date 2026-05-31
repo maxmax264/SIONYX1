@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿content = '''import { useState, useEffect } from "react";
 import { Switch, Button, Input, Upload, Space, Typography, Divider, Image, Spin, App } from "antd";
 import { UploadOutlined, LinkOutlined, DeleteOutlined } from "@ant-design/icons";
 import { ref as dbRef, get, set } from "firebase/database";
@@ -136,3 +136,6 @@ const KioskBackgroundSettings = () => {
 };
 
 export default KioskBackgroundSettings;
+'''
+open(r'.\src\components\settings\KioskBackgroundSettings.jsx', 'w', encoding='utf-8').write(content)
+print("OK")

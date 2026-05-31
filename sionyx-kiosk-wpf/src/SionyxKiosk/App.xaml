@@ -10,6 +10,7 @@
                 <ResourceDictionary Source="Themes/Theme.xaml" />
                 <ResourceDictionary Source="Themes/Animations.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

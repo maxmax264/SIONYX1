@@ -128,6 +128,24 @@ public class OrganizationMetadataService : BaseService
         }
     }
 
+    public async Task<ServiceResult> GetKioskBackgroundAsync()
+    {
+        try
+        {
+            var result = await Firebase.DbGetAsync("metadata");
+            if (!result.Success || result.Data is not System.Text.Json.JsonElement data || data.ValueKind == System.Text.Json.JsonValueKind.Null)
+                return Success(new { enabled = false, url = "" });
+
+            var enabled = data.TryGetProperty("kioskBackgroundEnabled", out var en) && en.GetBoolean();
+            var url = SafeGet(data, "kioskBackgroundUrl") ?? "";
+            return Success(new { enabled, url });
+        }
+        catch (Exception ex)
+        {
+            return Error(HandleFirebaseError(ex, "GetKioskBackground"));
+        }
+    }
+
     public async Task<ServiceResult> GetAdminContactAsync()
     {
         try
