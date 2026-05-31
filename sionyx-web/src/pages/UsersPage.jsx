@@ -888,12 +888,30 @@ const UsersPage = () => {
       title: 'תאריך',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: date => (date ? dayjs(date).format('MMM D, YYYY HH:mm') : 'לא זמין'),
+      render: date => (date ? dayjs(date).format('DD/MM/YYYY HH:mm') : 'לא זמין'),
     },
     {
-      title: 'חבילה',
-      dataIndex: 'packageName',
+      title: 'סוג',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type, record) => {
+        if (type === 'admin_charge') return <Tag color='blue'>טעינת מפעיל</Tag>;
+        return <Tag color='green'>רכישה</Tag>;
+      },
+    },
+    {
+      title: 'חבילה / הערה',
       key: 'packageName',
+      render: (_, record) => record.packageName || record.note || '—',
+    },
+    {
+      title: 'דקות',
+      key: 'timeSeconds',
+      render: (_, record) => {
+        if (!record.timeSeconds) return '—';
+        const mins = Math.floor(Math.abs(record.timeSeconds) / 60);
+        return (record.timeSeconds < 0 ? '-' : '+') + mins + ' דק';
+      },
     },
     {
       title: 'סכום',
@@ -901,7 +919,7 @@ const UsersPage = () => {
       key: 'amount',
       render: price => {
         const numPrice = parseFloat(price) || 0;
-        return `₪${numPrice.toFixed(2)}`;
+        return '₪' + numPrice.toFixed(2);
       },
     },
     {
