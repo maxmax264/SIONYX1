@@ -1147,7 +1147,7 @@ public class PrintMonitorService : BaseService, IDisposable
                 {
                     var logKey = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
                     var orgId = Firebase.OrgId;
-                    await Firebase.DbUpdateAsync($"organizations/{orgId}/printLogs/{_userId}/{logKey}", new Dictionary<string, object?>
+                    await Firebase.DbUpdateAsync($"printLogs/{_userId}/{logKey}", new Dictionary<string, object?>
                     {
                         ["userId"] = _userId,
                         ["docName"] = docName,
