@@ -22,6 +22,8 @@ const SupervisorOrgDetailPage = lazy(() => import('./supervisor/pages/Supervisor
 const SupervisorBlockedUsersPage = lazy(() => import('./supervisor/pages/SupervisorBlockedUsersPage'));
 const SupervisorMessagesPage = lazy(() => import('./supervisor/pages/SupervisorMessagesPage'));
 const SupervisorSettingsPage = lazy(() => import('./supervisor/pages/SupervisorSettingsPage'));
+const OwnerLoginPage = lazy(() => import('./owner/pages/OwnerLoginPage'));
+const OwnerDashboardPage = lazy(() => import('./owner/pages/OwnerDashboardPage'));
 
 // Admin Pages
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
@@ -34,17 +36,17 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 function App() {
-  const { setAuth, setAdmin, setLoading } = useAuthStore();
-  const { setSupervisorAuth, setSupervisor, setSupervisorLoading } = useSupervisorAuthStore();
+  const { setUser, setLoading } = useAuthStore();
+  const { setSupervisor, setLoading: setSupervisorLoading } = useSupervisorAuthStore();
 
   useEffect(() => {
     // Listen for regular Admin Auth Changes
     const unsubscribeAdmin = onAuthChange(async (user) => {
-      setAuth(user);
+      setUser(user);
       if (user) {
         try {
           const adminData = await getCurrentAdminData(user.uid);
-          setAdmin(adminData);
+          setUser(adminData);
         } catch (error) {
           console.error('Error fetching admin data:', error);
         }
@@ -56,7 +58,7 @@ function App() {
 
     // Listen for Supervisor Auth Changes
     const unsubscribeSupervisor = onSupervisorAuthChange(async (user) => {
-      setSupervisorAuth(user);
+      setSupervisor(user ? { uid: user.uid } : null);
       if (user) {
         try {
           const supervisorData = await getCurrentSupervisorData(user.uid);
@@ -74,7 +76,7 @@ function App() {
       unsubscribeAdmin();
       unsubscribeSupervisor();
     };
-  }, [setAuth, setAdmin, setLoading, setSupervisorAuth, setSupervisor, setSupervisorLoading]);
+  }, [setUser, setLoading, setSupervisor, setSupervisorLoading]);
 
   return (
     <ConfigProvider
@@ -137,6 +139,10 @@ function App() {
                 <Route path='reports' element={<ReportsPage />} />
                 <Route path='settings' element={<SettingsPage />} />
               </Route>
+
+              {/* Owner Routes */}
+              <Route path='/owner/login' element={<OwnerLoginPage />} />
+              <Route path='/owner' element={<OwnerDashboardPage />} />
 
               {/* Catch all - redirect to home */}
               <Route path='*' element={<Navigate to='/' replace />} />
