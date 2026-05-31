@@ -1619,12 +1619,14 @@ const UsersPage = () => {
             </Card>
           </Space>
         )}
+        <div style={{ marginTop: 8 }}>
         {selectedUser && (
-          <Tabs activeKey={userHistoryTab} onChange={setUserHistoryTab} style={{ marginTop: 24, marginBottom: 16 }} items={[
-            { key: 'purchases', label: 'רכישות' },
-            { key: 'sessions', label: 'שימוש (' + userSessions.length + ')' },
-            { key: 'prints', label: 'הדפסות (' + userPrints.length + ')' },
-          ]} />
+          <div style={{ marginTop: 48, borderTop: '2px solid #f0f0f0', paddingTop: 24, display: 'flex', justifyContent: 'space-evenly', marginBottom: 16 }}>
+            {['purchases','sessions','prints'].map((tab, i) => {
+              const labels = ['רכישות', 'שימוש (' + userSessions.length + ')', 'הדפסות (' + userPrints.length + ')'];
+              return <button key={tab} onClick={() => setUserHistoryTab(tab)} style={{ background: 'none', border: 'none', borderBottom: userHistoryTab === tab ? '2px solid #1677ff' : '2px solid transparent', color: userHistoryTab === tab ? '#1677ff' : '#666', fontWeight: userHistoryTab === tab ? 600 : 400, fontSize: 14, padding: '8px 0', cursor: 'pointer', flex: 1, textAlign: 'center' }}>{labels[i]}</button>;
+            })}
+          </div>
         )}
         {userHistoryTab === 'sessions' && selectedUser && (
           <Table
@@ -1637,7 +1639,7 @@ const UsersPage = () => {
             columns={[
               { title: 'תאריך', dataIndex: 'endTime', render: v => v ? new Date(v).toLocaleString('he-IL') : '-', sorter: (a,b) => new Date(a.endTime)-new Date(b.endTime), defaultSortOrder: 'descend' },
               { title: 'מחשב', dataIndex: 'computerName', render: v => v || '-' },
-              { title: 'זמן שימוש', dataIndex: 'usedSeconds', render: v => v ? Math.floor(v/60) + " דק'" : '-' },
+              { title: 'זמן שימוש', dataIndex: 'usedSeconds', render: v => v ? (v < 60 ? v + " שנ'" : Math.floor(v/60) + " דק'") : '-' },
               { title: 'סיבת סיום', dataIndex: 'reason', render: v => { const map = { user: 'יציאה', expired: 'נגמר זמן', idle: 'חוסר פעילות' }; return map[v] || v || '-'; } },
             ]}
           />
@@ -1658,6 +1660,7 @@ const UsersPage = () => {
             ]}
           />
         )}
+        </div>
       </Drawer>
 
       {/* Send Message Modal */}
