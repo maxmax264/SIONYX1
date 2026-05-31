@@ -71,9 +71,9 @@ const KioskBackgroundSettings = () => {
       setImageUrl(url);
       setUrlInput(url);
       await saveToDb(url, enabled);
-      message.success("\u05ea\u05de\u05d5\u05e0\u05d4 \u05e2\u05dc\u05ea\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4");
+      message.success("תמונה עלתה בהצלחה");
     } catch (e) {
-      message.error("\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05d4\u05e2\u05dc\u05d0\u05d4");
+      message.error("שגיאה בהעלאה");
     }
     setSaving(false);
     return false;
@@ -90,7 +90,7 @@ const KioskBackgroundSettings = () => {
       setEnabled(false);
       message.success("תמונה נמחקה");
     } catch (e) {
-      message.error("\u05e9\u05d2\u05d9\u05d0\u05d4");
+      message.error("שגיאה");
     }
     setSaving(false);
   };
@@ -101,18 +101,18 @@ const KioskBackgroundSettings = () => {
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
       <Space align="center">
         <Switch checked={enabled} onChange={handleToggle} loading={saving} />
-        <Text strong>\u05d4\u05e4\u05e2\u05dc \u05ea\u05de\u05d5\u05e0\u05ea \u05e8\u05e7\u05e2 \u05dc\u05e7\u05d9\u05d5\u05e1\u05e7</Text>
+        <Text strong>הפעל תמונת רקע לקיוסק</Text>
       </Space>
 
       {enabled && (
         <>
-          <Divider>\u05d4\u05e2\u05dc\u05d0\u05ea \u05e7\u05d5\u05d1\u05e5</Divider>
+          <Divider>העלאת קובץ</Divider>
           <Upload beforeUpload={handleUpload} showUploadList={false} accept="image/*">
-            <Button icon={<UploadOutlined />} loading={saving}>\u05d1\u05d7\u05e8 \u05ea\u05de\u05d5\u05e0\u05d4</Button>
+            <Button icon={<UploadOutlined />} loading={saving}>בחר תמונה</Button>
           </Upload>
           {maxSizeMB && <Text type="secondary">גודל מקסימלי: {maxSizeMB}MB</Text>}
 
-          <Divider>\u05d0\u05d5 \u05d4\u05d3\u05d1\u05e7 \u05e7\u05d9\u05e9\u05d5\u05e8</Divider>
+          <Divider>או הדבק קישור</Divider>
           <Space.Compact style={{ width: "100%" }}>
             <Input
               prefix={<LinkOutlined />}
@@ -120,14 +120,14 @@ const KioskBackgroundSettings = () => {
               value={urlInput}
               onChange={e => setUrlInput(e.target.value)}
             />
-            <Button type="primary" onClick={handleUrlSave} loading={saving}>\u05e9\u05de\u05d5\u05e8</Button>
+            <Button type="primary" onClick={handleUrlSave} loading={saving}>שמור</Button>
           </Space.Compact>
 
           {imageUrl && (
             <>
-              <Divider>\u05ea\u05e6\u05d5\u05d2\u05d4 \u05de\u05e7\u05d3\u05d9\u05de\u05d4</Divider>
+              <Divider>תצוגה מקדימה</Divider>
               <Image src={imageUrl} alt="kiosk background" style={{ maxHeight: 200, objectFit: "cover", borderRadius: 8 }} />
-              <Button danger icon={<DeleteOutlined />} onClick={handleDelete} loading={saving}>\u05de\u05d7\u05e7 \u05ea\u05de\u05d5\u05e0\u05d4</Button>
+              <Button danger icon={<DeleteOutlined />} onClick={handleDelete} loading={saving}>מחק תמונה</Button>
             </>
           )}
         </>
