@@ -30,7 +30,6 @@
     "organizations": {
       ".read": "auth != null",
       ".write": false,
-      
       "$orgId": {
         "users": {
           ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
@@ -229,6 +228,9 @@
           }
         },
         "metadata": {
+          "kioskBackgroundEnabled": { ".read": true },
+          "kioskBackgroundUrl": { ".read": true },
+          "kioskRefreshAt": { ".read": true },
           ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
           ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
           

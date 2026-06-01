@@ -132,13 +132,14 @@ public class OrganizationMetadataService : BaseService
     {
         try
         {
-            var result = await Firebase.DbGetAsync("metadata");
-            if (!result.Success || result.Data is not System.Text.Json.JsonElement data || data.ValueKind == System.Text.Json.JsonValueKind.Null)
-                return Success(new { enabled = false, url = "" });
-
-            var enabled = data.TryGetProperty("kioskBackgroundEnabled", out var en) && en.GetBoolean();
-            var url = SafeGet(data, "kioskBackgroundUrl") ?? "";
-            return Success(new { enabled, url });
+            var config = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+            using var http = new System.Net.Http.HttpClient();
+            var enabledJson = await http.GetStringAsync($"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/kioskBackgroundEnabled.json");
+            var enabled = enabledJson.Trim() == "true";
+            if (!enabled) return Success(new { enabled = false, url = "" });
+            var bgUrl = await http.GetStringAsync($"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/kioskBackgroundUrl.json");
+            bgUrl = bgUrl.Trim().Trim('"');
+            return Success(new { enabled = true, url = bgUrl });
         }
         catch (Exception ex)
         {

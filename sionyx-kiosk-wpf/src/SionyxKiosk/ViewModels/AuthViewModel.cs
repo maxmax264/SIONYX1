@@ -21,6 +21,7 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private string _forgotPasswordInfo = "";
     [ObservableProperty] private string _backgroundImageUrl = "";
     [ObservableProperty] private bool _hasBackgroundImage;
+    [ObservableProperty] private System.Windows.Media.ImageSource? _backgroundImageSource;
 
     /// <summary>Dynamic button text that changes during loading.</summary>
     public string LoginButtonText => IsLoading ? "מתחבר..." : "התחבר";
@@ -40,30 +41,84 @@ public partial class AuthViewModel : ObservableObject
         _auth = auth;
         _metadataService = metadataService;
         _ = LoadBackgroundAsync();
+        _ = StartRefreshListenerAsync();
     }
 
-    private async Task LoadBackgroundAsync()
+    public async Task ReloadBackgroundAsync() => await LoadBackgroundAsync();
+
+    private async Task StartRefreshListenerAsync()
     {
         if (_metadataService == null) return;
         try
         {
+            var config = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+            using var http = new System.Net.Http.HttpClient();
+            http.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+            var url = $"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/kioskRefreshAt.json";
+            string? lastVal = null;
+            while (true)
+            {
+                try
+                {
+                    var json = await http.GetStringAsync(url);
+                    var val = json.Trim().Trim('"');
+                    if (lastVal != null && val != lastVal)
+                    {
+                        Serilog.Log.Information("[BG] Refresh triggered from dashboard");
+                        await ReloadBackgroundAsync();
+                    }
+                    lastVal = val;
+                }
+                catch { }
+                await System.Threading.Tasks.Task.Delay(3000);
+            }
+        }
+        catch (Exception ex) { Serilog.Log.Error(ex, "[BG] RefreshListener failed"); }
+    }
+
+    private async Task LoadBackgroundAsync()
+    {
+        if (_metadataService == null) { Serilog.Log.Warning("[BG] metadataService is null"); return; }
+        try
+        {
             var result = await _metadataService.GetKioskBackgroundAsync();
+            Serilog.Log.Information("[BG] IsSuccess={S} dataType={D}", result.IsSuccess, result.Data?.GetType().Name ?? "null");
             if (result.IsSuccess && result.Data is { } data)
             {
                 var type = data.GetType();
                 var enabled = type.GetProperty("enabled")?.GetValue(data) is bool b && b;
                 var url = type.GetProperty("url")?.GetValue(data)?.ToString() ?? "";
+                Serilog.Log.Information("[BG] enabled={E} urlLen={L}", enabled, url.Length);
                 if (enabled && !string.IsNullOrWhiteSpace(url))
                 {
                     BackgroundImageUrl = url;
                     HasBackgroundImage = true;
+                    try {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                            bmp.BeginInit();
+                            if (url.StartsWith("data:image")) {
+                                var b64 = url.Substring(url.IndexOf(',')+1);
+                                var bytes = System.Convert.FromBase64String(b64);
+                                bmp.StreamSource = new System.IO.MemoryStream(bytes);
+                                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                            } else {
+                                bmp.UriSource = new Uri(url, UriKind.Absolute);
+                                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                            }
+                            bmp.EndInit();
+                            BackgroundImageSource = bmp;
+                        });
+                    } catch (Exception ex2) { Serilog.Log.Error(ex2, "[BG] BitmapImage failed"); }
+                    Serilog.Log.Information("[BG] Background set OK, HasBg={H}", HasBackgroundImage);
                     return;
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Error(ex, "[BG] Exception loading background"); }
         BackgroundImageUrl = "";
         HasBackgroundImage = false;
+        Serilog.Log.Warning("[BG] No background set");
     }
 
     private static bool IsValidPhone(string phone)

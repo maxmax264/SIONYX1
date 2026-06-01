@@ -1,0 +1,5 @@
+﻿f = open(r'.\src\SionyxKiosk\Services\OrganizationMetadataService.cs', encoding='utf-8')
+c = f.read()
+f.close()
+idx = c.find('GetKioskBackgroundAsync')
+print(repr(c[idx:idx+800]))
