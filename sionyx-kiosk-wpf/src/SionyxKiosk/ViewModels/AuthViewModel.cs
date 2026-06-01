@@ -21,6 +21,8 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private string _forgotPasswordInfo = "";
     [ObservableProperty] private string _backgroundImageUrl = "";
     [ObservableProperty] private bool _hasBackgroundImage;
+    [ObservableProperty] private double _bgOpacity = 0.55;
+    [ObservableProperty] private string _bgStretch = "UniformToFill";
     [ObservableProperty] private System.Windows.Media.ImageSource? _backgroundImageSource;
 
     /// <summary>Dynamic button text that changes during loading.</summary>
@@ -110,6 +112,19 @@ public partial class AuthViewModel : ObservableObject
                             BackgroundImageSource = bmp;
                         });
                     } catch (Exception ex2) { Serilog.Log.Error(ex2, "[BG] BitmapImage failed"); }
+                    try {
+                        using var http2 = new System.Net.Http.HttpClient();
+                        var cfg = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+                        var durl = $"{cfg.DatabaseUrl}/organizations/{cfg.OrgId}/metadata/kioskDesign.json";
+                        var djson = await http2.GetStringAsync(durl);
+                        if (djson != "null" && !string.IsNullOrEmpty(djson)) {
+                            var d = System.Text.Json.JsonDocument.Parse(djson).RootElement;
+                            System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                                if (d.TryGetProperty("opacity", out var op)) BgOpacity = op.GetDouble();
+                                if (d.TryGetProperty("stretch", out var st)) BgStretch = st.GetString() ?? "UniformToFill";
+                            });
+                        }
+                    } catch { }
                     Serilog.Log.Information("[BG] Background set OK, HasBg={H}", HasBackgroundImage);
                     return;
                 }

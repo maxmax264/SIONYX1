@@ -426,3 +426,4 @@ sionyx-kiosk-wpf/coverage-report/
 # Miscellaneous
 # ========================================
 # Note: .env.example should be committed (not ignored)
+sionyx-kiosk-wpf/set-env.ps1
