@@ -30,7 +30,7 @@ public partial class AuthWindow : Window
         LoginPhoneInput.KeyDown += OnLoginKeyDown;
         RegPasswordInput.KeyDown += OnRegisterKeyDown;
 
-        Loaded += (_, _) => LoginPhoneInput.Focus();
+        Loaded += (_, _) => { LoginPhoneInput.Focus(); _ = viewModel.ReloadBackgroundAsync(); };
     }
 
     public void AllowClose() => _allowClose = true;

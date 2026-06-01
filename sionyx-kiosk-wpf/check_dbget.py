@@ -1,0 +1,5 @@
+﻿f=open(r'.\src\SionyxKiosk\Infrastructure\FirebaseClient.cs', encoding='utf-8')
+c=f.read()
+f.close()
+idx=c.find('DbGetAsync')
+print(c[idx:idx+600])

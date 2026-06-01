@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Switch, Button, Input, Upload, Space, Typography, Divider, Image, Spin, App } from "antd";
+import { Switch, Button, Input, Upload, Space, Typography, Divider, Image, Spin, App, Alert, Tooltip } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 import { UploadOutlined, LinkOutlined, DeleteOutlined } from "@ant-design/icons";
 import { ref as dbRef, get, set } from "firebase/database";
 import { database } from "../../config/firebase";
@@ -23,6 +24,7 @@ const KioskBackgroundSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [maxSizeMB, setMaxSizeMB] = useState(null);
+  const [allowFileUpload, setAllowFileUpload] = useState(false);
 
   useEffect(() => {
     if (!orgId) return;
@@ -37,6 +39,8 @@ const KioskBackgroundSettings = () => {
       }
       const sysSnap = await get(dbRef(database, "systemSettings/maxImageSizeMB"));
       if (sysSnap.exists()) setMaxSizeMB(sysSnap.val());
+      const uploadSnap = await get(dbRef(database, `systemSettings/orgs/${orgId}/allowFileUpload`));
+      setAllowFileUpload(!uploadSnap.exists() || uploadSnap.val() !== false);
       setLoading(false);
     };
     load();
@@ -84,6 +88,13 @@ const KioskBackgroundSettings = () => {
     return false;
   };
 
+  const handleRefreshKiosk = async () => {
+    setSaving(true);
+    await set(dbRef(database, `organizations/${orgId}/metadata/kioskRefreshAt`), Date.now().toString());
+    message.success("הקיוסק יתרענן תוך 3 שניות");
+    setSaving(false);
+  };
+
   const handleDelete = async () => {
     setSaving(true);
     setImageUrl("");
@@ -98,20 +109,46 @@ const KioskBackgroundSettings = () => {
 
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
-      <Space align="center">
-        <Switch checked={enabled} onChange={handleToggle} loading={saving} />
-        <Text strong>הפעל תמונת רקע לקיוסק</Text>
+      <Alert
+        type="info"
+        showIcon
+        message="איך להגדיר תמונת רקע לקיוסק?"
+        description={
+          <Space direction="vertical" size={4}>
+            <Text>1. היכנס לאתר <a href="https://postimages.org" target="_blank" rel="noreferrer">postimages.org</a> והירשם — כדי שהתמונות ישמרו לצמיתות</Text>
+            <Text>2. העלה את התמונה הרצויה</Text>
+            <Text>3. מהרשימה שמופיעה העתק את השורה <strong>קישור ישיר</strong></Text>
+            <Text type="secondary">הקישור נראה כך: https://i.postimg.cc/xxxxx/image.jpg</Text>
+            <Text>4. הדבק את הקישור בשדה למטה ולחץ <strong>שמור</strong></Text>
+          </Space>
+        }
+        style={{ marginBottom: 8 }}
+      />
+      <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
+        <Space align="center">
+          <Switch checked={enabled} onChange={handleToggle} loading={saving} />
+          <Text strong>הפעל תמונת רקע לקיוסק</Text>
+        </Space>
+        <Tooltip title="שולח פקודת רענון לקיוסק — התמונה תתעדכן תוך 3 שניות">
+          <Button icon={<ReloadOutlined />} onClick={handleRefreshKiosk} loading={saving}>
+            רענן קיוסק
+          </Button>
+        </Tooltip>
       </Space>
 
       {enabled && (
         <>
-          <Divider>העלאת קובץ</Divider>
-          <Upload beforeUpload={handleUpload} showUploadList={false} accept="image/*">
-            <Button icon={<UploadOutlined />} loading={saving}>בחר תמונה</Button>
-          </Upload>
-          {maxSizeMB && <Text type="secondary">גודל מקסימלי: {maxSizeMB}MB</Text>}
+          {allowFileUpload && (
+            <>
+              <Divider>העלאת קובץ</Divider>
+              <Upload beforeUpload={handleUpload} showUploadList={false} accept="image/*">
+                <Button icon={<UploadOutlined />} loading={saving}>בחר תמונה</Button>
+              </Upload>
+              {maxSizeMB && <Text type="secondary">גודל מקסימלי: {maxSizeMB}MB</Text>}
+            </>
+          )}
 
-          <Divider>או הדבק קישור</Divider>
+          <Divider>הדבק קישור</Divider>
           <Space.Compact style={{ width: "100%" }}>
             <Input
               prefix={<LinkOutlined />}

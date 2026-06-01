@@ -91,7 +91,7 @@ public static class LoggingSetup
         if (RegistryConfig.IsProduction())
         {
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments),
                 "SIONYX", "logs");
         }
 

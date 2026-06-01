@@ -1,0 +1,5 @@
+﻿f = open(r'database.rules.json', encoding='utf-8')
+c = f.read()
+f.close()
+idx = c.find('"organizations"', c.find('"organizations"') + 1)
+print(repr(c[idx:idx+600]))
