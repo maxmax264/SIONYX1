@@ -47,7 +47,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border"
                                 CornerRadius="12"
-                                Background="{Binding OverlayGradient, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Background="{Binding DataContext.OverlayGradient, RelativeSource={RelativeSource AncestorType=Window}}"
                                 Padding="{TemplateBinding Padding}"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -77,13 +77,15 @@
                  Stretch="Uniform" StretchDirection="DownOnly"
                  MaxWidth="1000" MaxHeight="700" Margin="24">
         <Border CornerRadius="20" ClipToBounds="True"
-                Width="1000" Height="700">
+                Background="White">
             <Border.Style>
                 <Style TargetType="Border">
-                    <Setter Property="Background" Value="White"/>
+                    <Setter Property="Width" Value="1000"/>
+                    <Setter Property="Height" Value="700"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding CleanMode}" Value="True">
-                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Width" Value="500"/>
+                            <Setter Property="Height" Value="700"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -96,9 +98,19 @@
                  Each form panel sets RTL for Hebrew content. -->
             <Canvas FlowDirection="LeftToRight">
                 <!-- LOGIN form (right side, position 500..1000) -->
-                <StackPanel x:Name="LoginPanel" Canvas.Left="500" Canvas.Top="0"
+                <StackPanel x:Name="LoginPanel" Canvas.Top="0"
                             Width="500" Height="700" Opacity="1"
                             FlowDirection="RightToLeft">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Canvas.Left" Value="500"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CleanMode}" Value="True">
+                                    <Setter Property="Canvas.Left" Value="0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   Height="700">
