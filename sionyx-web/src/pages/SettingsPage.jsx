@@ -4,6 +4,7 @@ import { SettingOutlined, DollarOutlined, DownloadOutlined } from '@ant-design/i
 import PricingSettings from '../components/settings/PricingSettings';
 import KioskDesignSettings from '../components/settings/KioskDesignSettings';
 import DownloadsSettings from '../components/settings/DownloadsSettings';
+import AuthDesignSettings from '../components/settings/AuthDesignSettings';
 
 const { Title, Text } = Typography;
 
@@ -54,6 +55,16 @@ const SettingsPage = () => {
         </span>
       ),
       children: <DownloadsSettings />,
+    },
+    {
+      key: 'authdesign',
+      label: (
+        <span>
+          <SettingOutlined />
+          {' '}עיצוב דשבורד
+        </span>
+      ),
+      children: <AuthDesignSettings />,
     },
   ];
 
