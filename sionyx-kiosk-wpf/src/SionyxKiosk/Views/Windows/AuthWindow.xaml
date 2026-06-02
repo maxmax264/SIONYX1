@@ -40,6 +40,29 @@
                              Storyboard.TargetProperty="Opacity"
                              To="0" Duration="0:0:0.2" />
         </Storyboard>
+        <!-- Dynamic primary button that uses OverlayGradient from Firebase -->
+        <Style x:Key="BtnPrimaryDynamic" TargetType="Button" BasedOn="{StaticResource BtnPrimary}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                CornerRadius="12"
+                                Background="{Binding OverlayGradient, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#D1D5DB" />
+                                <Setter TargetName="border" Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Background="{StaticResource AuthPageBg}">
@@ -63,8 +86,8 @@
                  Each form panel sets RTL for Hebrew content. -->
             <Canvas FlowDirection="LeftToRight">
                 <!-- LOGIN form (right side, position 500..1000) -->
-                <StackPanel x:Name="LoginPanel" Canvas.Left="{Binding FormX}" Canvas.Top="{Binding FormY}"
-                            Width="{Binding FormWidth}" Height="700" Opacity="1"
+                <StackPanel x:Name="LoginPanel" Canvas.Left="500" Canvas.Top="0"
+                            Width="500" Height="700" Opacity="1"
                             FlowDirection="RightToLeft">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
@@ -163,6 +186,7 @@
                      Login: Left=-3 (outer left/top/bottom clipped, right interior corners show).
                      Register: Left=450 (outer right/top/bottom clipped, left interior corners show). -->
                 <Border x:Name="BrandOverlay" Canvas.Left="-3" Canvas.Top="-3"
+                        Visibility="{Binding CleanMode, Converter={StaticResource InverseBoolToVis}}"
                         Width="503" Height="706"
                         CornerRadius="20"
                         Background="{Binding OverlayGradient}">

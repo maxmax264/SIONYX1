@@ -11,6 +11,7 @@ const DEFAULTS = {
   brandSubtitle: "ניהול מחשבים חכם",
   overlayColor1: "#6366F1",
   overlayColor2: "#8B5CF6",
+  buttonColor: "#6366F1",
   showRegister: true,
   cleanMode: false,
   welcomeText: "ברוכים הבאים",
@@ -96,7 +97,7 @@ const AuthDesignSettings = () => {
             <div style={{ color: "#888", fontSize: 11, marginBottom: 16 }}>{design.welcomeSubtext || "התחבר לחשבון שלך"}</div>
             <div style={{ background: "#f0f0f0", borderRadius: 6, height: 28, marginBottom: 8 }} />
             <div style={{ background: "#f0f0f0", borderRadius: 6, height: 28, marginBottom: 12 }} />
-            <div style={{ background: design.overlayColor1, borderRadius: 6, height: 32, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>כניסה לחשבון</div>
+            <div style={{ background: design.buttonColor || design.overlayColor1, borderRadius: 6, height: 32, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>כניסה לחשבון</div>
             {design.showRegister && (
               <div style={{ textAlign: "center", marginTop: 8, color: "#888", fontSize: 11 }}>אין לך חשבון? הירשם</div>
             )}
@@ -117,6 +118,12 @@ const AuthDesignSettings = () => {
           <ColorPicker value={design.overlayColor2}
             onChange={(color) => handleChange("overlayColor2", color.toHexString())} />
           <Text type="secondary">{design.overlayColor2}</Text>
+        </Space>
+        <Space align="center">
+          <Text style={{ width: 120 }}>צבע כפתורים:</Text>
+          <ColorPicker value={design.buttonColor || design.overlayColor1}
+            onChange={(color) => handleChange("buttonColor", color.toHexString())} />
+          <Text type="secondary">{design.buttonColor || design.overlayColor1}</Text>
         </Space>
       </Space>
 

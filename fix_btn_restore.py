@@ -1,0 +1,5 @@
+﻿content = open(r'.\sionyx-kiosk-wpf\src\SionyxKiosk\Views\Windows\AuthWindow.xaml', encoding='utf-8').read()
+content = content.replace('Style="{StaticResource BtnPrimaryDynamic}"', 'Style="{StaticResource BtnPrimary}"')
+count = content.count('BtnPrimary"')
+print(f"Restored {count} buttons")
+open(r'.\sionyx-kiosk-wpf\src\SionyxKiosk\Views\Windows\AuthWindow.xaml', 'w', encoding='utf-8').write(content)
