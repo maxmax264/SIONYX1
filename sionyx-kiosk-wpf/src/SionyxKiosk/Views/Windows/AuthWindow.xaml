@@ -74,7 +74,7 @@
                Opacity="{Binding BgOpacity}" Panel.ZIndex="0" />
         <!-- Viewbox scales the auth card on screens smaller than 1000x700 -->
         <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
-                 MaxHeight="700" Margin="24">
+                 MaxHeight="700">
             <Viewbox.Style>
                 <Style TargetType="Viewbox">
                     <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -84,7 +84,6 @@
                         <DataTrigger Binding="{Binding CleanMode}" Value="True">
                             <Setter Property="HorizontalAlignment" Value="Left"/>
                             <Setter Property="VerticalAlignment" Value="Top"/>
-                            <Setter Property="MaxWidth" Value="{Binding FormWidth}"/>
                             <Setter Property="Margin" Value="{Binding FormMargin}"/>
                         </DataTrigger>
                     </Style.Triggers>

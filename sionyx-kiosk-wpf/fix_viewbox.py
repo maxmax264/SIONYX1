@@ -2,9 +2,8 @@
 c = f.read()
 f.close()
 
-old = '<Viewbox HorizontalAlignment="Center" VerticalAlignment="Center"\n                 Stretch="Uniform" StretchDirection="DownOnly"\n                 MaxWidth="1000" MaxHeight="700" Margin="24">'
-
-new = '<Viewbox Stretch="Uniform" StretchDirection="DownOnly"\n                 MaxWidth="1000" MaxHeight="700" Margin="24">\n            <Viewbox.Style>\n                <Style TargetType="Viewbox">\n                    <Setter Property="HorizontalAlignment" Value="Center"/>\n                    <Setter Property="VerticalAlignment" Value="Center"/>\n                    <Style.Triggers>\n                        <DataTrigger Binding="{Binding CleanMode}" Value="True">\n                            <Setter Property="HorizontalAlignment" Value="Left"/>\n                            <Setter Property="VerticalAlignment" Value="Top"/>\n                            <Setter Property="Margin" Value="{Binding FormMargin}"/>\n                        </DataTrigger>\n                    </Style.Triggers>\n                </Style>\n            </Viewbox.Style>'
+old = '        <Viewbox Stretch="Uniform" StretchDirection="DownOnly"\n                 MaxHeight="700" Margin="24"\n                 HorizontalAlignment="Center" VerticalAlignment="Center">'
+new = '        <Viewbox Stretch="Uniform" StretchDirection="DownOnly"\n                 MaxHeight="700">'
 
 count = c.count(old)
 print(f'Found {count} matches')
@@ -14,3 +13,5 @@ if count == 1:
     print('OK')
 else:
     print('NOT FOUND')
+    idx = c.find('<Viewbox Stretch')
+    print(repr(c[idx:idx+150]))
