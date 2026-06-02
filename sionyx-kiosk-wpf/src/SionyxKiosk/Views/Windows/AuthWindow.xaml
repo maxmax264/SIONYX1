@@ -76,9 +76,18 @@
         <Viewbox HorizontalAlignment="Center" VerticalAlignment="Center"
                  Stretch="Uniform" StretchDirection="DownOnly"
                  MaxWidth="1000" MaxHeight="700" Margin="24">
-        <Border CornerRadius="20" Background="White" ClipToBounds="True"
-                Width="1000" Height="700"
-                Visibility="{Binding CleanMode, Converter={StaticResource InverseBoolToVis}}">
+        <Border CornerRadius="20" ClipToBounds="True"
+                Width="1000" Height="700">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="White"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding CleanMode}" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Border.Effect>
                 <DropShadowEffect BlurRadius="120" ShadowDepth="0" Opacity="0.35" Color="#6366F1" />
             </Border.Effect>

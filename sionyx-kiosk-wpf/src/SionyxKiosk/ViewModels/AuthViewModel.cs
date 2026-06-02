@@ -27,6 +27,7 @@ public partial class AuthViewModel : ObservableObject
 
     // authDesign properties
     [ObservableProperty] private string _overlayColor1 = "#6366F1";
+    [ObservableProperty] private string _buttonColor = "";
     [ObservableProperty] private string _overlayColor2 = "#8B5CF6";
     [ObservableProperty] private string _brandSubtitle = "ניהול מחשבים חכם";
     [ObservableProperty] private string _welcomeText = "ברוכים הבאים";
@@ -281,6 +282,7 @@ public partial class AuthViewModel : ObservableObject
             {
                 if (d.TryGetProperty("overlayColor1", out var c1)) OverlayColor1 = (c1.GetString() ?? "#6366F1").Trim();
                 if (d.TryGetProperty("overlayColor2", out var c2)) OverlayColor2 = (c2.GetString() ?? "#8B5CF6").Trim();
+                if (d.TryGetProperty("buttonColor", out var bc)) { var bcStr = bc.GetString(); if (!string.IsNullOrEmpty(bcStr)) ButtonColor = bcStr.Trim(); }
                 if (d.TryGetProperty("brandSubtitle", out var bs)) BrandSubtitle = bs.GetString() ?? "";
                 if (d.TryGetProperty("welcomeText", out var wt)) WelcomeText = wt.GetString() ?? "";
                 if (d.TryGetProperty("welcomeSubtext", out var ws)) WelcomeSubtext = ws.GetString() ?? "";
@@ -293,8 +295,9 @@ public partial class AuthViewModel : ObservableObject
                 // עדכן את הגרדיאנט
                 try
                 {
-                    var col1 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(OverlayColor1);
-                    var col2 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(OverlayColor2);
+                    var btnCol = !string.IsNullOrEmpty(ButtonColor) ? ButtonColor : OverlayColor1;
+                    var col1 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(btnCol);
+                    var col2 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(btnCol);
                     OverlayGradient = new System.Windows.Media.LinearGradientBrush(col1, col2, 45);
                 }
                 catch { }
