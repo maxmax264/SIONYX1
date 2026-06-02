@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿combined = r"""import { useState, useEffect } from "react";
 import { Switch, Button, Input, Upload, Space, Typography, Divider, Spin, App, Alert, Tooltip, ColorPicker, Slider, Select } from "antd";
 import { ReloadOutlined, UploadOutlined, LinkOutlined, DeleteOutlined } from "@ant-design/icons";
 import { ref as dbRef, get, set } from "firebase/database";
@@ -314,3 +314,6 @@ const KioskDesignSettings = () => {
 };
 
 export default KioskDesignSettings;
+"""
+open(r'.\src\components\settings\KioskDesignSettings.jsx', 'w', encoding='utf-8').write(combined)
+print("OK")
