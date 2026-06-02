@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, Typography, Tabs, Space } from 'antd';
-import { SettingOutlined, DollarOutlined, DownloadOutlined, PictureOutlined, BgColorsOutlined } from '@ant-design/icons';
+import { SettingOutlined, DollarOutlined, DownloadOutlined } from '@ant-design/icons';
 import PricingSettings from '../components/settings/PricingSettings';
-import KioskBackgroundSettings from '../components/settings/KioskBackgroundSettings';
-import AuthDesignSettings from '../components/settings/AuthDesignSettings';
+import KioskDesignSettings from '../components/settings/KioskDesignSettings';
 import DownloadsSettings from '../components/settings/DownloadsSettings';
 
 const { Title, Text } = Typography;
@@ -35,25 +34,16 @@ const SettingsPage = () => {
       ),
       children: <PricingSettings />,
     },
+
     {
-      key: 'background',
+      key: 'kioskdesign',
       label: (
         <span>
-          <PictureOutlined />
-          {' '}תמונת רקע
-        </span>
-      ),
-      children: <KioskBackgroundSettings />,
-    },
-    {
-      key: 'authdesign',
-      label: (
-        <span>
-          <BgColorsOutlined />
+          <DownloadOutlined />
           {' '}עיצוב מסך כניסה
         </span>
       ),
-      children: <AuthDesignSettings />,
+      children: <KioskDesignSettings />,
     },
     {
       key: 'downloads',
