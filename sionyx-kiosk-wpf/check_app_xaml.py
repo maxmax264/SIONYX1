@@ -1,5 +1,0 @@
-﻿f = open(r'.\src\SionyxKiosk\App.xaml', encoding='utf-8')
-c = f.read()
-f.close()
-print("BoolToVis" in c, "BooleanToVisibility" in c)
-print(c[:2000])

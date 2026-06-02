@@ -1,7 +1,0 @@
-﻿f = open(r'.\src\SionyxKiosk\ViewModels\AuthViewModel.cs', encoding='utf-8')
-c = f.read()
-f.close()
-idx = c.find('_formX')
-print(c[idx-50:idx+100])
-idx2 = c.find('_formY')
-print(c[idx2-50:idx2+100])
