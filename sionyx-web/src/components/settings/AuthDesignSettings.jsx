@@ -109,13 +109,13 @@ const AuthDesignSettings = () => {
         <Space align="center">
           <Text style={{ width: 120 }}>צבע ראשי:</Text>
           <ColorPicker value={design.overlayColor1}
-            onChange={(_, hex) => handleChange("overlayColor1", hex)} />
+            onChange={(color) => handleChange("overlayColor1", color.toHexString())} />
           <Text type="secondary">{design.overlayColor1}</Text>
         </Space>
         <Space align="center">
           <Text style={{ width: 120 }}>צבע משני:</Text>
           <ColorPicker value={design.overlayColor2}
-            onChange={(_, hex) => handleChange("overlayColor2", hex)} />
+            onChange={(color) => handleChange("overlayColor2", color.toHexString())} />
           <Text type="secondary">{design.overlayColor2}</Text>
         </Space>
       </Space>

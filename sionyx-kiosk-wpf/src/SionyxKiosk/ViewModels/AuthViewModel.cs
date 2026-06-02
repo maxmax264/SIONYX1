@@ -33,6 +33,9 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private string _welcomeSubtext = "התחבר לחשבון שלך";
     [ObservableProperty] private bool _showRegister = true;
     [ObservableProperty] private bool _cleanMode = false;
+    [ObservableProperty] private double _formX = 500;
+    [ObservableProperty] private double _formY = 0;
+    [ObservableProperty] private double _formWidth = 500;
     [ObservableProperty] private System.Windows.Media.Brush _overlayGradient = new System.Windows.Media.LinearGradientBrush(
         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#6366F1"),
         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8B5CF6"),
@@ -286,6 +289,9 @@ public partial class AuthViewModel : ObservableObject
                 if (d.TryGetProperty("welcomeSubtext", out var ws)) WelcomeSubtext = ws.GetString() ?? "";
                 if (d.TryGetProperty("showRegister", out var sr)) ShowRegister = sr.GetBoolean();
                 if (d.TryGetProperty("cleanMode", out var cm)) CleanMode = cm.GetBoolean();
+                if (d.TryGetProperty("formX", out var fx)) FormX = fx.GetDouble();
+                if (d.TryGetProperty("formY", out var fy)) FormY = fy.GetDouble();
+                if (d.TryGetProperty("formWidth", out var fw)) FormWidth = fw.GetDouble();
 
                 // עדכן את הגרדיאנט
                 try

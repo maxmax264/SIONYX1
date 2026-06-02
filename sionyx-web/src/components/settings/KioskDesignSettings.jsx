@@ -351,11 +351,11 @@ const KioskDesignSettings = () => {
       <Space direction="vertical" size={14} style={{ width: "100%" }}>
         <Space align="center">
           <Text style={{ width: 120 }}>צבע ראשי:</Text>
-          <ColorPicker value={design.overlayColor1} onChange={(_, hex) => handleDesignChange("overlayColor1", hex)} />
+          <ColorPicker value={design.overlayColor1} onChange={(color) => handleDesignChange("overlayColor1", color.toHexString())} />
         </Space>
         <Space align="center">
           <Text style={{ width: 120 }}>צבע משני:</Text>
-          <ColorPicker value={design.overlayColor2} onChange={(_, hex) => handleDesignChange("overlayColor2", hex)} />
+          <ColorPicker value={design.overlayColor2} onChange={(color) => handleDesignChange("overlayColor2", color.toHexString())} />
         </Space>
         <Space align="center">
           <Text style={{ width: 120 }}>שם המערכת:</Text>

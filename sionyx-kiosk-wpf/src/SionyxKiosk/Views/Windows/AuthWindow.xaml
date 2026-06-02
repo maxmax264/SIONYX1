@@ -63,8 +63,8 @@
                  Each form panel sets RTL for Hebrew content. -->
             <Canvas FlowDirection="LeftToRight">
                 <!-- LOGIN form (right side, position 500..1000) -->
-                <StackPanel x:Name="LoginPanel" Canvas.Left="500" Canvas.Top="0"
-                            Width="500" Height="700" Opacity="1"
+                <StackPanel x:Name="LoginPanel" Canvas.Left="{Binding FormX}" Canvas.Top="{Binding FormY}"
+                            Width="{Binding FormWidth}" Height="700" Opacity="1"
                             FlowDirection="RightToLeft">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
