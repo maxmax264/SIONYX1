@@ -21,6 +21,7 @@ const DESIGN_DEFAULTS = {
   overlayColor2: "#8B5CF6",
   showRegister: true,
   cleanMode: false,
+  formPosition: "center",
   welcomeText: "ברוכים הבאים",
   welcomeSubtext: "התחבר לחשבון שלך",
 };
@@ -141,7 +142,10 @@ const KioskDesignSettings = () => {
       <div style={{ position: "absolute", inset: 0, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ display: "flex", flexDirection: "row", width: "80%", height: "80%", borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 16px rgba(0,0,0,0.3)" }}>
           {/* צד ימין - טופס */}
-          <div style={{ width: design.cleanMode ? "100%" : "50%", background: "rgba(255,255,255,0.95)", padding: 16, display: "flex", flexDirection: "column", justifyContent: "center", direction: "rtl" }}>
+          <div style={{ width: design.cleanMode ? "100%" : "50%", background: design.cleanMode ? "transparent" : "rgba(255,255,255,0.95)", padding: 16, display: "flex", flexDirection: "column", justifyContent: "center", direction: "rtl",
+            alignItems: design.cleanMode ? (design.formPosition === "right" ? "flex-end" : design.formPosition === "left" ? "flex-start" : "center") : "stretch" }}>
+            {design.cleanMode && (
+              <div style={{ width: 180, background: "rgba(255,255,255,0.93)", borderRadius: 8, padding: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.15)" }}>
             {design.cleanMode && <div style={{ textAlign: "center", marginBottom: 8, fontWeight: 800, fontSize: 14, color: design.overlayColor1 }}>{design.brandName}</div>}
             <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 2 }}>{design.welcomeText}</div>
             <div style={{ color: "#888", fontSize: 9, marginBottom: 8 }}>{design.welcomeSubtext}</div>
@@ -150,6 +154,8 @@ const KioskDesignSettings = () => {
             <div style={{ background: design.overlayColor1, borderRadius: 4, height: 22, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9 }}>כניסה לחשבון</div>
             {design.showRegister && <div style={{ textAlign: "center", marginTop: 4, color: "#888", fontSize: 8 }}>אין לך חשבון? הירשם</div>}
           </div>
+          )}
+        </div>
           {/* צד שמאל - פאנל צבעוני */}
           {!design.cleanMode && (
             <div style={{ width: "50%", height: "100%", background: `linear-gradient(135deg, ${design.overlayColor1}, ${design.overlayColor2})`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white", padding: 12 }}>
@@ -216,7 +222,7 @@ const KioskDesignSettings = () => {
         </Space>
         <Space align="center">
           <Text style={{ width: 110 }}>שם המערכת:</Text>
-          <Input value={design.brandName} onChange={e => setDesign({ ...design, brandName: e.target.value })} onBlur={() => saveDesign(design)} style={{ width: 180 }} />
+          <Text strong>{design.brandName}</Text>
         </Space>
         <Space align="center">
           <Text style={{ width: 110 }}>כותרת משנה:</Text>
@@ -242,9 +248,20 @@ const KioskDesignSettings = () => {
           <Switch checked={design.cleanMode || false} onChange={val => handleDesignChange("cleanMode", val)} />
           <Space direction="vertical" size={0}>
             <Text>מצב נקי — טופס בלבד</Text>
-            <Text type="secondary" style={{ fontSize: 11 }}>מסתיר את הפאנל הצבעוני, הלוגו יופיע מעל הטופס</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>מסתיר את הפאנל הצבעוני</Text>
           </Space>
         </Space>
+        {design.cleanMode && (
+          <Space align="center">
+            <Text style={{ width: 110 }}>מיקום טופס:</Text>
+            {["right","center","left"].map(pos => (
+              <Button key={pos} size="small" type={design.formPosition === pos ? "primary" : "default"}
+                onClick={() => handleDesignChange("formPosition", pos)}>
+                {pos === "right" ? "ימין" : pos === "center" ? "מרכז" : "שמאל"}
+              </Button>
+            ))}
+          </Space>
+        )}
       </Space>
     </Space>
   );
