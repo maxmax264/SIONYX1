@@ -135,7 +135,7 @@ public class OrganizationMetadataService : BaseService
             var config = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
             using var http = new System.Net.Http.HttpClient();
             var enabledJson = await http.GetStringAsync($"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/kioskBackgroundEnabled.json");
-            var enabled = enabledJson.Trim() == "true";
+            var enabled = enabledJson.Trim().ToLower() == "true";
             if (!enabled) return Success(new { enabled = false, url = "" });
             var bgUrl = await http.GetStringAsync($"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/kioskBackgroundUrl.json");
             bgUrl = bgUrl.Trim().Trim('"');
