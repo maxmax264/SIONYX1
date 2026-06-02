@@ -1,4 +1,5 @@
 <Application x:Class="SionyxKiosk.App"
+             xmlns:views="clr-namespace:SionyxKiosk.Views.Windows"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:infra="clr-namespace:SionyxKiosk.Infrastructure"
@@ -12,6 +13,7 @@
                 <ResourceDictionary Source="Themes/Animations.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <views:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
             <infra:Base64OrUrlToImageConverter x:Key="Base64ToImage" />
         </ResourceDictionary>
     </Application.Resources>
