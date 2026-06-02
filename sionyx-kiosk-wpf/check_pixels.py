@@ -1,0 +1,5 @@
+﻿f = open(r'.\src\SionyxKiosk\ViewModels\AuthViewModel.cs', encoding='utf-8')
+c = f.read()
+f.close()
+idx = c.find('FormXPixels')
+print(c[idx:idx+200])

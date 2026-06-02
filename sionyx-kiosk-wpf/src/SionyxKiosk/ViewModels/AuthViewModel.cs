@@ -34,6 +34,14 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private string _welcomeSubtext = "התחבר לחשבון שלך";
     [ObservableProperty] private bool _showRegister = true;
     [ObservableProperty] private bool _cleanMode = false;
+    [ObservableProperty] private double _formX = 50;
+    [ObservableProperty] private double _formY = 50;
+    [ObservableProperty] private double _formWidth = 480;
+    public double FormXPixels => Math.Max(0, FormX / 100.0 * (System.Windows.SystemParameters.PrimaryScreenWidth - FormWidth));
+    public double FormYPixels => Math.Max(0, FormY / 100.0 * (System.Windows.SystemParameters.PrimaryScreenHeight - 500));
+    public System.Windows.Thickness FormMargin => new System.Windows.Thickness(FormXPixels, FormYPixels, 0, 0);
+    partial void OnFormXChanged(double value) { Serilog.Log.Information("[Form] X={X} ScreenW={SW} FormW={FW} => Pixels={P}", FormX, System.Windows.SystemParameters.PrimaryScreenWidth, FormWidth, FormXPixels); OnPropertyChanged(nameof(FormXPixels)); OnPropertyChanged(nameof(FormMargin)); }
+    partial void OnFormYChanged(double value) { OnPropertyChanged(nameof(FormYPixels)); OnPropertyChanged(nameof(FormMargin)); }
     [ObservableProperty] private System.Windows.Media.Brush _overlayGradient = new System.Windows.Media.LinearGradientBrush(
         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#6366F1"),
         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8B5CF6"),
@@ -287,6 +295,9 @@ public partial class AuthViewModel : ObservableObject
                 if (d.TryGetProperty("welcomeText", out var wt)) WelcomeText = wt.GetString() ?? "";
                 if (d.TryGetProperty("welcomeSubtext", out var ws)) WelcomeSubtext = ws.GetString() ?? "";
                 if (d.TryGetProperty("showRegister", out var sr)) ShowRegister = sr.GetBoolean();
+                if (d.TryGetProperty("formX", out var fx)) FormX = fx.GetDouble();
+                if (d.TryGetProperty("formY", out var fy)) FormY = fy.GetDouble();
+                if (d.TryGetProperty("formWidth", out var fw)) FormWidth = fw.GetDouble();
                 if (d.TryGetProperty("cleanMode", out var cm)) { 
                     CleanMode = cm.GetBoolean(); 
                     Serilog.Log.Information("[Design] CleanMode updated to {V}", CleanMode); 
