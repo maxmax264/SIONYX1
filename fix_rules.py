@@ -1,24 +1,20 @@
-﻿f = open(r'database.rules.json', encoding='utf-8')
-c = f.read()
-f.close()
+﻿content = open(r'.\database.rules.json', encoding='utf-8').read()
 
-old = '''    "sessionLogs": {
-      "$userId": {
-        ".read": "auth.uid === $userId || root.child('organizations/sionov/users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations/sionov/users').child(auth.uid).child('role').val() === 'admin'",'''
+old = '''          "kioskBackgroundEnabled": { ".read": true },
+          "kioskBackgroundUrl": { ".read": true },
+          "kioskRefreshAt": { ".read": true },'''
 
-new = '''    "systemSettings": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    },
-    "sessionLogs": {
-      "$userId": {
-        ".read": "auth.uid === $userId || root.child('organizations/sionov/users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations/sionov/users').child(auth.uid).child('role').val() === 'admin'",'''
+new = '''          "kioskBackgroundEnabled": { ".read": true },
+          "kioskBackgroundUrl": { ".read": true },
+          "kioskRefreshAt": { ".read": true },
+          "authDesign": { ".read": true },
+          "kioskDesign": { ".read": true },'''
 
-count = c.count(old)
+count = content.count(old)
 print(f"Found {count} matches")
 if count == 1:
-    c = c.replace(old, new, 1)
-    open(r'database.rules.json', 'w', encoding='utf-8').write(c)
-    print("OK")
+    content = content.replace(old, new, 1)
+    open(r'.\database.rules.json', 'w', encoding='utf-8').write(content)
+    print('OK')
 else:
-    print("NOT FOUND")
+    print('NOT FOUND')

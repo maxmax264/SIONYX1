@@ -271,7 +271,9 @@ public partial class AuthViewModel : ObservableObject
             var cfg = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
             using var http = new System.Net.Http.HttpClient();
             var url = $"{cfg.DatabaseUrl}/organizations/{cfg.OrgId}/metadata/authDesign.json";
-            var json = await http.GetStringAsync(url);
+            var response = await http.GetAsync(url);
+            if (!response.IsSuccessStatusCode) { Serilog.Log.Warning("[Design] authDesign HTTP {S}", response.StatusCode); return; }
+            var json = await response.Content.ReadAsStringAsync();
             if (json == "null" || string.IsNullOrEmpty(json)) return;
             var d = System.Text.Json.JsonDocument.Parse(json).RootElement;
             System.Windows.Application.Current.Dispatcher.Invoke(() =>

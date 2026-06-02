@@ -173,7 +173,7 @@ const KioskDesignSettings = () => {
         position: "relative",
         width: "100%",
         height: 500,
-        background: "#f5f5f5",
+        background: "linear-gradient(135deg, #0F172A, #1E1B4B, #0F172A)",
         borderRadius: 16,
         overflow: "hidden",
         display: "flex",
@@ -192,70 +192,113 @@ const KioskDesignSettings = () => {
             width: "100%",
             height: "100%",
             objectFit: "cover",
+            zIndex: 0,
           }}
         />
       )}
-      <div
-        style={{
-          width: 800,
-          height: 560,
-          background: "white",
-          borderRadius: 20,
-          overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,.25)",
-          position: "relative",
-          display: "flex",
-        }}
-      >
-        <div
-          style={{
-            width: 400,
-            background: `linear-gradient(135deg, ${design.overlayColor1}, ${design.overlayColor2})`,
-            display: design.cleanMode ? "none" : "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "white",
-            padding: 40,
-          }}
-        >
-          <div style={{ fontSize: 42, fontWeight: 800 }}>SIONYX</div>
-          <div style={{ marginTop: 14, opacity: .9, textAlign: "center" }}>{design.brandSubtitle}</div>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            padding: 50,
-            direction: "rtl",
-            background: "white",
+      {design.cleanMode ? (
+        <>
+          <FormBox />
+          <div style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: "rgba(0,0,0,0.6)",
+            padding: "12px 20px",
+            zIndex: 10,
             display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
+            gap: 24,
+            alignItems: "center",
+            direction: "rtl",
+          }}>
+            <div style={{ flex: 1 }}>
+              <Text style={{ color: "white", fontSize: 11 }}>אופקי: {design.formX ?? 50}%</Text>
+              <Slider min={5} max={95} value={design.formX ?? 50}
+                onChange={val => setDesign({ ...design, formX: val })}
+                onChangeComplete={val => handleDesignChange("formX", val)}
+                style={{ margin: "4px 0 0" }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Text style={{ color: "white", fontSize: 11 }}>אנכי: {design.formY ?? 50}%</Text>
+              <Slider min={10} max={90} value={design.formY ?? 50}
+                onChange={val => setDesign({ ...design, formY: val })}
+                onChangeComplete={val => handleDesignChange("formY", val)}
+                style={{ margin: "4px 0 0" }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Text style={{ color: "white", fontSize: 11 }}>רוחב: {design.formWidth ?? 340}px</Text>
+              <Slider min={200} max={500} step={10} value={design.formWidth ?? 340}
+                onChange={val => setDesign({ ...design, formWidth: val })}
+                onChangeComplete={val => handleDesignChange("formWidth", val)}
+                style={{ margin: "4px 0 0" }} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <div
+          style={{
+            width: 800,
+            height: 560,
+            background: "white",
+            borderRadius: 20,
+            overflow: "hidden",
+            boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+            position: "relative",
+            display: "flex",
+            zIndex: 1,
           }}
         >
-          <h2>{design.welcomeText}</h2>
-          <div style={{ color: "#888", marginBottom: 30 }}>{design.welcomeSubtext}</div>
-          <div style={{ height: 46, background: "#f1f1f1", borderRadius: 8, marginBottom: 14 }} />
-          <div style={{ height: 46, background: "#f1f1f1", borderRadius: 8, marginBottom: 20 }} />
           <div
             style={{
-              height: 48,
-              background: design.overlayColor1,
-              borderRadius: 8,
-              color: "white",
+              flex: 1,
+              padding: 50,
+              direction: "rtl",
+              background: "white",
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
-              alignItems: "center",
-              fontWeight: 700,
             }}
           >
-            התחברות
+            <h2>{design.welcomeText}</h2>
+            <div style={{ color: "#888", marginBottom: 30 }}>{design.welcomeSubtext}</div>
+            <div style={{ height: 46, background: "#f1f1f1", borderRadius: 8, marginBottom: 14 }} />
+            <div style={{ height: 46, background: "#f1f1f1", borderRadius: 8, marginBottom: 20 }} />
+            <div
+              style={{
+                height: 48,
+                background: design.overlayColor1,
+                borderRadius: 8,
+                color: "white",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                fontWeight: 700,
+              }}
+            >
+              התחברות
+            </div>
+            {design.showRegister && (
+              <div style={{ textAlign: "center", marginTop: 15, color: "#888" }}>אין חשבון? הירשם</div>
+            )}
           </div>
-          {design.showRegister && (
-            <div style={{ textAlign: "center", marginTop: 15, color: "#888" }}>אין חשבון? הירשם</div>
-          )}
+          <div
+            style={{
+              width: 320,
+              background: `linear-gradient(160deg, ${design.overlayColor1}, ${design.overlayColor2})`,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              color: "white",
+              padding: 40,
+            }}
+          >
+            <div style={{ fontSize: 42, fontWeight: 800 }}>SIONYX</div>
+            <div style={{ marginTop: 14, opacity: 0.9, textAlign: "center" }}>{design.brandSubtitle}</div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -347,25 +390,7 @@ const KioskDesignSettings = () => {
           </Space>
         </Space>
 
-        {design.cleanMode && (
-          <Space direction="vertical" size={10} style={{ width: "100%", paddingRight: 8, borderRight: "3px solid #6366F1" }}>
-            <Space align="center">
-              <Text style={{ width: 120 }}>מיקום אופקי:</Text>
-              <Slider min={5} max={95} value={design.formX ?? 50} onChange={val => setDesign({ ...design, formX: val })} onChangeComplete={val => handleDesignChange("formX", val)} style={{ width: 180 }} />
-              <Text type="secondary" style={{ width: 30 }}>{design.formX ?? 50}%</Text>
-            </Space>
-            <Space align="center">
-              <Text style={{ width: 120 }}>מיקום אנכי:</Text>
-              <Slider min={10} max={90} value={design.formY ?? 50} onChange={val => setDesign({ ...design, formY: val })} onChangeComplete={val => handleDesignChange("formY", val)} style={{ width: 180 }} />
-              <Text type="secondary" style={{ width: 30 }}>{design.formY ?? 50}%</Text>
-            </Space>
-            <Space align="center">
-              <Text style={{ width: 120 }}>רוחב טופס:</Text>
-              <Slider min={200} max={500} step={10} value={design.formWidth ?? 340} onChange={val => setDesign({ ...design, formWidth: val })} onChangeComplete={val => handleDesignChange("formWidth", val)} style={{ width: 180 }} />
-              <Text type="secondary" style={{ width: 40 }}>{design.formWidth ?? 340}px</Text>
-            </Space>
-          </Space>
-        )}
+
       </Space>
     </Space>
   );
