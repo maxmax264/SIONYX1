@@ -53,7 +53,7 @@ public partial class AuthWindow : Window
         var sb = (Storyboard)FindResource("SlideToRegister");
         sb.Begin(this);
 
-        BrandSubtitle.Text = "הצטרף אלינו היום";
+        BrandSubtitleBlock.Text = "הצטרף אלינו היום";
         RegPhoneInput.Focus();
     }
 
@@ -73,7 +73,7 @@ public partial class AuthWindow : Window
         var sb = (Storyboard)FindResource("SlideToLogin");
         sb.Begin(this);
 
-        BrandSubtitle.Text = "ניהול מחשבים חכם";
+        BrandSubtitleBlock.Text = "ניהול מחשבים חכם";
         LoginPhoneInput.Focus();
     }
 

@@ -25,6 +25,19 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private string _bgStretch = "UniformToFill";
     [ObservableProperty] private System.Windows.Media.ImageSource? _backgroundImageSource;
 
+    // authDesign properties
+    [ObservableProperty] private string _overlayColor1 = "#6366F1";
+    [ObservableProperty] private string _overlayColor2 = "#8B5CF6";
+    [ObservableProperty] private string _brandSubtitle = "ניהול מחשבים חכם";
+    [ObservableProperty] private string _welcomeText = "ברוכים הבאים";
+    [ObservableProperty] private string _welcomeSubtext = "התחבר לחשבון שלך";
+    [ObservableProperty] private bool _showRegister = true;
+    [ObservableProperty] private bool _cleanMode = false;
+    [ObservableProperty] private System.Windows.Media.Brush _overlayGradient = new System.Windows.Media.LinearGradientBrush(
+        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#6366F1"),
+        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8B5CF6"),
+        45);
+
     /// <summary>Dynamic button text that changes during loading.</summary>
     public string LoginButtonText => IsLoading ? "מתחבר..." : "התחבר";
     public string RegisterButtonText => IsLoading ? "נרשם..." : "הירשם";
@@ -126,6 +139,7 @@ public partial class AuthViewModel : ObservableObject
                         }
                     } catch { }
                     Serilog.Log.Information("[BG] Background set OK, HasBg={H}", HasBackgroundImage);
+                    await LoadAuthDesignAsync();
                     return;
                 }
             }
@@ -248,6 +262,40 @@ public partial class AuthViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    private async Task LoadAuthDesignAsync()
+    {
+        try
+        {
+            var cfg = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+            using var http = new System.Net.Http.HttpClient();
+            var url = $"{cfg.DatabaseUrl}/organizations/{cfg.OrgId}/metadata/authDesign.json";
+            var json = await http.GetStringAsync(url);
+            if (json == "null" || string.IsNullOrEmpty(json)) return;
+            var d = System.Text.Json.JsonDocument.Parse(json).RootElement;
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (d.TryGetProperty("overlayColor1", out var c1)) OverlayColor1 = c1.GetString() ?? "#6366F1";
+                if (d.TryGetProperty("overlayColor2", out var c2)) OverlayColor2 = c2.GetString() ?? "#8B5CF6";
+                if (d.TryGetProperty("brandSubtitle", out var bs)) BrandSubtitle = bs.GetString() ?? "";
+                if (d.TryGetProperty("welcomeText", out var wt)) WelcomeText = wt.GetString() ?? "";
+                if (d.TryGetProperty("welcomeSubtext", out var ws)) WelcomeSubtext = ws.GetString() ?? "";
+                if (d.TryGetProperty("showRegister", out var sr)) ShowRegister = sr.GetBoolean();
+                if (d.TryGetProperty("cleanMode", out var cm)) CleanMode = cm.GetBoolean();
+
+                // עדכן את הגרדיאנט
+                try
+                {
+                    var col1 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(OverlayColor1);
+                    var col2 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(OverlayColor2);
+                    OverlayGradient = new System.Windows.Media.LinearGradientBrush(col1, col2, 45);
+                }
+                catch { }
+            });
+            Serilog.Log.Information("[Design] authDesign loaded OK");
+        }
+        catch (Exception ex) { Serilog.Log.Error(ex, "[Design] Failed to load authDesign"); }
     }
 
     /// <summary>Called by App when auto-login succeeds.</summary>
