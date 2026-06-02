@@ -358,6 +358,10 @@ const KioskDesignSettings = () => {
           <ColorPicker value={design.overlayColor2} onChange={(color) => handleDesignChange("overlayColor2", color.toHexString())} />
         </Space>
         <Space align="center">
+          <Text style={{ width: 120 }}>צבע כפתורים:</Text>
+          <ColorPicker value={design.buttonColor || design.overlayColor1} onChange={(color) => handleDesignChange("buttonColor", color.toHexString())} />
+        </Space>
+        <Space align="center">
           <Text style={{ width: 120 }}>שם המערכת:</Text>
           <Text strong>SIONYX</Text>
         </Space>
