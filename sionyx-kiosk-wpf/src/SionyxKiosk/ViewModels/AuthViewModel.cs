@@ -148,6 +148,7 @@ public partial class AuthViewModel : ObservableObject
         BackgroundImageUrl = "";
         HasBackgroundImage = false;
         Serilog.Log.Warning("[BG] No background set");
+        await LoadAuthDesignAsync();
     }
 
     private static bool IsValidPhone(string phone)
