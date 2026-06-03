@@ -46,6 +46,8 @@ public partial class AuthViewModel : ObservableObject
         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#6366F1"),
         (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#8B5CF6"),
         45);
+    [ObservableProperty] private System.Windows.Media.Brush _buttonGradient = new System.Windows.Media.SolidColorBrush(
+        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#6366F1"));
 
     /// <summary>Dynamic button text that changes during loading.</summary>
     public string LoginButtonText => IsLoading ? "מתחבר..." : "התחבר";
@@ -318,10 +320,16 @@ public partial class AuthViewModel : ObservableObject
                 // עדכן את הגרדיאנט
                 try
                 {
+                    var oc1 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(OverlayColor1);
+                    var oc2 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(OverlayColor2);
+                    OverlayGradient = new System.Windows.Media.LinearGradientBrush(oc1, oc2, 45);
+                }
+                catch { }
+                try
+                {
                     var btnCol = !string.IsNullOrEmpty(ButtonColor) ? ButtonColor : OverlayColor1;
-                    var col1 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(btnCol);
-                    var col2 = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(btnCol);
-                    OverlayGradient = new System.Windows.Media.LinearGradientBrush(col1, col2, 45);
+                    var btnColor = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(btnCol);
+                    ButtonGradient = new System.Windows.Media.SolidColorBrush(btnColor);
                 }
                 catch { }
             });

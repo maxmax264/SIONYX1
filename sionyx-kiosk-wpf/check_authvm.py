@@ -1,5 +1,5 @@
-﻿f = open(r'.\src\SionyxKiosk\App.xaml.cs', encoding='utf-8')
+﻿f = open(r'.\src\SionyxKiosk\ViewModels\AuthViewModel.cs', encoding='utf-8')
 c = f.read()
 f.close()
-idx = c.find('AuthViewModel')
-print(c[idx-100:idx+300])
+idx = c.find('OverlayGradient = new')
+print(repr(c[idx-200:idx+200]))
