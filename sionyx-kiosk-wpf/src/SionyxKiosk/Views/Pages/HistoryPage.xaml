@@ -96,9 +96,10 @@
                                 PurchaseDate="{Binding CreatedAt}"
                                 Amount="{Binding Amount, StringFormat='₪{0:F2}'}"
                                 Status="{Binding Status}"
-                                Minutes="{Binding Minutes}"
+                                Minutes="{Binding TimeMinutes}"
                                 PrintBudget="{Binding PrintBudget}"
-                                ValidityDays="{Binding ValidityDays}" />
+                                ValidityDays="{Binding ValidityDays}"
+                                IsOperatorTopup="{Binding IsOperatorTopup}" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

@@ -227,6 +227,18 @@ public partial class AuthViewModel : ObservableObject
             ErrorMessage = result.Error ?? "שגיאת הרשמה";
     }
 
+    public void ResetForm()
+    {
+        Phone = "";
+        Password = "";
+        FirstName = "";
+        LastName = "";
+        Email = "";
+        ErrorMessage = "";
+        ForgotPasswordInfo = "";
+        IsLoginMode = true;
+    }
+
     [RelayCommand]
     private void ToggleMode()
     {

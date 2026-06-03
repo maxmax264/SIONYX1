@@ -1,0 +1,5 @@
+﻿f = open(r'.\src\SionyxKiosk\Views\Controls\PurchaseCard.xaml', encoding='utf-8')
+c = f.read()
+f.close()
+idx = c.find('IsOperatorTopupVisible')
+print(c[idx-200:idx+300])

@@ -67,6 +67,15 @@ public partial class PurchaseCard : UserControl
     public Visibility HasPrints { get => (Visibility)GetValue(HasPrintsProperty); set => SetValue(HasPrintsProperty, value); }
     public Visibility HasValidity { get => (Visibility)GetValue(HasValidityProperty); set => SetValue(HasValidityProperty, value); }
 
+    public static readonly DependencyProperty IsOperatorTopupVisibleProperty =
+        DependencyProperty.Register(nameof(IsOperatorTopupVisible), typeof(Visibility), typeof(PurchaseCard), new PropertyMetadata(Visibility.Collapsed));
+    public static readonly DependencyProperty IsOperatorTopupProperty =
+        DependencyProperty.Register(nameof(IsOperatorTopup), typeof(bool), typeof(PurchaseCard), new PropertyMetadata(false, (d, e) => {
+            if (d is PurchaseCard card) card.IsOperatorTopupVisible = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
+        }));
+    public bool IsOperatorTopup { get => (bool)GetValue(IsOperatorTopupProperty); set => SetValue(IsOperatorTopupProperty, value); }
+    public Visibility IsOperatorTopupVisible { get => (Visibility)GetValue(IsOperatorTopupVisibleProperty); set => SetValue(IsOperatorTopupVisibleProperty, value); }
+
     public PurchaseCard() { InitializeComponent(); }
 
     private static void OnPurchaseDateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

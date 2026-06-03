@@ -50,4 +50,9 @@ public class Purchase
     public string Status { get; set; } = "pending";
     public string CreatedAt { get; set; } = "";
     public string UpdatedAt { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string Note { get; set; } = "";
+    public bool IsOperatorTopup => Type == "admin_charge" || Note == "טעינת מפעיל";
+    public int TimeSeconds { get; set; }
+    public int TimeMinutes => TimeSeconds != 0 ? TimeSeconds / 60 : Minutes;
 }

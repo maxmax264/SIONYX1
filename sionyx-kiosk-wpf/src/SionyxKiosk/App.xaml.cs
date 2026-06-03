@@ -164,7 +164,7 @@ public partial class App : Application
                     sp.GetRequiredService<IdleTimeoutService>()));
 
                 // ViewModels
-                services.AddTransient<AuthViewModel>(sp => new AuthViewModel(
+                services.AddSingleton<AuthViewModel>(sp => new AuthViewModel(
                     sp.GetRequiredService<AuthService>(),
                     sp.GetRequiredService<OrganizationMetadataService>()));
                 services.AddTransient<MainViewModel>();
@@ -256,9 +256,7 @@ public partial class App : Application
     private void ShowAuthWindow()
     {
         var authVm = _host!.Services.GetRequiredService<AuthViewModel>();
-
-        // AuthViewModel is Transient (new instance each time) so event subscriptions
-        // are fresh and don't leak.
+        authVm.ResetForm();
         authVm.LoginSucceeded += OnLoginSucceeded;
         authVm.RegistrationSucceeded += OnLoginSucceeded;
 
