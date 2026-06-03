@@ -30,7 +30,7 @@ const AuthDesignSettings = () => {
     const load = async () => {
       setLoading(true);
       const snap = await get(dbRef(database, `organizations/${orgId}/metadata/authDesign`));
-      if (snap.exists()) setDesign({ ...DEFAULTS, ...snap.val() });
+      if (snap.exists()) { const val = snap.val(); console.log('RAW:', JSON.stringify(val)); const filtered = Object.fromEntries(Object.entries(val).filter(([k,v]) => v !== '' && v !== null && v !== undefined)); console.log('FILTERED:', JSON.stringify(filtered)); setDesign({ ...DEFAULTS, ...filtered }); }
       setLoading(false);
     };
     load();
@@ -45,7 +45,9 @@ const AuthDesignSettings = () => {
   };
 
   const handleChange = (field, value) => {
-    save({ ...design, [field]: value });
+    const updated = { ...design, [field]: value };
+    setDesign(updated);
+    save(updated);
   };
 
   const handleReset = () => {
@@ -97,7 +99,7 @@ const AuthDesignSettings = () => {
             <div style={{ color: "#888", fontSize: 11, marginBottom: 16 }}>{design.welcomeSubtext || "התחבר לחשבון שלך"}</div>
             <div style={{ background: "#f0f0f0", borderRadius: 6, height: 28, marginBottom: 8 }} />
             <div style={{ background: "#f0f0f0", borderRadius: 6, height: 28, marginBottom: 12 }} />
-            <div style={{ background: design.buttonColor || design.overlayColor1, borderRadius: 6, height: 32, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>כניסה לחשבון</div>
+            <div style={{ background: design.buttonColor, borderRadius: 6, height: 32, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>כניסה לחשבון</div>
             {design.showRegister && (
               <div style={{ textAlign: "center", marginTop: 8, color: "#888", fontSize: 11 }}>אין לך חשבון? הירשם</div>
             )}
@@ -121,8 +123,8 @@ const AuthDesignSettings = () => {
         </Space>
         <Space align="center">
           <Text style={{ width: 120 }}>צבע כפתורים:</Text>
-          <ColorPicker value={design.buttonColor || design.overlayColor1}
-            onChange={(color) => handleChange("buttonColor", color.toHexString())} />
+          <ColorPicker value={design.buttonColor}
+            onChange={(color) => { console.log("NEW COLOR:", color.toHexString()); handleChange("buttonColor", color.toHexString()); }} />
           <Text type="secondary">{design.buttonColor || design.overlayColor1}</Text>
         </Space>
       </Space>

@@ -1,0 +1,15 @@
+﻿f = open(r'.\src\components\settings\AuthDesignSettings.jsx', encoding='utf-8')
+c = f.read()
+f.close()
+
+old = "if (snap.exists()) setDesign({ ...DEFAULTS, ...snap.val() });"
+new = "if (snap.exists()) { const val = snap.val(); console.log('Firebase data:', JSON.stringify(val)); setDesign({ ...DEFAULTS, ...val }); }"
+
+count = c.count(old)
+print(f'Found {count} matches')
+if count == 1:
+    c = c.replace(old, new, 1)
+    open(r'.\src\components\settings\AuthDesignSettings.jsx', 'w', encoding='utf-8').write(c)
+    print('OK')
+else:
+    print('NOT FOUND')
