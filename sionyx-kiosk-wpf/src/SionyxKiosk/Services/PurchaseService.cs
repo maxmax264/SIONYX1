@@ -83,6 +83,7 @@ public class PurchaseService : BaseService, IPurchaseService
         }
 
         purchases.Sort((a, b) => string.Compare(b.CreatedAt, a.CreatedAt, StringComparison.Ordinal));
+        foreach (var p in purchases) Serilog.Log.Information("[Purchase] Id={Id} Type={Type} Note={Note} IsTopup={IsTopup}", p.Id, p.Type, p.Note, p.IsOperatorTopup);
         return Success(purchases);
     }
 
@@ -120,5 +121,8 @@ public class PurchaseService : BaseService, IPurchaseService
         Status = el.TryGetProperty("status", out var s) ? s.GetString() ?? "pending" : "pending",
         CreatedAt = el.TryGetProperty("createdAt", out var ca) ? ca.GetString() ?? "" : "",
         UpdatedAt = el.TryGetProperty("updatedAt", out var ua) ? ua.GetString() ?? "" : "",
+        Type = el.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
+        Note = el.TryGetProperty("note", out var n) ? n.GetString() ?? "" : "",
+        TimeSeconds = el.TryGetProperty("timeSeconds", out var ts) && ts.TryGetInt32(out var tsv) ? tsv : 0,
     };
 }
