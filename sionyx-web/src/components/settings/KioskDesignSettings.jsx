@@ -162,7 +162,7 @@ const KioskDesignSettings = () => {
       <div style={{ color: "#888", fontSize: 10, marginBottom: 10 }}>{design.welcomeSubtext}</div>
       <div style={{ background: "#f0f0f0", borderRadius: 5, height: 20, marginBottom: 6 }} />
       <div style={{ background: "#f0f0f0", borderRadius: 5, height: 20, marginBottom: 10 }} />
-      <div style={{ background: design.overlayColor1, borderRadius: 5, height: 26, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>כניסה לחשבון</div>
+      <div style={{ background: design.buttonColor || design.overlayColor1, borderRadius: 5, height: 26, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>כניסה לחשבון</div>
       {design.showRegister && <div style={{ textAlign: "center", marginTop: 6, color: "#888", fontSize: 9 }}>אין לך חשבון? הירשם</div>}
     </div>
   );
@@ -267,7 +267,7 @@ const KioskDesignSettings = () => {
             <div
               style={{
                 height: 48,
-                background: design.overlayColor1,
+                background: design.buttonColor || design.overlayColor1,
                 borderRadius: 8,
                 color: "white",
                 display: "flex",

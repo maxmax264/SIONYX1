@@ -1,5 +1,5 @@
 ﻿f = open(r'.\src\components\settings\AuthDesignSettings.jsx', encoding='utf-8')
 c = f.read()
 f.close()
-idx = c.find('background: design.buttonColor')
-print(repr(c[idx-20:idx+100]))
+idx = c.find('buttonColor || design.overlayColor1, borderRadius')
+print(repr(c[idx-50:idx+80]))
