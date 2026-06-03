@@ -47,7 +47,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border"
                                 CornerRadius="12"
-                                Background="{Binding DataContext.OverlayGradient, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Background="{Binding DataContext.ButtonGradient, RelativeSource={RelativeSource AncestorType=Window}}"
                                 Padding="{TemplateBinding Padding}"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
