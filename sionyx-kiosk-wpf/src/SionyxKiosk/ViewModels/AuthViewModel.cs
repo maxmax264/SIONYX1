@@ -37,7 +37,7 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private double _formX = 50;
     [ObservableProperty] private double _formY = 50;
     [ObservableProperty] private double _formWidth = 480;
-    public double FormXPixels => Math.Max(0, FormX / 100.0 * (System.Windows.SystemParameters.PrimaryScreenWidth - FormWidth));
+    public double FormXPixels => Math.Max(0, (1.0 - FormX / 100.0) * (System.Windows.SystemParameters.PrimaryScreenWidth - FormWidth));
     public double FormYPixels => Math.Max(0, FormY / 100.0 * (System.Windows.SystemParameters.PrimaryScreenHeight - 500));
     public System.Windows.Thickness FormMargin => new System.Windows.Thickness(FormXPixels, FormYPixels, 0, 0);
     partial void OnFormXChanged(double value) { Serilog.Log.Information("[Form] X={X} ScreenW={SW} FormW={FW} => Pixels={P}", FormX, System.Windows.SystemParameters.PrimaryScreenWidth, FormWidth, FormXPixels); OnPropertyChanged(nameof(FormXPixels)); OnPropertyChanged(nameof(FormMargin)); }
