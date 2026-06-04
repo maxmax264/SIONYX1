@@ -230,6 +230,8 @@ public partial class App : Application
                 services.AddTransient(sp => new PrintHistoryPage(
                     sp.GetRequiredService<PrintHistoryViewModel>()));
                 services.AddTransient<HelpPage>();
+                services.AddTransient(sp => new ProfileViewModel(sp.GetRequiredService<AuthService>()));
+                services.AddTransient(sp => new ProfilePage(sp.GetRequiredService<ProfileViewModel>()));
             })
             .Build();
 

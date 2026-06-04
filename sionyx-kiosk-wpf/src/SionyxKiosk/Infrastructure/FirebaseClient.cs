@@ -239,6 +239,24 @@ public sealed class FirebaseClient : IFirebaseClient
         }
     }
 
+    public async Task<FirebaseResult> ChangePasswordAsync(string newPassword)
+    {
+        var url = $"{_authUrl}:update?key={_apiKey}";
+        var payload = new { idToken = _idToken, password = newPassword, returnSecureToken = true };
+        try
+        {
+            var response = await PostJsonAsync(url, payload);
+            StoreAuthData(response);
+            Logger.Information("Password changed for user: {UserId}", _userId);
+            return FirebaseResult.Ok(null);
+        }
+        catch (Exception ex)
+        {
+            var msg = ParseFirebaseError(ex);
+            Logger.Error(ex, "Change password failed");
+            return FirebaseResult.Fail(msg);
+        }
+    }
     public async Task<FirebaseResult> DbDeleteAsync(string path)
     {
         if (!await EnsureValidTokenAsync())
