@@ -1,0 +1,5 @@
+﻿content = open(r'.\src\SionyxKiosk\ViewModels\ProfileViewModel.cs', encoding='utf-8').read()
+content = content.replace('if (result.Success)', 'if (result.IsSuccess)')
+content = content.replace("Dictionary<string, object?>", "Dictionary<string, object>")
+open(r'.\src\SionyxKiosk\ViewModels\ProfileViewModel.cs', 'w', encoding='utf-8').write(content)
+print('OK')

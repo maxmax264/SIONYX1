@@ -20,6 +20,7 @@ public interface IFirebaseClient : IDisposable
     Task<FirebaseResult> DbGetAsync(string path);
     Task<FirebaseResult> DbSetAsync(string path, object data);
     Task<FirebaseResult> DbUpdateAsync(string path, object data);
+    Task<FirebaseResult> ChangePasswordAsync(string newPassword);
     Task<FirebaseResult> DbDeleteAsync(string path);
 
     SseListener DbListen(string path, Action<string, JsonElement?> callback, Action<string>? errorCallback = null);

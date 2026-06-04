@@ -218,6 +218,14 @@ public class AuthService : BaseService, IAuthService
         CurrentUser = null;
     }
 
+    /// <summary>Change current user password in Firebase Auth.</summary>
+    public async Task<ServiceResult> ChangePasswordAsync(string newPassword)
+    {
+        var result = await Firebase.ChangePasswordAsync(newPassword);
+        if (!result.Success)
+            return Error(result.Error ?? "שגיאה בשינוי הסיסמה");
+        return Success();
+    }
     /// <summary>Update current user's data in Firebase.</summary>
     public async Task<ServiceResult> UpdateUserDataAsync(Dictionary<string, object> updates)
     {
