@@ -1,4 +1,5 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿path = r'.\src\SionyxKiosk\ViewModels\ProfileViewModel.cs'
+new_content = """using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SionyxKiosk.Services;
 
@@ -50,7 +51,7 @@ public partial class ProfileViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(FirstName) || string.IsNullOrWhiteSpace(LastName))
         {
-            StatusMessage = "יש למלא שם פרטי ושם משפחה";
+            StatusMessage = "\u05d9\u05e9 \u05dc\u05de\u05dc\u05d0 \u05e9\u05dd \u05e4\u05e8\u05d8\u05d9 \u05d5\u05e9\u05dd \u05de\u05e9\u05e4\u05d7\u05d4";
             IsSuccess = false;
             return;
         }
@@ -67,17 +68,17 @@ public partial class ProfileViewModel : ObservableObject
             var result = await _auth.UpdateUserDataAsync(updates);
             if (result.IsSuccess)
             {
-                await ShowSuccessToastAsync("הפרטים עודכנו בהצלחה");
+                await ShowSuccessToastAsync("\u05d4\u05e4\u05e8\u05d8\u05d9\u05dd \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4");
             }
             else
             {
-                StatusMessage = result.Error ?? "שגיאה בעדכון הפרטים";
+                StatusMessage = result.Error ?? "\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e2\u05d3\u05db\u05d5\u05df \u05d4\u05e4\u05e8\u05d8\u05d9\u05dd";
                 IsSuccess = false;
             }
         }
         catch
         {
-            StatusMessage = "שגיאה בעדכון הפרטים";
+            StatusMessage = "\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e2\u05d3\u05db\u05d5\u05df \u05d4\u05e4\u05e8\u05d8\u05d9\u05dd";
             IsSuccess = false;
         }
         finally
@@ -91,19 +92,19 @@ public partial class ProfileViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(NewPassword) || string.IsNullOrWhiteSpace(ConfirmPassword))
         {
-            StatusMessage = "יש למלא סיסמא חדשה ואישור";
+            StatusMessage = "\u05d9\u05e9 \u05dc\u05de\u05dc\u05d0 \u05e1\u05d9\u05e1\u05de\u05d0 \u05d7\u05d3\u05e9\u05d4 \u05d5\u05d0\u05d9\u05e9\u05d5\u05e8";
             IsSuccess = false;
             return;
         }
         if (NewPassword != ConfirmPassword)
         {
-            StatusMessage = "הסיסמאות אינן תואמות";
+            StatusMessage = "\u05d4\u05e1\u05d9\u05e1\u05de\u05d0\u05d5\u05ea \u05d0\u05d9\u05e0\u05df \u05ea\u05d5\u05d0\u05de\u05d5\u05ea";
             IsSuccess = false;
             return;
         }
         if (NewPassword.Length < 6)
         {
-            StatusMessage = "הסיסמא חייבת להכיל לפחות 6 תווים";
+            StatusMessage = "\u05d4\u05e1\u05d9\u05e1\u05de\u05d0 \u05d7\u05d9\u05d9\u05d1\u05ea \u05dc\u05d4\u05db\u05d9\u05dc \u05dc\u05e4\u05d7\u05d5\u05ea 6 \u05ea\u05d5\u05d5\u05d9\u05dd";
             IsSuccess = false;
             return;
         }
@@ -112,25 +113,25 @@ public partial class ProfileViewModel : ObservableObject
         StatusMessage = "";
         try
         {
-            _forceLogout.Pause();
+            _forceLogout.StopListening();
             var result = await _auth.ChangePasswordAsync(NewPassword);
             if (result.IsSuccess)
             {
                 NewPassword = "";
                 ConfirmPassword = "";
-                await ShowSuccessToastAsync("הסיסמא שונתה בהצלחה ✓");
-                await Task.Delay(3000);
-                _forceLogout.Resume();
+                await ShowSuccessToastAsync("\u05d4\u05e1\u05d9\u05e1\u05de\u05d0 \u05e9\u05d5\u05e0\u05ea\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4 \u2713");
+                var uid = _auth.CurrentUser?.Uid;
+                if (uid != null) { await Task.Delay(2000); _forceLogout.StartListening(uid); }
             }
             else
             {
-                StatusMessage = result.Error ?? "שגיאה בשינוי הסיסמא";
+                StatusMessage = result.Error ?? "\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e9\u05d9\u05e0\u05d5\u05d9 \u05d4\u05e1\u05d9\u05e1\u05de\u05d0";
                 IsSuccess = false;
             }
         }
         catch
         {
-            StatusMessage = "שגיאה בשינוי הסיסמא";
+            StatusMessage = "\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05e9\u05d9\u05e0\u05d5\u05d9 \u05d4\u05e1\u05d9\u05e1\u05de\u05d0";
             IsSuccess = false;
         }
         finally
@@ -139,3 +140,6 @@ public partial class ProfileViewModel : ObservableObject
         }
     }
 }
+"""
+open(path, 'w', encoding='utf-8').write(new_content)
+print('OK')

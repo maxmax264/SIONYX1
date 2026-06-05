@@ -3,6 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:controls="clr-namespace:SionyxKiosk.Views.Controls"
       Title="פרופיל" FlowDirection="RightToLeft">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -15,7 +18,7 @@
                              Margin="0,0,0,24" />
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel MaxWidth="600" HorizontalAlignment="Right">
+            <StackPanel Margin="0,0,0,24">
 
                 <!-- פרטים אישיים -->
                 <Border Background="White" CornerRadius="{StaticResource RadiusLg}"
@@ -29,19 +32,19 @@
 
                         <TextBlock Text="שם פרטי" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
                         <TextBox Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource ModernTextBox}" Margin="0,0,0,16" />
+                                 Style="{StaticResource FrostInput}" Margin="0,0,0,16" />
 
                         <TextBlock Text="שם משפחה" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
                         <TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource ModernTextBox}" Margin="0,0,0,16" />
+                                 Style="{StaticResource FrostInput}" Margin="0,0,0,16" />
 
                         <TextBlock Text="טלפון" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
                         <TextBox Text="{Binding PhoneNumber}" IsReadOnly="True"
-                                 Style="{StaticResource ModernTextBox}" Opacity="0.6" Margin="0,0,0,24" />
+                                 Style="{StaticResource FrostInput}" Opacity="0.6" Margin="0,0,0,24" />
 
                         <Button Content="שמור פרטים" Style="{StaticResource BtnPrimary}"
                                 Command="{Binding SaveDetailsCommand}"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                
                                 HorizontalAlignment="Left" />
                     </StackPanel>
                 </Border>
@@ -57,32 +60,23 @@
                         <TextBlock Text="שינוי סיסמה" Style="{StaticResource TextH3}" Margin="0,0,0,20" />
 
                         <TextBlock Text="סיסמה חדשה" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
-                        <PasswordBox x:Name="NewPasswordBox" Style="{StaticResource ModernPasswordBox}"
+                        <PasswordBox x:Name="NewPasswordBox" Style="{StaticResource FrostPasswordBox}"
                                      Margin="0,0,0,16" PasswordChanged="NewPasswordBox_Changed" />
 
                         <TextBlock Text="אישור סיסמה" FontSize="13" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6" />
-                        <PasswordBox x:Name="ConfirmPasswordBox" Style="{StaticResource ModernPasswordBox}"
+                        <PasswordBox x:Name="ConfirmPasswordBox" Style="{StaticResource FrostPasswordBox}"
                                      Margin="0,0,0,24" PasswordChanged="ConfirmPasswordBox_Changed" />
 
                         <Button Content="שנה סיסמה" Style="{StaticResource BtnPrimary}"
                                 Command="{Binding ChangePasswordCommand}"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                
                                 HorizontalAlignment="Left" />
                     </StackPanel>
                 </Border>
 
                 <!-- הודעת סטטוס -->
-                <Border Padding="16,12" CornerRadius="{StaticResource RadiusLg}" Margin="0,0,0,20">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding StatusMessage}" Value="">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
+                <Border x:Name="StatusBorder" Padding="16,12" CornerRadius="{StaticResource RadiusLg}"
+                        Margin="0,0,0,20" Visibility="{Binding ShowStatus, Converter={StaticResource BoolToVis}}">
                     <Border.Background>
                         <SolidColorBrush Color="#F0FDF4" />
                     </Border.Background>

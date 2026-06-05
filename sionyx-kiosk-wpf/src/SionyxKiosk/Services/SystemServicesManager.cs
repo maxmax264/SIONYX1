@@ -150,6 +150,7 @@ public class SystemServicesManager
             Logger.Warning("Force logout received: {Reason}", reason);
             _ = Application.Current.Dispatcher.InvokeAsync(async () =>
             {
+                if (_forceLogout.IsPaused) { Logger.Warning("ForceLogout suppressed - password change in progress"); return; }
                 if (ForceLogoutReceived != null)
                     await ForceLogoutReceived.Invoke();
             });

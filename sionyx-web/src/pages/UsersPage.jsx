@@ -74,6 +74,7 @@ import {
   kickUser,
   resetUserPassword,
   deleteUser,
+  verifyUserPhone,
 } from '../services/userService';
 import { getMessagesForUser, sendMessage } from '../services/chatService';
 import { formatTimeHebrewCompact } from '../utils/timeFormatter';
@@ -359,6 +360,19 @@ const UsersPage = () => {
     });
   };
 
+  const handleVerifyPhone = async (record) => {
+    try {
+      const result = await verifyUserPhone(orgId, record.uid);
+      if (result.success) {
+        message.success(`${record.fullName || record.email} אומת בהצלחה`);
+      } else {
+        message.error('שגיאה באימות: ' + result.error);
+      }
+    } catch (error) {
+      message.error('שגיאה באימות');
+    }
+  };
+
   const handleDeleteUser = record => {
     Modal.confirm({
       title: 'מחיקת משתמש',
@@ -576,6 +590,13 @@ const UsersPage = () => {
             label: 'הענק הרשאות מנהל',
             onClick: () => handleGrantAdmin(userRecord),
           },
+      {
+        key: 'verifyPhone',
+        icon: <PhoneOutlined />,
+        label: userRecord.phoneVerified ? 'טלפון מאומת' : 'אמת ידנית',
+        disabled: userRecord.phoneVerified === true,
+        onClick: () => handleVerifyPhone(userRecord),
+      },
       ...(!userRecord.isAdmin && userRecord.uid !== user?.uid
         ? [
             { type: 'divider' },

@@ -29,7 +29,7 @@ public partial class MainWindow : Window
 
         Loaded += (_, _) =>
         {
-            NavigateToPage("Home");
+            Dispatcher.InvokeAsync(() => NavigateToPage("Home"), System.Windows.Threading.DispatcherPriority.Loaded);
             UpdateAvatarInitials();
         };
 
