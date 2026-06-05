@@ -1,4 +1,5 @@
-using System.Text.Json;
+﻿path = r'.\src\SionyxKiosk\Services\ForceLogoutService.cs'
+new_content = """using System.Text.Json;
 using Serilog;
 using SionyxKiosk.Infrastructure;
 namespace SionyxKiosk.Services;
@@ -80,3 +81,6 @@ public class ForceLogoutService
         }
     }
 }
+"""
+open(path, 'w', encoding='utf-8').write(new_content)
+print('OK')

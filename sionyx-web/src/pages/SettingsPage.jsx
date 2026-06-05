@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, Typography, Tabs, Space } from 'antd';
-import { SettingOutlined, DollarOutlined, DownloadOutlined } from '@ant-design/icons';
+import { SettingOutlined, DollarOutlined, DownloadOutlined, PhoneOutlined } from '@ant-design/icons';
 import PricingSettings from '../components/settings/PricingSettings';
+import PhoneVerificationSettings from '../components/settings/PhoneVerificationSettings';
 import KioskDesignSettings from '../components/settings/KioskDesignSettings';
 import DownloadsSettings from '../components/settings/DownloadsSettings';
 
@@ -44,6 +45,16 @@ const SettingsPage = () => {
         </span>
       ),
       children: <KioskDesignSettings />,
+    },
+    {
+      key: 'phone',
+      label: (
+        <span>
+          <PhoneOutlined />
+          {' '}אימות טלפון
+        </span>
+      ),
+      children: <PhoneVerificationSettings />,
     },
     {
       key: 'downloads',

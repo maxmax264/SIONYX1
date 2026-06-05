@@ -164,7 +164,7 @@ public partial class App : Application
                     sp.GetRequiredService<IdleTimeoutService>()));
 
                 // ViewModels
-                services.AddTransient<AuthViewModel>(sp => new AuthViewModel(
+                services.AddSingleton<AuthViewModel>(sp => new AuthViewModel(
                     sp.GetRequiredService<AuthService>(),
                     sp.GetRequiredService<OrganizationMetadataService>()));
                 services.AddTransient<MainViewModel>();
@@ -192,7 +192,8 @@ public partial class App : Application
                 {
                     var purchase = sp.GetRequiredService<PurchaseService>();
                     var auth = sp.GetRequiredService<AuthService>();
-                    return new HistoryViewModel(purchase, auth.CurrentUser?.Uid ?? "");
+                    var firebase = sp.GetRequiredService<FirebaseClient>();
+                    return new HistoryViewModel(purchase, auth.CurrentUser?.Uid ?? "", firebase);
                 });
                 services.AddTransient(sp => new HelpViewModel(
                     sp.GetRequiredService<OrganizationMetadataService>(),
@@ -214,7 +215,7 @@ public partial class App : Application
                     var vm = sp.GetRequiredService<MainViewModel>();
                     return new MainWindow(vm, sp);
                 });
-                services.AddTransient<HomePage>(sp =>
+                services.AddSingleton<HomePage>(sp =>
                 {
                     var vm = sp.GetRequiredService<HomeViewModel>();
                     return new HomePage(vm, sp);
@@ -229,6 +230,8 @@ public partial class App : Application
                 services.AddTransient(sp => new PrintHistoryPage(
                     sp.GetRequiredService<PrintHistoryViewModel>()));
                 services.AddTransient<HelpPage>();
+                services.AddTransient(sp => new ProfileViewModel(sp.GetRequiredService<AuthService>(), sp.GetRequiredService<ForceLogoutService>()));
+                services.AddTransient(sp => new ProfilePage(sp.GetRequiredService<ProfileViewModel>()));
             })
             .Build();
 
@@ -255,9 +258,7 @@ public partial class App : Application
     private void ShowAuthWindow()
     {
         var authVm = _host!.Services.GetRequiredService<AuthViewModel>();
-
-        // AuthViewModel is Transient (new instance each time) so event subscriptions
-        // are fresh and don't leak.
+        authVm.ResetForm();
         authVm.LoginSucceeded += OnLoginSucceeded;
         authVm.RegistrationSucceeded += OnLoginSucceeded;
 
