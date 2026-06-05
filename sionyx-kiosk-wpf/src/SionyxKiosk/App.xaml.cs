@@ -317,11 +317,43 @@ public partial class App : Application
 
     private void OnLoginSucceeded()
     {
-        Current.Dispatcher.Invoke(() =>
+        _ = Current.Dispatcher.InvokeAsync(async () =>
         {
             try
             {
-                Log.Information("Login succeeded — closing auth window, opening main window");
+                Log.Information("Login succeeded — checking phone verification");
+                var auth = _host!.Services.GetRequiredService<AuthService>();
+                var (required, verified) = await auth.CheckPhoneVerificationAsync();
+
+                if (required && !verified)
+                {
+                    Log.Information("Phone verification required — showing waiting screen");
+                    var firebase = _host!.Services.GetRequiredService<FirebaseClient>();
+                    var userId = auth.CurrentUser?.Uid ?? "";
+                    var phone = "0775022924";
+
+                    if (MainWindow is AuthWindow aw2) { aw2.AllowClose(); aw2.Close(); }
+
+                    var waitWin = new Views.Windows.VerificationWaitingWindow(firebase, userId, phone);
+                    waitWin.VerificationCompleted += () =>
+                    {
+                        waitWin.AllowClose();
+                        waitWin.Close();
+                        ShowMainWindow();
+                    };
+                    waitWin.BackToLogin += async () =>
+                    {
+                        waitWin.AllowClose();
+                        waitWin.Close();
+                        await auth.LogoutAsync();
+                        ShowAuthWindow();
+                    };
+                    waitWin.Show();
+                    MainWindow = waitWin;
+                    return;
+                }
+
+                Log.Information("Phone OK — closing auth window, opening main window");
 
                 if (MainWindow is AuthWindow aw)
                 {

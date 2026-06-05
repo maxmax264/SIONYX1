@@ -1,19 +1,35 @@
 ﻿content = open(r'.\src\SionyxKiosk\Services\AuthService.cs', encoding='utf-8').read()
-old = '    /// <summary>Update current user\'s data in Firebase.</summary>'
-new = '''    /// <summary>Change current user password in Firebase Auth.</summary>
-    public async Task<ServiceResult> ChangePasswordAsync(string newPassword)
+addition = '''
+    /// <summary>Check if phone verification is required and if the current user has verified.</summary>
+    public async Task<(bool Required, bool Verified)> CheckPhoneVerificationAsync()
     {
-        var result = await Firebase.ChangePasswordAsync(newPassword);
-        if (!result.Success)
-            return Error(result.Error ?? "שגיאה בשינוי הסיסמה");
-        return Success();
+        try
+        {
+            var settingResult = await Firebase.DbGetAsync("metadata/settings/requirePhoneVerification");
+            bool required = settingResult.Success &&
+                            settingResult.Data is System.Text.Json.JsonElement el &&
+                            el.ValueKind == System.Text.Json.JsonValueKind.True;
+
+            if (!required) return (false, true);
+
+            if (CurrentUser == null) return (true, false);
+
+            var userResult = await Firebase.DbGetAsync($"users/{CurrentUser.Uid}");
+            bool verified = userResult.Success &&
+                            userResult.Data is System.Text.Json.JsonElement userData &&
+                            userData.TryGetProperty("phoneVerified", out var pv) &&
+                            pv.GetBoolean();
+
+            return (true, verified);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "CheckPhoneVerificationAsync failed");
+            return (false, true);
+        }
     }
-    /// <summary>Update current user\'s data in Firebase.</summary>'''
-count = content.count(old)
-print(f"Found {count} matches")
-if count == 1:
-    content = content.replace(old, new, 1)
-    open(r'.\src\SionyxKiosk\Services\AuthService.cs', 'w', encoding='utf-8').write(content)
-    print('OK')
-else:
-    print('NOT FOUND')
+'''
+idx = content.rfind('\n}')
+content = content[:idx] + addition + content[idx:]
+open(r'.\src\SionyxKiosk\Services\AuthService.cs', 'w', encoding='utf-8').write(content)
+print('OK')
