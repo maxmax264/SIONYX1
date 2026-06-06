@@ -422,6 +422,19 @@ public partial class App : Application
                 var auth = _host!.Services.GetRequiredService<AuthService>();
                 await auth.LogoutAsync();
 
+                // Clean browser data so next user sees no trace of previous user
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        _host!.Services.GetRequiredService<BrowserCleanupService>().CleanupWithBrowserClose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "Browser cleanup failed during logout (non-fatal)");
+                    }
+                });
+
                 if (MainWindow is Views.Windows.MainWindow mw)
                 {
                     mw.AllowClose();
