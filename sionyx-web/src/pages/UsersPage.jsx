@@ -776,6 +776,11 @@ const UsersPage = () => {
                   >
                     {userRecord.phoneNumber}
                   </Text>
+                  {userRecord.phoneVerified ? (
+                    <span style={{ color: '#52c41a', fontSize: 12 }}>✅</span>
+                  ) : (
+                    <span style={{ color: '#ff4d4f', fontSize: 12 }}>❌</span>
+                  )}
                 </div>
               )}
               {userRecord.email && (
@@ -1431,6 +1436,18 @@ const UsersPage = () => {
                     <ClockCircleOutlined />
                     {formatTime(selectedUser.remainingTime || 0)}
                   </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label='אימות טלפון'>
+                  {selectedUser.phoneVerified ? (
+                    <Tag color='green' icon={<span>✅</span>}>מאומת</Tag>
+                  ) : (
+                    <Space>
+                      <Tag color='red' icon={<span>❌</span>}>לא מאומת</Tag>
+                      <Button size='small' type='primary' onClick={() => handleVerifyPhone(selectedUser)}>
+                        אמת ידנית
+                      </Button>
+                    </Space>
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label='תקציב הדפסות'>
                   <Space>
