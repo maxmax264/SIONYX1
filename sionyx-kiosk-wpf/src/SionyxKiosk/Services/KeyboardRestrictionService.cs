@@ -57,6 +57,7 @@ public class KeyboardRestrictionService : IDisposable
     private IntPtr _hookHandle = IntPtr.Zero;
     private LowLevelKeyboardProc? _hookProc; // prevent GC
     private Thread? _hookThread;
+    private uint _hookThreadId;
 
     public bool Enabled { get; set; }
     public bool IsActive => _hookHandle != IntPtr.Zero && Enabled;
@@ -96,6 +97,8 @@ public class KeyboardRestrictionService : IDisposable
         Logger.Information("Starting keyboard restriction service");
         _hookThread = new Thread(RunHookLoop) { IsBackground = true, Name = "KeyboardHook" };
         _hookThread.Start();
+        // Give thread time to register its ID
+        Thread.Sleep(100);
     }
 
     public void Stop()
@@ -105,6 +108,11 @@ public class KeyboardRestrictionService : IDisposable
             Logger.Information("Stopping keyboard restriction service");
             UnhookWindowsHookEx(_hookHandle);
             _hookHandle = IntPtr.Zero;
+        }
+        if (_hookThreadId != 0)
+        {
+            PostThreadMessage(_hookThreadId, 0x0012, IntPtr.Zero, IntPtr.Zero); // WM_QUIT
+            _hookThreadId = 0;
         }
     }
 
@@ -120,6 +128,7 @@ public class KeyboardRestrictionService : IDisposable
     {
         try
         {
+            _hookThreadId = GetCurrentThreadId();
             _hookProc = HookCallback;
             var moduleHandle = GetModuleHandle(null);
             if (moduleHandle == IntPtr.Zero)
@@ -219,4 +228,10 @@ public class KeyboardRestrictionService : IDisposable
 
     [DllImport("user32.dll")]
     private static extern IntPtr DispatchMessage(ref MSG lpMsg);
+
+    [DllImport("user32.dll")]
+    private static extern bool PostThreadMessage(uint idThread, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 }
