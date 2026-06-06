@@ -15,7 +15,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     private readonly ChatService _chat;
     private readonly OperatingHoursService _operatingHours;
     private readonly AnnouncementService? _announcements;
-    private readonly UserData _user;
+    private UserData _user;
     private readonly PrintMonitorService? _printMonitor;
     private bool _disposed;
 
@@ -77,6 +77,20 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         if (_printMonitor != null) _printMonitor.BudgetUpdated += OnPrintBudgetUpdated;
         _chat.MessagesReceived += OnMessagesReceived;
 
+        _ = LoadUnreadCountAsync();
+        _ = LoadAnnouncementsAsync();
+    }
+
+    /// <summary>Called on each new login to refresh user data.</summary>
+    public void Reinitialize(UserData user)
+    {
+        _user = user;
+        WelcomeMessage = $"שלום, {_user.FullName}!";
+        IsSessionActive = _session.IsActive;
+        HasNoTime = _user.RemainingTime <= 0;
+        PrimaryButtonText = HasNoTime ? "רכוש חבילה" : "▶  התחל הפעלה";
+        ErrorMessage = "";
+        UpdateStats();
         _ = LoadUnreadCountAsync();
         _ = LoadAnnouncementsAsync();
     }
