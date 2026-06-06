@@ -41,13 +41,16 @@ public class BrowserCleanupService
     /// <summary>Close browsers first, then clean up. Recommended for session end.</summary>
     public Dictionary<string, object> CleanupWithBrowserClose()
     {
-        Logger.Information("Closing browsers before cleanup...");
+        Logger.Information("=== BROWSER CLEANUP STARTED ===");
 
         var closeResults = CloseBrowsers();
-        Thread.Sleep(1000); // Let browsers finish closing
+        Logger.Information("Browsers closed: {Results}", string.Join(", ", closeResults.Select(kv => $"{kv.Key}={kv.Value}")));
+        Thread.Sleep(1500); // Let browsers finish closing
 
         var results = CleanupAllBrowsers();
         results["browsers_closed"] = closeResults;
+
+        Logger.Information("=== BROWSER CLEANUP FINISHED ===");
         return results;
     }
 
@@ -137,15 +140,12 @@ public class BrowserCleanupService
             var profiles = FindChromiumProfiles(basePath);
             foreach (var profile in profiles)
             {
-                foreach (var fileName in ChromiumFiles)
-                {
-                    var filePath = Path.Combine(profile, fileName);
-                    filesDeleted += TryDeleteFileOrDir(filePath, browserName, errors);
-                }
+                filesDeleted += TryDeleteFileOrDir(profile, browserName, errors);
+                Logger.Information("{Browser}: Deleted profile directory {Profile}", browserName, profile);
             }
         }
 
-        Logger.Information("{Browser}: Cleanup complete, {Count} files deleted", browserName, filesDeleted);
+        Logger.Information("{Browser}: Cleanup complete, {Count} profiles deleted", browserName, filesDeleted);
         return new Dictionary<string, object>
         {
             ["success"] = errors.Count == 0,
