@@ -27,6 +27,7 @@ public class BrowserCleanupService
         "Web Data", "Web Data-journal", "History", "History-journal",
         "Sessions", "Current Session", "Current Tabs",
         "Last Session", "Last Tabs",
+        "Preferences", "Secure Preferences",
     ];
 
     // Firefox files to delete
