@@ -393,6 +393,13 @@ public partial class App : Application
     private void ShowMainWindow()
     {
         Log.Debug("Creating MainWindow from DI");
+
+        // Reinitialize HomeViewModel with the current (fresh) user
+        var auth = _host!.Services.GetRequiredService<AuthService>();
+        var homeVm = _host!.Services.GetRequiredService<HomeViewModel>();
+        if (auth.CurrentUser != null)
+            homeVm.Reinitialize(auth.CurrentUser);
+
         var mainWindow = _host!.Services.GetRequiredService<MainWindow>();
         var mainVm = (MainViewModel)mainWindow.DataContext;
 
