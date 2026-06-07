@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -16,7 +16,7 @@ namespace SionyxKiosk;
 
 /// <summary>
 /// Application entry point. Sets up DI, Serilog, single-instance mutex,
-/// and manages the Auth ? Main window lifecycle.
+/// and manages the Auth → Main window lifecycle.
 /// </summary>
 public partial class App : Application
 {
@@ -31,16 +31,16 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // ?? Single-instance enforcement ??????????????????????????
+        // ── Single-instance enforcement ──────────────────────────
         _singleInstanceMutex = new Mutex(true, "SionyxKiosk_SingleInstance", out bool isNew);
         if (!isNew)
         {
-            MessageBox.Show("SIONYX ��� ����.", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("SIONYX כבר פועל.", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
 
-        // ?? Serilog ??????????????????????????????????????????????
+        // ── Serilog ──────────────────────────────────────────────
         var logDir = e.Args.Contains("--kiosk")
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SIONYX", "logs")
             : "logs";
@@ -65,7 +65,7 @@ public partial class App : Application
 
         Log.Information("SIONYX Kiosk WPF starting, version {Version}", GetVersion());
 
-        // ?? Global exception handlers ????????????????????????????
+        // ── Global exception handlers ────────────────────────────
         DispatcherUnhandledException += (_, ex) =>
         {
             Log.Fatal(ex.Exception, "Unhandled UI exception");
@@ -84,7 +84,7 @@ public partial class App : Application
             ex.SetObserved();
         };
 
-        // ?? Host + DI Container ??????????????????????????????????
+        // ── Host + DI Container ──────────────────────────────────
         _host = Host.CreateDefaultBuilder()
             .UseSerilog()
             .ConfigureServices((_, services) =>
@@ -237,7 +237,7 @@ public partial class App : Application
 
         await _host.StartAsync();
 
-        // ?? Start with Auth or Main ??????????????????????????????
+        // ── Start with Auth or Main ──────────────────────────────
         _isKiosk = e.Args.Contains("--kiosk");
         var isVerbose = e.Args.Contains("--verbose");
 
@@ -280,8 +280,8 @@ public partial class App : Application
 
         _systemServices.ForceLogoutReceived += async () =>
         {
-            AlertDialog.Show("����� �� ��� ����",
-                "������ ������� �� ��� ����. ��� ����� ����.",
+            AlertDialog.Show("ניתוק על ידי מנהל",
+                "הותנקת מהמערכת על ידי מנהל. אנא התחבר מחדש.",
                 AlertDialog.AlertType.Warning, MainWindow);
             await StopSystemServicesAsync();
             _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
@@ -321,13 +321,13 @@ public partial class App : Application
         {
             try
             {
-                Log.Information("Login succeeded � checking phone verification");
+                Log.Information("Login succeeded — checking phone verification");
                 var auth = _host!.Services.GetRequiredService<AuthService>();
                 var (required, verified) = await auth.CheckPhoneVerificationAsync();
 
                 if (required && !verified)
                 {
-                    Log.Information("Phone verification required � showing waiting screen");
+                    Log.Information("Phone verification required — showing waiting screen");
                     var firebase = _host!.Services.GetRequiredService<FirebaseClient>();
                     var userId = auth.CurrentUser?.Uid ?? "";
                     var phone = "0775022924";
@@ -353,7 +353,7 @@ public partial class App : Application
                     return;
                 }
 
-                Log.Information("Phone OK � closing auth window, opening main window");
+                Log.Information("Phone OK — closing auth window, opening main window");
 
                 if (MainWindow is AuthWindow aw)
                 {
@@ -367,7 +367,7 @@ public partial class App : Application
                 Log.Fatal(ex, "Failed to transition from auth to main window");
                 // Re-show the auth window so the user isn't stuck with an invisible app
                 try { ShowAuthWindow(); }
-                catch (Exception ex2) { Log.Fatal(ex2, "Recovery failed � app is in a broken state"); }
+                catch (Exception ex2) { Log.Fatal(ex2, "Recovery failed — app is in a broken state"); }
             }
         });
     }
@@ -386,7 +386,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Auto-login failed � staying on auth window");
+            Log.Error(ex, "Auto-login failed — staying on auth window");
         }
     }
 
@@ -412,10 +412,10 @@ public partial class App : Application
         MainWindow = mainWindow;
         Log.Information("MainWindow shown and set as Application.MainWindow");
         // Navigate to Home explicitly (Loaded fires only on first Show)
-        StartSystemServices();
+        mainWindow.NavigateHome();
 
         // Start system services
-        mainWindow.NavigateHome();
+        StartSystemServices();
     }
 
     private void OnLogoutRequested()
@@ -564,7 +564,7 @@ public partial class App : Application
                 else
                 {
                     Log.Warning("Admin exit: incorrect password");
-                    MessageBox.Show("����� �����", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("סיסמה שגויה", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
         }
@@ -652,7 +652,6 @@ public partial class App : Application
         }
     }
 }
-
 
 
 
