@@ -73,9 +73,7 @@ const MainLayout = () => {
   const handleLogout = async () => {
     await signOut();
     logout();
-    localStorage.removeItem('admin-auth-storage');
-    localStorage.removeItem('adminOrgId');
-    navigate('/login');
+    navigate('/admin/login');
   };
 
   const handleBackToHome = () => {

@@ -38,25 +38,9 @@ public partial class HomePage : Page
         viewModel.SessionStartedSuccessfully += OnSessionStarted;
         viewModel.ResumeSessionRequested += OnResumeSession;
 
-        Loaded += OnPageLoaded;
         Unloaded += OnPageUnloaded;
 
         UpdateMessageCard(viewModel.UnreadMessages);
-        UpdateAnnouncementsSection();
-    }
-
-    private void OnPageLoaded(object sender, RoutedEventArgs e)
-    {
-        Log.Debug("[HOME] HomePage.Loaded — re-subscribing events and refreshing");
-        _vm.ViewMessagesRequested -= OpenMessageDialog;
-        _vm.NavigateToPackagesRequested -= NavigateToPackages;
-        _vm.SessionStartedSuccessfully -= OnSessionStarted;
-        _vm.ResumeSessionRequested -= OnResumeSession;
-        _vm.ViewMessagesRequested += OpenMessageDialog;
-        _vm.NavigateToPackagesRequested += NavigateToPackages;
-        _vm.SessionStartedSuccessfully += OnSessionStarted;
-        _vm.ResumeSessionRequested += OnResumeSession;
-        UpdateMessageCard(_vm.UnreadMessages);
         UpdateAnnouncementsSection();
     }
 
