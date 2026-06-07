@@ -411,6 +411,8 @@ public partial class App : Application
         mainWindow.Show();
         MainWindow = mainWindow;
         Log.Information("MainWindow shown and set as Application.MainWindow");
+        // Navigate to Home explicitly (Loaded fires only on first Show)
+        mainWindow.NavigateHome();
 
         // Start system services
         StartSystemServices();
