@@ -226,9 +226,9 @@
     <InstallExecuteSequence>
       <!-- INSTALL -->
       <Custom Action="CA_CreateKioskUser"          After="InstallFiles"                 Condition="NOT Installed AND NOT REMOVE" />
-      <Custom Action="CA_ApplySecurityRestrictions" After="CA_CreateKioskUser"           Condition="NOT Installed AND NOT REMOVE" />
+      <Custom Action="CA_InitializeProfile"        After="CA_CreateKioskUser"           Condition="NOT Installed AND NOT REMOVE" />
+      <Custom Action="CA_ApplySecurityRestrictions" After="CA_InitializeProfile"         Condition="NOT Installed AND NOT REMOVE" />
       <Custom Action="CA_SetupAutoStart"           After="CA_ApplySecurityRestrictions"  Condition="NOT Installed AND NOT REMOVE" />
-      <Custom Action="CA_InitializeProfile"        After="CA_SetupAutoStart"            Condition="NOT Installed AND NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation"       After="WriteRegistryValues"          Condition="NOT Installed AND NOT REMOVE" />
 
       <!-- UNINSTALL -->

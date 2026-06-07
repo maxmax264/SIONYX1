@@ -117,6 +117,12 @@ namespace SionyxInstaller
         {
             var sw = Stopwatch.StartNew();
             session.Log("=== ApplySecurityRestrictions: START ===");
+            session.Log($"[DBG] ntuser.dat path: C:\Users\{KioskUsername}\ntuser.dat");
+            session.Log($"[DBG] ntuser.dat exists: {File.Exists($@"C:\Users\{KioskUsername}\ntuser.dat")}");
+            session.Log($"[DBG] Profile dir exists: {Directory.Exists($@"C:\Users\{KioskUsername}")}");
+            session.Log($"[DBG] ntuser.dat path: C:\Users\{KioskUsername}\ntuser.dat");
+            session.Log($"[DBG] ntuser.dat exists: {File.Exists($@"C:\Users\{KioskUsername}\ntuser.dat")}");
+            session.Log($"[DBG] Profile dir exists: {Directory.Exists($@"C:\Users\{KioskUsername}")}");
 
             try
             {
