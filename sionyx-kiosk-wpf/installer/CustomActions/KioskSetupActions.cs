@@ -136,6 +136,14 @@ namespace SionyxInstaller
                         @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System",
                         "DisableTaskMgr", 1);
 
+                    // Skip Windows OOBE ("Getting Windows ready") on first logon
+                    SetUserRegistryPolicy(session, tempHiveKey,
+                        @"SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE",
+                        "SkipUserOOBE", 1);
+                    SetUserRegistryPolicy(session, tempHiveKey,
+                        @"SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE",
+                        "SkipMachineOOBE", 1);
+
                     // Ensure .txt ShellNew exists so "New > Text Document" appears in context menu
                     using (var hku = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Registry64))
                     using (var shellNewKey = hku.CreateSubKey($@"{tempHiveKey}\SOFTWARE\Classes\.txt\ShellNew"))
