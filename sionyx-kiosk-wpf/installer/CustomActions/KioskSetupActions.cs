@@ -274,13 +274,21 @@ namespace SionyxInstaller
                 {
                     try
                     {
-                        Directory.Delete(profilePath, true);
-                        session.Log($"[OK] Deleted old profile folder: {profilePath}");
-                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Deleted old profile folder\n");
+                        int rmResult = RunCommand("cmd", $"/c rmdir /s /q \"{profilePath}\"", session);
+                        if (rmResult == 0)
+                        {
+                            session.Log($"[OK] Deleted old profile folder: {profilePath}");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Deleted old profile folder\n");
+                        }
+                        else
+                        {
+                            session.Log($"[WARN] rmdir returned {rmResult} - continuing anyway");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] WARNING: rmdir failed, continuing\n");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        session.Log($"[WARN] Could not delete profile folder (locked): {ex.Message} - continuing");
+                        session.Log($"[WARN] Could not delete profile folder: {ex.Message} - continuing");
                         File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] WARNING: could not delete profile folder\n");
                     }
                 }
