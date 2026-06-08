@@ -1,27 +1,44 @@
 ﻿content = open(r'.\installer\CustomActions\KioskSetupActions.cs', encoding='utf-8').read()
 
-old = '                bool exists = UserExists(KioskUsername, session);'
+old = '            RunCommand("schtasks", "/delete /tn \\"SIONYX_FirstLogon\\" /f", session);'
 
-new = r'''                // Clean up stale profile folders (SionyxUser.* and TEMP.*)
-                string usersDir = @"C:\Users";
-                foreach (var dir in System.IO.Directory.GetDirectories(usersDir))
+new = r'''            // 4. Clean AutoLogon registry entries
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true))
                 {
-                    string name = System.IO.Path.GetFileName(dir);
-                    if (name.StartsWith(KioskUsername + ".") || name.StartsWith("TEMP."))
+                    if (key != null)
                     {
-                        try
-                        {
-                            System.IO.Directory.Delete(dir, true);
-                            session.Log($"[OK] Removed stale profile folder: {name}");
-                        }
-                        catch (Exception ex)
-                        {
-                            session.Log($"[WARN] Could not remove {name}: {ex.Message}");
-                        }
+                        key.SetValue("AutoAdminLogon", "0", RegistryValueKind.String);
+                        try { key.DeleteValue("DefaultPassword", false); } catch { }
+                        try { key.DeleteValue("DefaultUserName", false); } catch { }
+                        try { key.DeleteValue("AutoLogonSID", false); } catch { }
+                        try { key.DeleteValue("AutoLogonCount", false); } catch { }
+                        try { key.DeleteValue("EnableFirstLogonAnimation", false); } catch { }
+                        session.Log("[OK] AutoLogon cleaned");
                     }
                 }
+            }
+            catch (Exception ex) { session.Log($"[WARN] AutoLogon cleanup: {ex.Message}"); }
 
-                bool exists = UserExists(KioskUsername, session);'''
+            // 5. Clean SpecialAccounts
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList", true))
+                {
+                    if (key != null)
+                    {
+                        try { key.DeleteValue(username, false); } catch { }
+                        session.Log("[OK] SpecialAccounts cleaned");
+                    }
+                }
+            }
+            catch (Exception ex) { session.Log($"[WARN] SpecialAccounts cleanup: {ex.Message}"); }
+
+            // 6. Remove scheduled tasks
+            RunCommand("schtasks", "/delete /tn \"SIONYX_FirstLogon\" /f", session);'''
 
 count = content.count(old)
 print(f"Found {count} matches")
@@ -30,4 +47,6 @@ if count == 1:
     open(r'.\installer\CustomActions\KioskSetupActions.cs', 'w', encoding='utf-8').write(content)
     print('OK')
 else:
-    print('NOT FOUND')
+    print('NOT FOUND - searching...')
+    idx = content.find('RunCommand("schtasks"')
+    print(repr(content[idx:idx+80]))
