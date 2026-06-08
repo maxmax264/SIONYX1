@@ -259,6 +259,9 @@ public partial class App : Application
     {
         var authVm = _host!.Services.GetRequiredService<AuthViewModel>();
         authVm.ResetForm();
+        _ = authVm.ReloadBackgroundAsync();
+        authVm.LoginSucceeded -= OnLoginSucceeded;
+        authVm.RegistrationSucceeded -= OnLoginSucceeded;
         authVm.LoginSucceeded += OnLoginSucceeded;
         authVm.RegistrationSucceeded += OnLoginSucceeded;
 
@@ -411,6 +414,8 @@ public partial class App : Application
         mainWindow.Show();
         MainWindow = mainWindow;
         Log.Information("MainWindow shown and set as Application.MainWindow");
+        // Navigate to Home explicitly (Loaded fires only on first Show)
+        mainWindow.NavigateHome();
 
         // Start system services
         StartSystemServices();

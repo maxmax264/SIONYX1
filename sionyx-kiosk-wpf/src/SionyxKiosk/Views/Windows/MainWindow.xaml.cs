@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private bool _initialized;
     private bool _allowClose;
     private Page? _currentPage;
+    private SionyxKiosk.Services.TrayIconService? _trayIcon;
 
     public MainWindow(MainViewModel viewModel, IServiceProvider services)
     {
@@ -31,6 +32,13 @@ public partial class MainWindow : Window
         {
             Dispatcher.InvokeAsync(() => NavigateToPage("Home"), System.Windows.Threading.DispatcherPriority.Loaded);
             UpdateAvatarInitials();
+            if (viewModel.CurrentUser?.IsAdmin == true)
+            {
+                _trayIcon = new SionyxKiosk.Services.TrayIconService();
+                _trayIcon.RestoreRequested += () => Dispatcher.Invoke(() => { WindowState = System.Windows.WindowState.Maximized; Topmost = true; Activate(); });
+                _trayIcon.OpenControlPanelRequested += () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("control.exe") { UseShellExecute = true });
+                _trayIcon.Show();
+            }
         };
 
         viewModel.PropertyChanged += (_, e) =>
@@ -142,6 +150,9 @@ public partial class MainWindow : Window
         if (_currentPage?.DataContext is IDisposable disposable)
             disposable.Dispose();
 
+        _trayIcon?.Hide();
+        _trayIcon?.Dispose();
+        _trayIcon = null;
         if (!_allowClose)
         {
             e.Cancel = true;
@@ -150,7 +161,7 @@ public partial class MainWindow : Window
         base.OnClosing(e);
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Escape || e.Key == Key.System)
         {
