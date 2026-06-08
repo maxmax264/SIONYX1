@@ -262,13 +262,34 @@ namespace SionyxInstaller
         {
             var sw = Stopwatch.StartNew();
             session.Log("=== InitializeProfile: START ===");
+                File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] InitializeProfile: START\n");
 
             try
             {
                 string installDir = session.CustomActionData["INSTALLDIR"];
                 string profilePath = $@"C:\Users\{KioskUsername}";
 
-                session.Log("[INFO] Skipping CreateProfile — Windows will create profile on first logon via AutoLogon");
+                // Delete old profile folder before CreateProfile so it uses the correct path
+                if (Directory.Exists(profilePath))
+                {
+                    Directory.Delete(profilePath, true);
+                    session.Log($"[OK] Deleted old profile folder: {profilePath}");
+                    File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Deleted old profile folder\n");
+                }
+
+                // Create the profile via Win32 API so Windows does not show "Getting Windows ready"
+                var profilePathBuilder = new StringBuilder(260);
+                string userSid = GetUserSid(KioskUsername);
+                if (userSid != null)
+                {
+                    int cpResult = CreateProfile(userSid, KioskUsername, profilePathBuilder, (uint)profilePathBuilder.Capacity);
+                    session.Log($"[INFO] CreateProfile API result: {cpResult} path: {profilePathBuilder}");
+                    File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] CreateProfile result={cpResult} path={profilePathBuilder}\n");
+                }
+                else
+                {
+                    session.Log("[WARN] Could not get SID for CreateProfile — skipping API call");
+                }
 
                 // Ensure ProfileList registry entry exists regardless
                 // Clean up stale ProfileList entries before creating new one
@@ -348,6 +369,7 @@ namespace SionyxInstaller
                 Directory.CreateDirectory(sionyxDir);
                 Directory.CreateDirectory(logsDir);
                 session.Log("[OK] Profile directories created");
+                File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Profile dirs created\n");
 
                 string shortcutPath = Path.Combine(startupPath, "SIONYX.lnk");
                 string targetExe = Path.Combine(installDir, "SionyxKiosk.exe");
@@ -556,6 +578,7 @@ namespace SionyxInstaller
         {
             var sw = Stopwatch.StartNew();
             session.Log("=== SetupFirstLogon: START ===");
+                File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] SetupFirstLogon: START\n");
             try
             {
                 string installDir = session.CustomActionData["INSTALLDIR"];
@@ -592,7 +615,9 @@ schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
                     key.SetValue("DefaultUserName", "SionyxUser", RegistryValueKind.String);
                     key.SetValue("DefaultPassword", "", RegistryValueKind.String);
                     key.SetValue("AutoLogonCount", 1, RegistryValueKind.DWord);
+                    key.SetValue("EnableFirstLogonAnimation", 1, RegistryValueKind.DWord);
                     session.Log("[OK] AutoLogon configured for SionyxUser (1 time)");
+                    File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] AutoLogon configured\n");
                 }
 
                 session.Log("=== SetupFirstLogon: DONE (" + sw.ElapsedMilliseconds + "ms) ===");
@@ -905,12 +930,12 @@ schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
                 }
             }
 
-            // 3. Delete profile folder and all stale SionyxUser.* / TEMP.* folders
+            // 3. Delete ONLY stale SionyxUser.* / TEMP.* folders - keep main profile
             string usersDir = @"C:\Users";
             foreach (var dir in Directory.GetDirectories(usersDir))
             {
                 string name = Path.GetFileName(dir);
-                if (name == username || name.StartsWith(username + ".") || name.StartsWith("TEMP."))
+                if (name.StartsWith(username + ".") || name.StartsWith("TEMP."))
                 {
                     try
                     {
