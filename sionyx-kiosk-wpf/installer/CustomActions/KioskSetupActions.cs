@@ -1006,15 +1006,13 @@ schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
                             newList.Add("");
                             regKey.SetValue("PendingFileRenameOperations", newList.ToArray(), RegistryValueKind.MultiString);
                             session.Log($"[OK] Scheduled {mainProfile} for deletion on next reboot");
-                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] PendingRename registered for {mainProfile}
-");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] PendingRename registered for {mainProfile}\n");
                         }
                     }
                     catch (Exception rex)
                     {
                         session.Log($"[WARN] PendingRename failed: {rex.Message}");
-                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] PendingRename FAILED: {rex.Message}
-");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] PendingRename FAILED: {rex.Message}\n");
                     }
                 }
             }
