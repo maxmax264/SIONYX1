@@ -995,6 +995,42 @@ schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
             catch (Exception ex) { session.Log($"[WARN] AutoLogon cleanup: {ex.Message}"); }
 
             // 5. Remove FirstLogon scheduled task
+            // 4. Clean AutoLogon registry entries
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue("AutoAdminLogon", "0", RegistryValueKind.String);
+                        try { key.DeleteValue("DefaultPassword", false); } catch { }
+                        try { key.DeleteValue("DefaultUserName", false); } catch { }
+                        try { key.DeleteValue("AutoLogonSID", false); } catch { }
+                        try { key.DeleteValue("AutoLogonCount", false); } catch { }
+                        try { key.DeleteValue("EnableFirstLogonAnimation", false); } catch { }
+                        session.Log("[OK] AutoLogon cleaned");
+                    }
+                }
+            }
+            catch (Exception ex) { session.Log($"[WARN] AutoLogon cleanup: {ex.Message}"); }
+
+            // 5. Clean SpecialAccounts
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList", true))
+                {
+                    if (key != null)
+                    {
+                        try { key.DeleteValue(username, false); } catch { }
+                        session.Log("[OK] SpecialAccounts cleaned");
+                    }
+                }
+            }
+            catch (Exception ex) { session.Log($"[WARN] SpecialAccounts cleanup: {ex.Message}"); }
+
+            // 6. Remove scheduled tasks
             RunCommand("schtasks", "/delete /tn \"SIONYX_FirstLogon\" /f", session);
             session.Log("[OK] SIONYX_FirstLogon task removed (if existed)");
 
