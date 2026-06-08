@@ -79,7 +79,7 @@ public partial class AuthWindow : Window
 
     // ── Enter key to submit ──
 
-    private void OnLoginKeyDown(object sender, KeyEventArgs e)
+    private void OnLoginKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Enter && _vm.LoginCommand.CanExecute(null))
         {
@@ -88,7 +88,7 @@ public partial class AuthWindow : Window
         }
     }
 
-    private void OnRegisterKeyDown(object sender, KeyEventArgs e)
+    private void OnRegisterKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Enter && _vm.RegisterCommand.CanExecute(null))
         {
@@ -109,7 +109,7 @@ public partial class AuthWindow : Window
         base.OnClosing(e);
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Escape || e.Key == Key.System)
         {
