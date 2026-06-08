@@ -272,6 +272,23 @@ namespace SionyxInstaller
                 // Delete old profile folder before CreateProfile so it uses the correct path
                 if (Directory.Exists(profilePath))
                 {
+                    // Unload SionyxUser registry hive before deleting (prevents UsrClass.dat lock)
+                    try
+                    {
+                        string sidForUnload = GetUserSid(KioskUsername);
+                        if (sidForUnload != null)
+                        {
+                            int unloadResult = RunCommand("reg", $"unload \"HKU\\{sidForUnload}\"", session);
+                            session.Log($"[INFO] reg unload result: {unloadResult}");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] reg unload result={unloadResult}\n");
+                            System.Threading.Thread.Sleep(500);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        session.Log($"[WARN] reg unload failed: {ex.Message}");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] reg unload failed: {ex.Message}\n");
+                    }
                     try
                     {
                         int rmResult = RunCommand("cmd", $"/c rmdir /s /q \"{profilePath}\"", session);
@@ -915,7 +932,9 @@ schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
         private static void RemoveUserAndProfile(string username, Session session)
         {
             session.Log($"=== RemoveUserAndProfile: cleaning everything for {username} ===");
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] === UNINSTALL START for {username} ===\n");
             string sid = GetUserSid(username);
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] SID={sid}\n");
 
             // 1. Delete user account
             if (UserExists(username, session))
@@ -1051,6 +1070,12 @@ schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
             session.Log("[OK] SIONYX_FirstLogon task removed (if existed)");
 
             session.Log("=== RemoveUserAndProfile: DONE ===");
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] === UNINSTALL DONE ===\n");
+            // Check what remains
+            bool folderExists = System.IO.Directory.Exists($@"C:\Users\{username}");
+            bool userExists = false;
+            try { new System.Security.Principal.NTAccount(username).Translate(typeof(System.Security.Principal.SecurityIdentifier)); userExists = true; } catch { }
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] After cleanup — folder exists: {folderExists}, user exists: {userExists}\n");
         }
     }
 }
