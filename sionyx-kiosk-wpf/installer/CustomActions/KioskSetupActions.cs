@@ -272,9 +272,17 @@ namespace SionyxInstaller
                 // Delete old profile folder before CreateProfile so it uses the correct path
                 if (Directory.Exists(profilePath))
                 {
-                    Directory.Delete(profilePath, true);
-                    session.Log($"[OK] Deleted old profile folder: {profilePath}");
-                    File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Deleted old profile folder\n");
+                    try
+                    {
+                        Directory.Delete(profilePath, true);
+                        session.Log($"[OK] Deleted old profile folder: {profilePath}");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Deleted old profile folder\n");
+                    }
+                    catch (Exception ex)
+                    {
+                        session.Log($"[WARN] Could not delete profile folder (locked): {ex.Message} - continuing");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] WARNING: could not delete profile folder\n");
+                    }
                 }
 
                 // Create the profile via Win32 API so Windows does not show "Getting Windows ready"
