@@ -259,6 +259,7 @@ public partial class App : Application
     {
         var authVm = _host!.Services.GetRequiredService<AuthViewModel>();
         authVm.ResetForm();
+        _ = authVm.ReloadBackgroundAsync();
         authVm.LoginSucceeded -= OnLoginSucceeded;
         authVm.RegistrationSucceeded -= OnLoginSucceeded;
         authVm.LoginSucceeded += OnLoginSucceeded;
