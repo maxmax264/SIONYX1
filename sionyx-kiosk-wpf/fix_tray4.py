@@ -1,4 +1,4 @@
-using Hardcodet.Wpf.TaskbarNotification;
+﻿code = """using Hardcodet.Wpf.TaskbarNotification;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -41,6 +41,7 @@ public class TrayIconService : IDisposable
                 ContextMenu = menu,
                 Icon = icon,
             };
+            _trayIcon.ForceCreate();
         });
         Log.Information("[Tray] Icon shown");
     }
@@ -58,3 +59,6 @@ public class TrayIconService : IDisposable
 
     public void Dispose() => Hide();
 }
+"""
+open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\TrayIconService.cs', 'w', encoding='utf-8').write(code)
+print('OK')

@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Content Include="Assets\templates\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\app-logo.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
