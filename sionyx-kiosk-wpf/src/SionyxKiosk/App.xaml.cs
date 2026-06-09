@@ -26,6 +26,7 @@ public partial class App : Application
 
     private SystemServicesManager? _systemServices;
     private SessionCoordinator? _sessionCoordinator;
+    private TrayIconService? _trayIcon;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -395,6 +396,10 @@ public partial class App : Application
 
     private void ShowMainWindow()
     {
+        // Restore desktop snapshot for new client session
+        try { new Services.DesktopSnapshotService().RestoreSnapshot(); }
+        catch (Exception ex) { Log.Warning(ex, "[Snapshot] Restore failed, continuing"); }
+
         Log.Debug("Creating MainWindow from DI");
 
         // Reinitialize HomeViewModel with the current (fresh) user
@@ -439,7 +444,9 @@ public partial class App : Application
                 {
                     try
                     {
-                        _host!.Services.GetRequiredService<BrowserCleanupService>().CleanupWithBrowserClose();
+                        var browserCleanup = _host!.Services.GetRequiredService<BrowserCleanupService>();
+                        browserCleanup.CleanupWithBrowserClose();
+                        browserCleanup.CleanupDownloads();
                     }
                     catch (Exception ex)
                     {
@@ -551,9 +558,10 @@ public partial class App : Application
                 var passwordResult = orgMetadata != null ? await orgMetadata.GetAdminExitPasswordAsync() : null;
                 var firebasePassword = passwordResult?.IsSuccess == true && passwordResult.Data is string p ? p : null;
                 var expectedPassword = firebasePassword ?? Infrastructure.AppConstants.GetAdminExitPassword();
+                Log.Information("Admin exit: firebaseOK={Ok} firebasePass={FP} expected={EP}", passwordResult?.IsSuccess, firebasePassword, expectedPassword);
                 if (password == expectedPassword)
                 {
-                    Log.Information("Admin exit: correct password, shutting down");
+                    Log.Information("Admin exit: correct password, showing tray");
                     _ = Task.Run(async () =>
                     {
                         await StopSystemServicesAsync();
@@ -562,10 +570,65 @@ public partial class App : Application
                         Current.Dispatcher.Invoke(() =>
                         {
                             if (MainWindow is Views.Windows.MainWindow mainWin)
-                                mainWin.AllowClose();
+                            { mainWin.AllowClose(); mainWin.Close(); }
                             else if (MainWindow is AuthWindow aw)
-                                aw.AllowClose();
-                            Shutdown();
+                            { aw.AllowClose(); aw.Close(); }
+                            _trayIcon = new TrayIconService();
+                            _trayIcon.RestoreRequested += () =>
+                            {
+                                _trayIcon?.Hide();
+                                _trayIcon = null;
+                                ShowAuthWindow();
+                            };
+                            _trayIcon.OpenControlPanelRequested += () =>
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = "control.exe",
+                                    UseShellExecute = true
+                                });
+                            };
+                            _trayIcon.OpenDashboardRequested += () =>
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = "https://pc-sion.web.app",
+                                    UseShellExecute = true
+                                });
+                            };
+                            _trayIcon.AboutRequested += () =>
+                            {
+                                var orgId = Infrastructure.RegistryConfig.ReadValue("OrgId") ?? "";
+                                var version = GetVersion();
+                                var dlg = new Views.Dialogs.AboutDialog(orgId, version);
+                                dlg.Show();
+                            };
+                            _trayIcon.CustomizeDesktopRequested += () =>
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = "explorer.exe",
+                                    Arguments = "shell:::{ED834ED6-4B5A-4bfe-8F11-A626DCB6A921}",
+                                    UseShellExecute = true
+                                });
+                            };
+                            _trayIcon.SaveSnapshotRequested += () =>
+                            {
+                                var snapshot = new Services.DesktopSnapshotService();
+                                snapshot.SaveSnapshot();
+                            };
+                            _trayIcon.SettingsRequested += () =>
+                            {
+                                var dlg = new Views.Dialogs.SettingsDialog();
+                                dlg.Show();
+                            };
+                            _trayIcon.ExitRequested += () =>
+                            {
+                                _trayIcon.Hide();
+                                _trayIcon = null;
+                                Shutdown();
+                            };
+                            _trayIcon.Show();
                         });
                     });
                 }
@@ -660,6 +723,7 @@ public partial class App : Application
         }
     }
 }
+
 
 
 

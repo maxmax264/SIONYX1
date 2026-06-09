@@ -151,12 +151,15 @@ public class OrganizationMetadataService : BaseService
     {
         try
         {
-            var result = await Firebase.DbGetAsync("metadata/settings/adminExitPassword");
-            if (!result.Success || result.Data is not System.Text.Json.JsonElement el || el.ValueKind == System.Text.Json.JsonValueKind.Null)
+            var config = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+            using var http = new System.Net.Http.HttpClient();
+            http.Timeout = TimeSpan.FromSeconds(5);
+            var url = $"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/settings/adminExitPassword.json";
+            var response = await http.GetStringAsync(url);
+            var password = response.Trim().Trim('"');
+            if (string.IsNullOrEmpty(password) || password == "null")
                 return Error("not found");
-
-            var password = el.ValueKind == System.Text.Json.JsonValueKind.String ? el.GetString() : null;
-            return string.IsNullOrEmpty(password) ? Error("not found") : Success(password);
+            return Success(password);
         }
         catch (Exception)
         {

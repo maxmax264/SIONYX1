@@ -1,13 +1,8 @@
-﻿path = r'.\src\SionyxKiosk\ViewModels\ProfileViewModel.cs'
-content = open(path, encoding='utf-8').read()
+﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
 
-old = 'auth.ChangePasswordAsync(NewPassword);\n            if (result.IsSuccess)\n            {\n                StatusMessage = "\u05d4\u05e1\u05d9\u05e1\u05de\u05d0 \u05e9\u05d5\u05e0\u05ea\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4";\n                IsSuccess = true;\n                NewPassword = "";\n                ConfirmPassword = "";\n                var uid = _auth.CurrentUser?.Uid;\n                if (uid != null) { await Task.Delay(2000); _forceLogout.StartListening(uid); }\n            '
-
-new = 'auth.ChangePasswordAsync(NewPassword);\n            if (result.IsSuccess)\n            {\n                NewPassword = "";\n                ConfirmPassword = "";\n                await ShowSuccessToastAsync("\u05d4\u05e1\u05d9\u05e1\u05de\u05d0 \u05e9\u05d5\u05e0\u05ea\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4 \u2713");\n                var uid = _auth.CurrentUser?.Uid;\n                if (uid != null) { await Task.Delay(2000); _forceLogout.StartListening(uid); }\n            '
-
-if old in content:
-    content = content.replace(old, new)
-    open(path, 'w', encoding='utf-8').write(content)
-    print('OK')
-else:
-    print('NOT FOUND')
+old = '                            if (MainWindow is Views.Windows.MainWindow mainWin)\n                                mainWin.AllowClose();\n                            else if (MainWindow is AuthWindow aw)\n                                aw.AllowClose();'
+new = '                            if (MainWindow is Views.Windows.MainWindow mainWin)\n                            { mainWin.AllowClose(); mainWin.Close(); }\n                            else if (MainWindow is AuthWindow aw)\n                            { aw.AllowClose(); aw.Close(); }'
+assert content.count(old) == 1, "not found"
+content = content.replace(old, new)
+open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
+print('OK')

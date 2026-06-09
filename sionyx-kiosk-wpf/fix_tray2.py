@@ -1,36 +1,14 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Views\Windows\MainWindow.xaml.cs', encoding='utf-8').read()
-old = "    private readonly MainViewModel _vm;\n    private readonly IServiceProvider _services;\n    private bool _initialized;\n    private bool _allowClose;\n    private Page? _currentPage;"
-new = "    private readonly MainViewModel _vm;\n    private readonly IServiceProvider _services;\n    private bool _initialized;\n    private bool _allowClose;\n    private Page? _currentPage;\n    private SionyxKiosk.Services.TrayIconService? _trayIcon;"
-count = content.count(old)
-print(f"patch1: {count} matches")
-if count == 1:
-    content = content.replace(old, new, 1)
-    print("patch1 OK")
-else:
-    print("patch1 NOT FOUND")
-    exit(1)
+﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\TrayIconService.cs', encoding='utf-8').read()
 
-old2 = "        Loaded += (_, _) =>\n        {\n            Dispatcher.InvokeAsync(() => NavigateToPage(\"Home\"), System.Windows.Threading.DispatcherPriority.Loaded);\n            UpdateAvatarInitials();\n        };"
-new2 = "        Loaded += (_, _) =>\n        {\n            Dispatcher.InvokeAsync(() => NavigateToPage(\"Home\"), System.Windows.Threading.DispatcherPriority.Loaded);\n            UpdateAvatarInitials();\n            if (viewModel.CurrentUser?.IsAdmin == true)\n            {\n                _trayIcon = new SionyxKiosk.Services.TrayIconService();\n                _trayIcon.RestoreRequested += () => Dispatcher.Invoke(() => { WindowState = System.Windows.WindowState.Maximized; Topmost = true; Activate(); });\n                _trayIcon.OpenControlPanelRequested += () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(\"control.exe\") { UseShellExecute = true });\n                _trayIcon.Show();\n            }\n        };"
-count2 = content.count(old2)
-print(f"patch2: {count2} matches")
-if count2 == 1:
-    content = content.replace(old2, new2, 1)
-    print("patch2 OK")
-else:
-    print("patch2 NOT FOUND")
-    exit(1)
+old = '    public event Action? RestoreRequested;\n    public event Action? OpenControlPanelRequested;\n    public event Action? ExitRequested;'
+new = '    public event Action? RestoreRequested;\n    public event Action? OpenControlPanelRequested;\n    public event Action? AboutRequested;\n    public event Action? ExitRequested;'
+assert content.count(old) == 1, "events not found"
+content = content.replace(old, new)
 
-old3 = "        if (!_allowClose)\n        {\n            e.Cancel = true;\n            return;\n        }\n        base.OnClosing(e);"
-new3 = "        _trayIcon?.Hide();\n        _trayIcon?.Dispose();\n        _trayIcon = null;\n        if (!_allowClose)\n        {\n            e.Cancel = true;\n            return;\n        }\n        base.OnClosing(e);"
-count3 = content.count(old3)
-print(f"patch3: {count3} matches")
-if count3 == 1:
-    content = content.replace(old3, new3, 1)
-    print("patch3 OK")
-else:
-    print("patch3 NOT FOUND")
-    exit(1)
+old = '            menu.Items.Add(restoreItem);\n            menu.Items.Add(controlItem);\n            menu.Items.Add(separator);\n            menu.Items.Add(exitItem);'
+new = '            var aboutItem = new MenuItem { Header = "\u05d0\u05d5\u05d3\u05d5\u05ea", FlowDirection = FlowDirection.RightToLeft };\n            aboutItem.Click += (s, e) => AboutRequested?.Invoke();\n            menu.Items.Add(restoreItem);\n            menu.Items.Add(controlItem);\n            menu.Items.Add(aboutItem);\n            menu.Items.Add(new Separator());\n            menu.Items.Add(exitItem);'
+assert content.count(old) == 1, "menu not found"
+content = content.replace(old, new)
 
-open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Views\Windows\MainWindow.xaml.cs', 'w', encoding='utf-8').write(content)
-print("DONE")
+open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\TrayIconService.cs', 'w', encoding='utf-8').write(content)
+print('OK')
