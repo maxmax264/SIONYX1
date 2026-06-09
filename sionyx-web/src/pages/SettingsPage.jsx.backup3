@@ -1,27 +1,29 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Typography, Tabs, Space } from 'antd';
-import { SettingOutlined, DollarOutlined, DownloadOutlined, PhoneOutlined, LockOutlined } from '@ant-design/icons';
+import { SettingOutlined, DollarOutlined, DownloadOutlined, PhoneOutlined } from '@ant-design/icons';
 import PricingSettings from '../components/settings/PricingSettings';
 import PhoneVerificationSettings from '../components/settings/PhoneVerificationSettings';
 import KioskDesignSettings from '../components/settings/KioskDesignSettings';
 import DownloadsSettings from '../components/settings/DownloadsSettings';
-import KioskPasswordSettings from '../components/settings/KioskPasswordSettings';
 
 const { Title, Text } = Typography;
 
 const useIsMobile = (breakpoint = 768) => {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
     const handler = (e) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [breakpoint]);
+
   return isMobile;
 };
 
 const SettingsPage = () => {
   const isMobile = useIsMobile();
+
   const tabs = [
     {
       key: 'pricing',
@@ -33,12 +35,13 @@ const SettingsPage = () => {
       ),
       children: <PricingSettings />,
     },
+
     {
       key: 'kioskdesign',
       label: (
         <span>
           <DownloadOutlined />
-          {' '}עיצוב מסך קיוסק
+          {' '}עיצוב מסך כניסה
         </span>
       ),
       children: <KioskDesignSettings />,
@@ -54,16 +57,6 @@ const SettingsPage = () => {
       children: <PhoneVerificationSettings />,
     },
     {
-      key: 'password',
-      label: (
-        <span>
-          <LockOutlined />
-          {' '}סיסמת יציאה
-        </span>
-      ),
-      children: <KioskPasswordSettings />,
-    },
-    {
       key: 'downloads',
       label: (
         <span>
@@ -72,8 +65,10 @@ const SettingsPage = () => {
         </span>
       ),
       children: <DownloadsSettings />,
+
     },
   ];
+
   return (
     <div style={{ direction: 'rtl' }}>
       <Space direction='vertical' size='large' style={{ width: '100%' }}>
@@ -97,11 +92,14 @@ const SettingsPage = () => {
               הגדרות
             </Title>
             <Text type='secondary' style={{ fontSize: isMobile ? 12 : 14 }}>
-              ניהול הגדרות הארגון שלך
+              נהל את הגדרות הארגון שלך
             </Text>
           </div>
         </div>
-        <Card styles={{ body: { padding: isMobile ? '12px 8px' : undefined } }}>
+
+        <Card
+          styles={{ body: { padding: isMobile ? '12px 8px' : undefined } }}
+        >
           <Tabs
             defaultActiveKey='pricing'
             items={tabs}
