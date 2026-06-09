@@ -78,6 +78,7 @@ const MessagesPage = () => {
   const chatEndRef = useRef(null);
 
   const { user } = useAuthStore();
+  const adminUid = user?.uid || user?.admin?.uid || user?.admin?.uid;
   const { message } = App.useApp();
   const orgId = useOrgId();
 
@@ -145,11 +146,11 @@ const MessagesPage = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser || !user?.uid) return;
+    if (!newMessage.trim() || !selectedUser || !adminUid) return;
 
     setSending(true);
     try {
-      const result = await sendMessage(orgId, selectedUser.uid, newMessage.trim(), user.uid);
+      const result = await sendMessage(orgId, selectedUser.uid, newMessage.trim(), adminUid);
       if (result.success) {
         setNewMessage('');
         const msgResult = await getMessagesForUser(orgId, selectedUser.uid);
