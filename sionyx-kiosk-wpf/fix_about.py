@@ -1,0 +1,8 @@
+﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
+
+old = '                            _trayIcon.OpenControlPanelRequested += () =>\n                            {\n                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo\n                                {\n                                    FileName = "https://pc-sion.web.app",\n                                    UseShellExecute = true\n                                });\n                            };'
+new = '                            _trayIcon.OpenControlPanelRequested += () =>\n                            {\n                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo\n                                {\n                                    FileName = "https://pc-sion.web.app",\n                                    UseShellExecute = true\n                                });\n                            };\n                            _trayIcon.AboutRequested += () =>\n                            {\n                                var orgId = Infrastructure.RegistryConfig.ReadValue("OrgId") ?? "";\n                                var version = Infrastructure.AppVersion.Get();\n                                var dlg = new Views.Dialogs.AboutDialog(orgId, version);\n                                dlg.Show();\n                            };'
+assert content.count(old) == 1, "not found"
+content = content.replace(old, new)
+open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
+print('OK')

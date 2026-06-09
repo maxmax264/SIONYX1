@@ -15,6 +15,14 @@ public class TrayIconService : IDisposable
 
     public event Action? RestoreRequested;
     public event Action? OpenControlPanelRequested;
+    public event Action? OpenDashboardRequested;
+    public event Action? AboutRequested;
+    public event Action? ExitRequested;
+    public event Action? CustomizeDesktopRequested;
+    public event Action? SaveSnapshotRequested;
+    public event Action? SettingsRequested;
+
+    private MenuItem? _customizeItem;
 
     public void Show()
     {
@@ -26,8 +34,37 @@ public class TrayIconService : IDisposable
             restoreItem.Click += (s, e) => RestoreRequested?.Invoke();
             var controlItem = new MenuItem { Header = "פתח לוח בקרה", FlowDirection = FlowDirection.RightToLeft };
             controlItem.Click += (s, e) => OpenControlPanelRequested?.Invoke();
+            var separator = new Separator();
+            var exitItem = new MenuItem { Header = "צא מהתוכנה", FlowDirection = FlowDirection.RightToLeft };
+            exitItem.Click += (s, e) => ExitRequested?.Invoke();
+            var dashItem = new MenuItem { Header = "פתח דשבורד", FlowDirection = FlowDirection.RightToLeft };
+            dashItem.Click += (s, e) => OpenDashboardRequested?.Invoke();
+            var aboutItem = new MenuItem { Header = "אודות", FlowDirection = FlowDirection.RightToLeft };
+            aboutItem.Click += (s, e) => AboutRequested?.Invoke();
             menu.Items.Add(restoreItem);
             menu.Items.Add(controlItem);
+            menu.Items.Add(dashItem);
+            menu.Items.Add(aboutItem);
+            _customizeItem = new MenuItem { Header = "עצב שולחן עבודה", FlowDirection = FlowDirection.RightToLeft };
+            _customizeItem.Click += (s, e) =>
+            {
+                if (_customizeItem.Header?.ToString()?.Contains("סיום") == true)
+                {
+                    _customizeItem.Header = "עצב שולחן עבודה";
+                    SaveSnapshotRequested?.Invoke();
+                }
+                else
+                {
+                    _customizeItem.Header = "סיום עיצוב";
+                    CustomizeDesktopRequested?.Invoke();
+                }
+            };
+            menu.Items.Add(_customizeItem);
+            var settingsItem = new MenuItem { Header = "הגדרות", FlowDirection = FlowDirection.RightToLeft };
+            settingsItem.Click += (s, e) => SettingsRequested?.Invoke();
+            menu.Items.Add(settingsItem);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(exitItem);
             menu.FlowDirection = FlowDirection.RightToLeft;
 
             var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "app-logo.ico");

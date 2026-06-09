@@ -20,9 +20,13 @@ public static class AppConstants
     /// </summary>
     public static string GetAdminExitPassword()
     {
-        // Production: read from registry
+        // Production: read from registry (CurrentUser overrides LocalMachine)
         if (RegistryConfig.IsProduction())
         {
+            var userPassword = RegistryConfig.ReadValueCurrentUser("AdminExitPassword");
+            if (!string.IsNullOrEmpty(userPassword))
+                return userPassword;
+
             var password = RegistryConfig.ReadValue("AdminExitPassword");
             if (!string.IsNullOrEmpty(password))
                 return password;

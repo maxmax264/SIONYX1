@@ -1,11 +1,73 @@
-﻿content = open(r'.\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
-old = "    private void OnLoginSucceeded()\n    {\n        Current.Dispatcher.Invoke(() =>\n        {\n            try\n            {\n                Log.Information(\"Login succeeded \u2014 closing auth window, opening main window\");\n\n                if (MainWindow is AuthWindow aw)\n                {\n                    aw.AllowClose();\n                    aw.Close();\n                }\n                ShowMainWindow();"
-new = "    private void OnLoginSucceeded()\n    {\n        _ = Current.Dispatcher.InvokeAsync(async () =>\n        {\n            try\n            {\n                Log.Information(\"Login succeeded \u2014 checking phone verification\");\n                var auth = _host!.Services.GetRequiredService<AuthService>();\n                var (required, verified) = await auth.CheckPhoneVerificationAsync();\n\n                if (required && !verified)\n                {\n                    Log.Information(\"Phone verification required \u2014 showing waiting screen\");\n                    var firebase = _host!.Services.GetRequiredService<FirebaseClient>();\n                    var userId = auth.CurrentUser?.Uid ?? \"\";\n                    var phone = AppConstants.SupportPhone;\n\n                    if (MainWindow is AuthWindow aw2) { aw2.AllowClose(); aw2.Close(); }\n\n                    var waitWin = new Views.Windows.VerificationWaitingWindow(firebase, userId, phone);\n                    waitWin.VerificationCompleted += () =>\n                    {\n                        waitWin.AllowClose();\n                        waitWin.Close();\n                        ShowMainWindow();\n                    };\n                    waitWin.BackToLogin += async () =>\n                    {\n                        waitWin.AllowClose();\n                        waitWin.Close();\n                        await auth.LogoutAsync();\n                        ShowAuthWindow();\n                    };\n                    waitWin.Show();\n                    MainWindow = waitWin;\n                    return;\n                }\n\n                Log.Information(\"Phone OK \u2014 closing auth window, opening main window\");\n\n                if (MainWindow is AuthWindow aw)\n                {\n                    aw.AllowClose();\n                    aw.Close();\n                }\n                ShowMainWindow();"
-count = content.count(old)
-print(f"match: {count}")
-if count == 1:
-    content = content.replace(old, new, 1)
-    open(r'.\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
-    print('OK')
-else:
-    print('NOT FOUND')
+﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
+
+# 1. Add _trayIcon field
+old = '    private SystemServicesManager? _systemServices;\n    private SessionCoordinator? _sessionCoordinator;'
+new = '    private SystemServicesManager? _systemServices;\n    private SessionCoordinator? _sessionCoordinator;\n    private TrayIconService? _trayIcon;'
+assert content.count(old) == 1, "field not found"
+content = content.replace(old, new)
+
+# 2. Replace Shutdown() block with tray show
+old = '''                if (password == expectedPassword)
+                {
+                    Log.Information("Admin exit: correct password, shutting down");
+                    _ = Task.Run(async () =>
+                    {
+                        await StopSystemServicesAsync();
+                        _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
+                        await auth.LogoutAsync();
+                        Current.Dispatcher.Invoke(() =>
+                        {
+                            if (MainWindow is Views.Windows.MainWindow mainWin)
+                                mainWin.AllowClose();
+                            else if (MainWindow is AuthWindow aw)
+                                aw.AllowClose();
+                            Shutdown();
+                        });
+                    });
+                }'''
+new = '''                if (password == expectedPassword)
+                {
+                    Log.Information("Admin exit: correct password, showing tray");
+                    _ = Task.Run(async () =>
+                    {
+                        await StopSystemServicesAsync();
+                        _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
+                        await auth.LogoutAsync();
+                        Current.Dispatcher.Invoke(() =>
+                        {
+                            if (MainWindow is Views.Windows.MainWindow mainWin)
+                                mainWin.AllowClose();
+                            else if (MainWindow is AuthWindow aw)
+                                aw.AllowClose();
+                            _trayIcon = new TrayIconService();
+                            _trayIcon.RestoreRequested += () =>
+                            {
+                                _trayIcon.Hide();
+                                _trayIcon = null;
+                                var authWindow = new AuthWindow();
+                                MainWindow = authWindow;
+                                authWindow.Show();
+                            };
+                            _trayIcon.OpenControlPanelRequested += () =>
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                {
+                                    FileName = "https://pc-sion.web.app",
+                                    UseShellExecute = true
+                                });
+                            };
+                            _trayIcon.ExitRequested += () =>
+                            {
+                                _trayIcon.Hide();
+                                _trayIcon = null;
+                                Shutdown();
+                            };
+                            _trayIcon.Show();
+                        });
+                    });
+                }'''
+assert content.count(old) == 1, "shutdown block not found"
+content = content.replace(old, new)
+
+open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
+print('OK')

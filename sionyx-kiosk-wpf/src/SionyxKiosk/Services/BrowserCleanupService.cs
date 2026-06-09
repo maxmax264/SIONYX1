@@ -38,6 +38,29 @@ public class BrowserCleanupService
         "sessionstore.jsonlz4", "sessionstore-backups",
     ];
 
+    /// <summary>Delete all files in SionyxUser Downloads folder.</summary>
+    public void CleanupDownloads()
+    {
+        var downloadsPath = Path.Combine(@"C:\Users\SionyxUser\Downloads");
+        if (!Directory.Exists(downloadsPath))
+        {
+            Logger.Information("Downloads folder not found, skipping");
+            return;
+        }
+        var deleted = 0;
+        foreach (var file in Directory.GetFiles(downloadsPath, "*", SearchOption.AllDirectories))
+        {
+            try { File.Delete(file); deleted++; }
+            catch (Exception ex) { Logger.Warning("Could not delete {File}: {Err}", file, ex.Message); }
+        }
+        foreach (var dir in Directory.GetDirectories(downloadsPath))
+        {
+            try { Directory.Delete(dir, recursive: true); deleted++; }
+            catch (Exception ex) { Logger.Warning("Could not delete {Dir}: {Err}", dir, ex.Message); }
+        }
+        Logger.Information("Downloads cleanup: {Count} items deleted", deleted);
+    }
+
     /// <summary>Close browsers first, then clean up. Recommended for session end.</summary>
     public Dictionary<string, object> CleanupWithBrowserClose()
     {

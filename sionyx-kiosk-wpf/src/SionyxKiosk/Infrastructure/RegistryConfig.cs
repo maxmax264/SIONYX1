@@ -65,6 +65,36 @@ public static class RegistryConfig
     /// <summary>
     /// Check if SIONYX registry key exists with required values.
     /// </summary>
+    public static string? ReadValueCurrentUser(string name, string? defaultValue = null)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryKey);
+            if (key == null) return defaultValue;
+            var value = key.GetValue(name);
+            return value?.ToString() ?? defaultValue;
+        }
+        catch (Exception)
+        {
+            return defaultValue;
+        }
+    }
+
+    public static bool WriteValue(string name, string value)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(RegistryKey, writable: true);
+            if (key == null) return false;
+            key.SetValue(name, value, RegistryValueKind.String);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     public static bool RegistryConfigExists()
     {
         try
