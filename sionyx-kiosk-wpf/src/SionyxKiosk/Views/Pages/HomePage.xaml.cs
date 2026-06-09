@@ -34,6 +34,7 @@ public partial class HomePage : Page
         viewModel.PropertyChanged += _propChangedHandler;
 
         viewModel.ViewMessagesRequested += OpenMessageDialog;
+        viewModel.NewMessageReceived += OnNewMessageReceived;
         viewModel.NavigateToPackagesRequested += NavigateToPackages;
         viewModel.SessionStartedSuccessfully += OnSessionStarted;
         viewModel.ResumeSessionRequested += OnResumeSession;
@@ -154,5 +155,14 @@ public partial class HomePage : Page
     private void ResumeSession_Click(object sender, RoutedEventArgs e)
     {
         _vm.ResumeSessionCommand.Execute(null);
+    }
+
+    private void OnNewMessageReceived()
+    {
+        SionyxKiosk.Views.Controls.FloatingNotification.Show(
+            "הודעה חדשה מהמנהל",
+            "קיבלת הודעה חדשה - לחץ על כפתור ההודעות לקריאה",
+            SionyxKiosk.Views.Controls.FloatingNotification.NotificationType.Info,
+            6000);
     }
 }

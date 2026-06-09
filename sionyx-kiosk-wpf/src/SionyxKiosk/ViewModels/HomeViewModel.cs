@@ -38,6 +38,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
 
     /// <summary>Raised when the user wants to view unread messages.</summary>
     public event Action? ViewMessagesRequested;
+    public event Action? NewMessageReceived;
     /// <summary>Raised when user clicks "buy package" button.</summary>
     public event Action? NavigateToPackagesRequested;
     /// <summary>Raised after a session is successfully started.</summary>
@@ -224,7 +225,14 @@ public partial class HomeViewModel : ObservableObject, IDisposable
 
     private void OnMessagesReceived(List<Dictionary<string, object?>> msgs)
     {
-        UnreadMessages = msgs.Count;
+        var count = msgs.Count;
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            var isNew = UnreadMessages == 0 && count > 0;
+            UnreadMessages = count;
+            if (isNew)
+                NewMessageReceived?.Invoke();
+        });
     }
 
     // ── Helpers ─────────────────────────────────────────────────
