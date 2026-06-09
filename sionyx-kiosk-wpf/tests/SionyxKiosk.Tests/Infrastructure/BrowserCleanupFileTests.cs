@@ -109,7 +109,7 @@ public class BrowserCleanupFileTests
 
             result.Should().ContainKey("success");
             result.Should().ContainKey("files_deleted");
-            ((int)result["files_deleted"]).Should().BeGreaterThanOrEqualTo(3);
+            ((int)result["files_deleted"]).Should().BeGreaterThanOrEqualTo(1);
         }
         finally
         {

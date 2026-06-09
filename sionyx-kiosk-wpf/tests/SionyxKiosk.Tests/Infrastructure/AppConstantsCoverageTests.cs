@@ -27,8 +27,24 @@ public class AppConstantsCoverageTests
     [Fact]
     public void GetAdminExitPassword_DefaultFallback()
     {
-        var password = AppConstants.GetAdminExitPassword();
-        password.Should().Be("dev-exit");
+        if (RegistryConfig.IsProduction())
+        {
+            var prodPassword = AppConstants.GetAdminExitPassword();
+            prodPassword.Should().NotBeNullOrEmpty();
+            return;
+        }
+
+        var originalValue = Environment.GetEnvironmentVariable("ADMIN_EXIT_PASSWORD");
+        try
+        {
+            Environment.SetEnvironmentVariable("ADMIN_EXIT_PASSWORD", null);
+            var password = AppConstants.GetAdminExitPassword();
+            password.Should().Be("dev-exit");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ADMIN_EXIT_PASSWORD", originalValue);
+        }
     }
 
     [Fact]

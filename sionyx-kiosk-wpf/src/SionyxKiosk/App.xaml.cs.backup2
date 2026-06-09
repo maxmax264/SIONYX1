@@ -518,7 +518,7 @@ public partial class App : Application
     // Admin Exit
     // ================================================================
 
-    private async void ShowAdminExitDialog(AuthService auth)
+    private void ShowAdminExitDialog(AuthService auth)
     {
         try
         {
@@ -546,10 +546,7 @@ public partial class App : Application
             if (dialog.ShowDialog() == true)
             {
                 var password = dialog.EnteredPassword;
-                var orgMetadata = _host?.Services.GetService<OrganizationMetadataService>();
-                var passwordResult = orgMetadata != null ? await orgMetadata.GetAdminExitPasswordAsync() : null;
-                var expectedPassword = passwordResult?.IsSuccess == true && passwordResult.Data is string p ? p : Infrastructure.AppConstants.GetAdminExitPassword();
-                if (password == expectedPassword)
+                if (password == Infrastructure.AppConstants.GetAdminExitPassword())
                 {
                     Log.Information("Admin exit: correct password, shutting down");
                     _ = Task.Run(async () =>
@@ -658,8 +655,6 @@ public partial class App : Application
         }
     }
 }
-
-
 
 
 

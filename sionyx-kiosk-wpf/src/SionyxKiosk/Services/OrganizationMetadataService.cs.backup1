@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using SionyxKiosk.Infrastructure;
 
@@ -147,23 +147,6 @@ public class OrganizationMetadataService : BaseService
         }
     }
 
-    public async Task<ServiceResult> GetAdminExitPasswordAsync()
-    {
-        try
-        {
-            var result = await Firebase.DbGetAsync("metadata/settings/adminExitPassword");
-            if (!result.Success || result.Data is not System.Text.Json.JsonElement el || el.ValueKind == System.Text.Json.JsonValueKind.Null)
-                return Success(AppConstants.GetAdminExitPassword());
-
-            var password = el.ValueKind == System.Text.Json.JsonValueKind.String ? el.GetString() : null;
-            return Success(string.IsNullOrEmpty(password) ? AppConstants.GetAdminExitPassword() : password);
-        }
-        catch (Exception)
-        {
-            return Success(AppConstants.GetAdminExitPassword());
-        }
-    }
-
     public async Task<ServiceResult> GetAdminContactAsync()
     {
         try
@@ -186,5 +169,3 @@ public class OrganizationMetadataService : BaseService
         }
     }
 }
-
-
