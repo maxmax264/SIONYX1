@@ -153,14 +153,14 @@ public class OrganizationMetadataService : BaseService
         {
             var result = await Firebase.DbGetAsync("metadata/settings/adminExitPassword");
             if (!result.Success || result.Data is not System.Text.Json.JsonElement el || el.ValueKind == System.Text.Json.JsonValueKind.Null)
-                return Success(AppConstants.GetAdminExitPassword());
+                return Error("not found");
 
             var password = el.ValueKind == System.Text.Json.JsonValueKind.String ? el.GetString() : null;
-            return Success(string.IsNullOrEmpty(password) ? AppConstants.GetAdminExitPassword() : password);
+            return string.IsNullOrEmpty(password) ? Error("not found") : Success(password);
         }
         catch (Exception)
         {
-            return Success(AppConstants.GetAdminExitPassword());
+            return Error("firebase error");
         }
     }
 
@@ -186,5 +186,6 @@ public class OrganizationMetadataService : BaseService
         }
     }
 }
+
 
 
