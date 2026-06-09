@@ -519,6 +519,7 @@ public partial class App : Application
     // ================================================================
 
     private async void ShowAdminExitDialog(AuthService auth)
+    // Priority: Firebase → Registry → Default
     {
         try
         {
@@ -548,7 +549,8 @@ public partial class App : Application
                 var password = dialog.EnteredPassword;
                 var orgMetadata = _host?.Services.GetService<OrganizationMetadataService>();
                 var passwordResult = orgMetadata != null ? await orgMetadata.GetAdminExitPasswordAsync() : null;
-                var expectedPassword = passwordResult?.IsSuccess == true && passwordResult.Data is string p ? p : Infrastructure.AppConstants.GetAdminExitPassword();
+                var firebasePassword = passwordResult?.IsSuccess == true && passwordResult.Data is string p ? p : null;
+                var expectedPassword = firebasePassword ?? Infrastructure.AppConstants.GetAdminExitPassword();
                 if (password == expectedPassword)
                 {
                     Log.Information("Admin exit: correct password, shutting down");
@@ -658,6 +660,8 @@ public partial class App : Application
         }
     }
 }
+
+
 
 
 
