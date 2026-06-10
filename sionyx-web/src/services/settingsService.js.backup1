@@ -196,3 +196,34 @@ export const setPhoneVerificationSetting = async (orgId, value) => {
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Get kiosk exit password
+ */
+export const getKioskExitPassword = async (orgId) => {
+  try {
+    const passwordRef = ref(database, `organizations/${orgId}/metadata/settings/adminExitPassword`);
+    const snapshot = await get(passwordRef);
+    return { success: true, password: snapshot.exists() ? snapshot.val() : '1234' };
+  } catch (error) {
+    logger.error('Error getting kiosk exit password:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Update kiosk exit password
+ */
+export const updateKioskExitPassword = async (orgId, password) => {
+  try {
+    if (!password || password.length < 4) {
+      return { success: false, error: 'הסיסמה חייבת להכיל לפחות 4 תווים' };
+    }
+    await update(ref(database, `organizations/${orgId}/metadata/settings`), { adminExitPassword: password });
+    logger.info('Kiosk exit password updated successfully');
+    return { success: true };
+  } catch (error) {
+    logger.error('Error updating kiosk exit password:', error);
+    return { success: false, error: error.message };
+  }
+};

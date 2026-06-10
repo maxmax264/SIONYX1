@@ -25,7 +25,6 @@ import {
   CheckCircleOutlined,
   SearchOutlined,
   ReloadOutlined,
-  DeleteOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -37,7 +36,6 @@ import {
   getAllMessages,
   getMessagesForUser,
   sendMessage,
-  deleteMessage,
   isUserActive,
   cleanupOldMessages,
 } from '../services/chatService';
@@ -144,21 +142,6 @@ const MessagesPage = () => {
       message.error('שגיאה בטעינת ההודעות');
     } finally {
       setLoadingChat(false);
-    }
-  };
-
-  const handleDeleteMessage = async (msgId) => {
-    try {
-      const result = await deleteMessage(orgId, msgId);
-      if (result.success) {
-        setUserMessages(prev => prev.filter(m => m.id !== msgId));
-        setMessages(prev => prev.filter(m => m.id !== msgId));
-        message.success('ההודעה נמחקה');
-      } else {
-        message.error('שגיאה במחיקה');
-      }
-    } catch (error) {
-      message.error('שגיאה במחיקה');
     }
   };
 
@@ -710,8 +693,6 @@ const MessagesPage = () => {
                         display: 'flex',
                         justifyContent: 'flex-start',
                         marginBottom: 10,
-                        alignItems: 'flex-start',
-                        gap: 6,
                       }}
                     >
                       <div
@@ -753,27 +734,6 @@ const MessagesPage = () => {
                           )}
                         </div>
                       </div>
-                      <Tooltip title="מחק הודעה">
-                        <button
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            color: '#ccc',
-                            display: 'flex',
-                            alignItems: 'center',
-                            marginTop: 4,
-                            borderRadius: 4,
-                            transition: 'color 0.2s',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.color = '#ff4d4f'}
-                          onMouseLeave={e => e.currentTarget.style.color = '#ccc'}
-                        >
-                          <DeleteOutlined style={{ fontSize: 13 }} />
-                        </button>
-                      </Tooltip>
                     </div>
                   </div>
                 );
