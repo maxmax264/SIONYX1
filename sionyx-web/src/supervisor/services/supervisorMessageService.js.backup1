@@ -1,23 +1,5 @@
-import { ref, get, push, set, update } from 'firebase/database';
+import { ref, get, push, set } from 'firebase/database';
 import { database } from '../../config/firebase';
-
-export const getSupervisorDisplayName = async (supervisorId) => {
-  try {
-    const snap = await get(ref(database, `supervisors/${supervisorId}/displayName`));
-    return { success: true, displayName: snap.exists() ? snap.val() : '' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateSupervisorDisplayName = async (supervisorId, displayName) => {
-  try {
-    await update(ref(database, `supervisors/${supervisorId}`), { displayName: displayName.trim() });
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
 
 export const getOrgMessages = async orgId => {
   try {

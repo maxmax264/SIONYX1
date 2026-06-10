@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿content = open(r'.\src\supervisor\pages\SupervisorSettingsPage.jsx', encoding='utf-8').read()
+
+new_content = """import { useState, useEffect } from 'react';
 import { Card, Descriptions, Typography, Form, Input, Button, App, Divider } from 'antd';
 import { UserOutlined, PhoneOutlined, SettingOutlined, MessageOutlined } from '@ant-design/icons';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
@@ -101,3 +103,7 @@ const SupervisorSettingsPage = () => {
 };
 
 export default SupervisorSettingsPage;
+"""
+
+open(r'.\src\supervisor\pages\SupervisorSettingsPage.jsx', 'w', encoding='utf-8').write(new_content)
+print('OK')

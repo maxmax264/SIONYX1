@@ -234,19 +234,6 @@ export const listenToUserMessages = (orgId, userId, callback) => {
 };
 
 /**
- * Delete a message by ID
- */
-export const deleteMessage = async (orgId, messageId) => {
-  try {
-    await remove(ref(database, `organizations/${orgId}/messages/${messageId}`));
-    return { success: true };
-  } catch (error) {
-    logger.error('Error deleting message:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
  * Update user's last seen timestamp
  */
 export const updateUserLastSeen = async (orgId, userId) => {
