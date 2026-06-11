@@ -232,7 +232,7 @@ public class ChatService : BaseService, IChatService
             var toUser = prop.Value.TryGetProperty("toUserId", out var tu) ? tu.GetString() : null;
             var isRead = prop.Value.TryGetProperty("read", out var r) && r.GetBoolean();
 
-            if (toUser == _userId && !isRead)
+            if (toUser == _userId)
             {
                 var msg = new Dictionary<string, object?> { ["id"] = prop.Name };
                 foreach (var field in prop.Value.EnumerateObject())
