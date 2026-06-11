@@ -15,6 +15,7 @@ public class KioskMessageItem
     public string DisplayTime { get; set; } = "";
     public long RawTimestamp { get; set; }
     public bool FromSupervisor { get; set; }
+    public bool IsUserReply { get; set; }
 }
 
 public partial class MessagesPage : Page
@@ -67,7 +68,7 @@ public partial class MessagesPage : Page
 
         try
         {
-            var result = await _chat.GetUnreadMessagesAsync(useCache: false);
+            var result = await _chat.GetAllMessagesAsync();
             if (!result.IsSuccess) return;
 
             var allMsgs = (List<Dictionary<string, object?>>)result.Data!;
@@ -222,15 +223,30 @@ public partial class MessagesPage : Page
                 isUserReply = true,
             };
 
-            await _firebase.DbPushAsync($"organizations/{orgId}/userReplies", replyData);
+            var replyKey = $"reply_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{userId[..8]}";
+            var pushResult = await _firebase.DbSetAsync($"userReplies/{replyKey}", replyData);
+            Log.Information("SendReply result: Success={Success} Error={Error}", pushResult.Success, pushResult.Error);
+
+            // Add reply locally so it appears immediately in the UI
+            var now = DateTimeOffset.Now;
+            var replyItem = new KioskMessageItem
+            {
+                Id = replyKey,
+                SenderName = "אתה",
+                DisplayBody = text,
+                DisplayTime = now.ToString("HH:mm"),
+                RawTimestamp = now.ToUnixTimeMilliseconds(),
+                FromSupervisor = toSupervisor,
+                IsUserReply = true
+            };
+            if (toSupervisor) { _supervisorMessages.Add(replyItem); UpdateSupervisorUI(); }
+            else { _adminMessages.Add(replyItem); UpdateAdminUI(); }
 
             Views.Controls.FloatingNotification.Show(
                 toSupervisor ? "תגובה נשלחה לפיקוח"
                              : "תגובה נשלחה למנהל",
                 text.Length > 40 ? text[..40] + "..." : text,
                 Views.Controls.FloatingNotification.NotificationType.Success, 3000);
-
-            await LoadMessagesAsync();
         }
         catch (Exception ex)
         {

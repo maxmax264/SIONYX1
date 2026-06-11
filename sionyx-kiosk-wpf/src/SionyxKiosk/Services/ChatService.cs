@@ -41,6 +41,19 @@ public class ChatService : BaseService, IChatService
         Logger.Information("Chat service re-initialized for user {UserId}", userId);
     }
 
+    /// <summary>Get all messages for the current user (read and unread).</summary>
+    public async Task<ServiceResult> GetAllMessagesAsync()
+    {
+        var result = await Firebase.DbGetAsync("messages");
+        if (!result.Success) return Error(result.Error ?? "Failed to fetch messages");
+        if (result.Data is JsonElement data && data.ValueKind == JsonValueKind.Object)
+        {
+            var messages = ExtractUserMessages(data, includeRead: true);
+            return Success(messages);
+        }
+        return Success(new List<Dictionary<string, object?>>());
+    }
+
     /// <summary>Get all unread messages for the current user.</summary>
     public async Task<ServiceResult> GetUnreadMessagesAsync(bool useCache = true)
     {
@@ -221,7 +234,7 @@ public class ChatService : BaseService, IChatService
         Logger.Error("SSE stream error: {Error}", error);
     }
 
-    private List<Dictionary<string, object?>> ExtractUserMessages(JsonElement allMessages)
+    private List<Dictionary<string, object?>> ExtractUserMessages(JsonElement allMessages, bool includeRead = false)
     {
         var messages = new List<Dictionary<string, object?>>();
         if (allMessages.ValueKind != JsonValueKind.Object) return messages;
@@ -232,7 +245,7 @@ public class ChatService : BaseService, IChatService
             var toUser = prop.Value.TryGetProperty("toUserId", out var tu) ? tu.GetString() : null;
             var isRead = prop.Value.TryGetProperty("read", out var r) && r.GetBoolean();
 
-            if (toUser == _userId)
+            if (toUser == _userId && (!isRead || includeRead))
             {
                 var msg = new Dictionary<string, object?> { ["id"] = prop.Name };
                 foreach (var field in prop.Value.EnumerateObject())

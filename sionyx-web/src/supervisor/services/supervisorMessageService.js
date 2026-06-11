@@ -37,9 +37,9 @@ export const getOrgUserReplies = async (orgId) => {
   try {
     const snap = await get(ref(database, `organizations/${orgId}/userReplies`));
     if (!snap.exists()) return { success: true, replies: [] };
-    const replies = Object.entries(snap.val()).map(([id, r]) => ({
-      id, ...r, isReply: true, fromSupervisorReply: r.fromSupervisorReply || false,
-    }));
+    const replies = Object.entries(snap.val())
+      .filter(([, r]) => r.fromSupervisorReply === true)
+      .map(([id, r]) => ({ id, ...r, isReply: true }));
     return { success: true, replies };
   } catch (error) {
     return { success: false, error: error.message, replies: [] };

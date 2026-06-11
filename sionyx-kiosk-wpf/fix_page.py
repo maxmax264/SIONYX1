@@ -1,7 +1,6 @@
 ﻿content = open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml.cs', encoding='utf-8').read()
-old = '            await _firebase.DbPushAsync($"organizations/{orgId}/userReplies", replyData);'
-new = '''            var pushResult = await _firebase.DbPushAsync($"organizations/{orgId}/userReplies", replyData);
-            Log.Information("SendReply result: Success={Success} Error={Error}", pushResult.Success, pushResult.Error);'''
+old = '            var result = await _chat.GetUnreadMessagesAsync(useCache: false);'
+new = '            var result = await _chat.GetAllMessagesAsync();'
 count = content.count(old)
 print(f"Found {count}")
 if count == 1:
