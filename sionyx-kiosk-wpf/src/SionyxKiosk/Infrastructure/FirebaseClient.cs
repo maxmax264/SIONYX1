@@ -168,6 +168,20 @@ public sealed class FirebaseClient : IFirebaseClient
     private string GetOrgPath(string path) =>
         $"organizations/{_orgId}/{path.Trim('/')}";
 
+    public async Task<FirebaseResult> DbPushAsync(string path, object data)
+    {
+        if (!await EnsureValidTokenAsync())
+            return FirebaseResult.Fail("Not authenticated");
+
+        var url = $"{_databaseUrl}/{path}.json?auth={_idToken}";
+        var json = JsonSerializer.Serialize(data, JsonOptions);
+        var response = await _http.PostAsync(url, new StringContent(json, System.Text.Encoding.UTF8, "application/json"));
+        if (!response.IsSuccessStatusCode)
+            return FirebaseResult.Fail($"Push failed: {response.StatusCode}");
+
+        return FirebaseResult.Ok();
+    }
+
     public async Task<FirebaseResult> DbGetAsync(string path)
     {
         if (!await EnsureValidTokenAsync())

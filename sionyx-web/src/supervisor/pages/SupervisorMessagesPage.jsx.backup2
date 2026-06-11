@@ -28,7 +28,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/he';
 import { getSupervisorOrgs, getOrgUsers } from '../services/supervisorOrgService';
-import { getOrgMessages, sendSupervisorMessage, getOrgUserReplies } from '../services/supervisorMessageService';
+import { getOrgMessages, sendSupervisorMessage } from '../services/supervisorMessageService';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
 import { getAuth } from 'firebase/auth';
 
@@ -70,16 +70,12 @@ const SupervisorMessagesPage = () => {
     if (!selectedOrgId) return;
     const load = async () => {
       setLoadingMessages(true);
-      const [usersRes, msgsRes, repliesRes] = await Promise.all([
+      const [usersRes, msgsRes] = await Promise.all([
         getOrgUsers(selectedOrgId),
         getOrgMessages(selectedOrgId),
-        getOrgUserReplies(selectedOrgId),
       ]);
       if (usersRes.success) setUsers(usersRes.users || []);
-      const msgs = msgsRes.success ? msgsRes.messages || [] : [];
-      const replies = repliesRes.success ? repliesRes.replies || [] : [];
-      const merged = [...msgs, ...replies].sort((a, b) => b.timestamp - a.timestamp);
-      setMessages(merged);
+      if (msgsRes.success) setMessages(msgsRes.messages || []);
       setLoadingMessages(false);
     };
     load();
@@ -94,13 +90,8 @@ const SupervisorMessagesPage = () => {
     if (res.success) {
       antMsg.success('ההודעה נשלחה');
       setNewMessage('');
-      const [msgsRes2, repliesRes2] = await Promise.all([
-        getOrgMessages(selectedOrgId),
-        getOrgUserReplies(selectedOrgId),
-      ]);
-      const msgs2 = msgsRes2.success ? msgsRes2.messages || [] : [];
-      const replies2 = repliesRes2.success ? repliesRes2.replies || [] : [];
-      setMessages([...msgs2, ...replies2].sort((a, b) => b.timestamp - a.timestamp));
+      const msgsRes = await getOrgMessages(selectedOrgId);
+      if (msgsRes.success) setMessages(msgsRes.messages || []);
     } else {
       antMsg.error(res.error || 'שגיאה בשליחה');
     }
@@ -239,9 +230,6 @@ const SupervisorMessagesPage = () => {
                       </Text>
                       {msg.fromSupervisor && (
                         <Tag color='blue' style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>מפקח</Tag>
-                      )}
-                      {msg.isReply && (
-                        <Tag color='green' style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>תגובת לקוח</Tag>
                       )}
                     </Space>
                     <Space size={8}>

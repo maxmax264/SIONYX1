@@ -101,7 +101,6 @@ public partial class MainWindow : Window
                 "PrintHistory" => _services.GetService(typeof(PrintHistoryPage)),
                 "Profile" => _services.GetService(typeof(ProfilePage)),
                 "Help" => _services.GetService(typeof(HelpPage)),
-                "Messages" => _services.GetService(typeof(MessagesPage)),
                 _ => _services.GetService(typeof(HomePage))
             };
 

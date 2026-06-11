@@ -228,7 +228,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         var count = msgs.Count;
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
-            var isNew = UnreadMessages == 0 && count > 0;
+            var isNew = count > UnreadMessages;
             UnreadMessages = count;
             if (isNew)
                 NewMessageReceived?.Invoke();
