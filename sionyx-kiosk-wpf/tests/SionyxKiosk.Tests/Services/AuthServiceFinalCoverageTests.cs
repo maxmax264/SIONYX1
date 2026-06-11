@@ -273,7 +273,7 @@ public class AuthServiceFinalCoverageTests : IDisposable
             expiresIn = "3600",
         });
 
-        // Get the actual device ID for this machine
+        // Use a fixed known computer ID that matches what ComputerService returns
         var computerId = DeviceInfo.GetDeviceId();
 
         _handler.When("users/uid-same.json", new
