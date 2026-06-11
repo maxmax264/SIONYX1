@@ -25,7 +25,9 @@ export const getOrgMessages = async orgId => {
     if (!snap.exists()) return { success: true, messages: [] };
 
     const data = snap.val();
-    const messages = Object.entries(data).map(([id, msg]) => ({ id, ...msg }));
+    const messages = Object.entries(data)
+      .filter(([, msg]) => msg.fromSupervisor === true)
+      .map(([id, msg]) => ({ id, ...msg }));
     messages.sort((a, b) => b.timestamp - a.timestamp);
     return { success: true, messages };
   } catch (error) {
