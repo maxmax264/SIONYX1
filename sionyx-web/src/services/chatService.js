@@ -61,10 +61,9 @@ export const getAllMessages = async orgId => {
     }
 
     const messagesData = snapshot.val();
-    const messages = Object.keys(messagesData).map(key => ({
-      id: key,
-      ...messagesData[key],
-    }));
+    const messages = Object.keys(messagesData)
+      .map(key => ({ id: key, ...messagesData[key] }))
+      .filter(msg => !msg.fromSupervisor);
 
     // Sort by timestamp (newest first)
     messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -101,10 +100,9 @@ export const getMessagesForUser = async (orgId, userId) => {
     }
 
     const messagesData = snapshot.val();
-    const messages = Object.keys(messagesData).map(key => ({
-      id: key,
-      ...messagesData[key],
-    }));
+    const messages = Object.keys(messagesData)
+      .map(key => ({ id: key, ...messagesData[key] }))
+      .filter(msg => !msg.fromSupervisor);
 
     // Sort by timestamp (newest first)
     messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));

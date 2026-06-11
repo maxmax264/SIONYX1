@@ -1,16 +1,13 @@
-﻿path = r'.\src\SionyxKiosk\Services\ForceLogoutService.cs'
-content = open(path, encoding='utf-8').read()
-content = content.replace(
-    'await _firebase.DbDeleteAsync($"organizations/sionov/users/{userId}/forceLogout");',
-    'await _firebase.DbDeleteAsync($"users/{userId}/forceLogout");'
-)
-content = content.replace(
-    'var path = $"organizations/sionov/users/{userId}/forceLogout";',
-    'var path = $"users/{userId}/forceLogout";'
-)
-content = content.replace(
-    '_ = _firebase.DbDeleteAsync($"organizations/sionov/users/{_userId}/forceLogout");',
-    '_ = _firebase.DbDeleteAsync($"users/{_userId}/forceLogout");'
-)
-open(path, 'w', encoding='utf-8').write(content)
-print('OK')
+﻿content = open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml.cs', encoding='utf-8').read()
+
+old = 'var repliesResult = await _firebase.DbGetAsync($"organizations/{_firebase.OrgId}/userReplies");'
+new = 'var repliesResult = await _firebase.DbGetAsync($"userReplies");'
+
+count = content.count(old)
+print(f"Found: {count}")
+if count == 1:
+    content = content.replace(old, new, 1)
+    open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml.cs', 'w', encoding='utf-8').write(content)
+    print('Done')
+else:
+    print('NOT FOUND')
