@@ -12,6 +12,10 @@
       "$uid": {
         ".read": "auth.uid === $uid",
         ".write": false,
+        "displayName": {
+          ".read": "auth != null",
+          ".write": "auth.uid === $uid"
+        },
         "organizations": {
           "$orgId": {
             ".read": "auth.uid === $uid"

@@ -33,19 +33,6 @@ export const getOrgMessages = async orgId => {
   }
 };
 
-export const getOrgUserReplies = async (orgId) => {
-  try {
-    const snap = await get(ref(database, `organizations/${orgId}/userReplies`));
-    if (!snap.exists()) return { success: true, replies: [] };
-    const replies = Object.entries(snap.val()).map(([id, r]) => ({
-      id, ...r, isReply: true, fromSupervisorReply: r.fromSupervisorReply || false,
-    }));
-    return { success: true, replies };
-  } catch (error) {
-    return { success: false, error: error.message, replies: [] };
-  }
-};
-
 export const sendSupervisorMessage = async (orgId, toUserId, messageText, supervisorId) => {
   try {
     const messagesRef = ref(database, `organizations/${orgId}/messages`);

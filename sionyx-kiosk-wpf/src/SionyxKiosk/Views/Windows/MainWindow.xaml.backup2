@@ -116,15 +116,6 @@
                             <TextBlock Text="פרופיל" FontSize="15" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavMessages" AutomationProperties.AutomationId="NavMessages" Tag="Messages"
-                                 Style="{StaticResource SidebarNavButton}"
-                                 Checked="NavButton_Checked" GroupName="Nav">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE715;" FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <TextBlock Text="הודעות" FontSize="15" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
                     <RadioButton x:Name="NavHelp" AutomationProperties.AutomationId="NavHelp" Tag="Help"
                                  Style="{StaticResource SidebarNavButton}"
                                  Checked="NavButton_Checked" GroupName="Nav">

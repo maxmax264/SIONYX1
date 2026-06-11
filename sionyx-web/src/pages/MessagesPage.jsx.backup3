@@ -38,7 +38,6 @@ import {
   getMessagesForUser,
   sendMessage,
   deleteMessage,
-  getUserReplies,
   isUserActive,
   cleanupOldMessages,
 } from '../services/chatService';
@@ -133,16 +132,13 @@ const MessagesPage = () => {
     setLoadingChat(true);
 
     try {
-      const [msgsResult, repliesResult] = await Promise.all([
-        getMessagesForUser(orgId, userItem.uid),
-        getUserReplies(orgId, userItem.uid),
-      ]);
-      const msgs = msgsResult.success ? msgsResult.messages : [];
-      const replies = repliesResult.success ? repliesResult.replies : [];
-      const merged = [...msgs, ...replies].sort(
-        (a, b) => dayjs(a.timestamp).unix() - dayjs(b.timestamp).unix()
-      );
-      setUserMessages(merged);
+      const result = await getMessagesForUser(orgId, userItem.uid);
+      if (result.success) {
+        const sorted = [...result.messages].sort(
+          (a, b) => dayjs(a.timestamp).unix() - dayjs(b.timestamp).unix()
+        );
+        setUserMessages(sorted);
+      }
     } catch (error) {
       logger.error('Error loading chat:', error);
       message.error('שגיאה בטעינת ההודעות');
@@ -174,16 +170,13 @@ const MessagesPage = () => {
       const result = await sendMessage(orgId, selectedUser.uid, newMessage.trim(), adminUid);
       if (result.success) {
         setNewMessage('');
-        const [msgResult2, repliesResult2] = await Promise.all([
-          getMessagesForUser(orgId, selectedUser.uid),
-          getUserReplies(orgId, selectedUser.uid),
-        ]);
-        const msgs2 = msgResult2.success ? msgResult2.messages : [];
-        const replies2 = repliesResult2.success ? repliesResult2.replies : [];
-        const merged2 = [...msgs2, ...replies2].sort(
-          (a, b) => dayjs(a.timestamp).unix() - dayjs(b.timestamp).unix()
-        );
-        setUserMessages(merged2);
+        const msgResult = await getMessagesForUser(orgId, selectedUser.uid);
+        if (msgResult.success) {
+          const sorted = [...msgResult.messages].sort(
+            (a, b) => dayjs(a.timestamp).unix() - dayjs(b.timestamp).unix()
+          );
+          setUserMessages(sorted);
+        }
         loadData();
         message.success('הודעה נשלחה');
       } else {
@@ -715,7 +708,7 @@ const MessagesPage = () => {
                     <div
                       style={{
                         display: 'flex',
-                        justifyContent: msg.isReply ? 'flex-end' : 'flex-start',
+                        justifyContent: 'flex-start',
                         marginBottom: 10,
                         alignItems: 'flex-start',
                         gap: 6,
@@ -724,11 +717,11 @@ const MessagesPage = () => {
                       <div
                         style={{
                           maxWidth: '78%',
-                          background: msg.isReply ? '#e6f7e6' : tokens.gradientPrimary,
-                          color: msg.isReply ? '#1a7f1a' : '#fff',
+                          background: tokens.gradientPrimary,
+                          color: '#fff',
                           padding: '11px 16px',
-                          borderRadius: msg.isReply ? '18px 18px 18px 6px' : '18px 18px 6px 18px',
-                          boxShadow: msg.isReply ? '0 2px 8px rgba(0,0,0,0.08)' : '0 2px 12px rgba(102, 126, 234, 0.2)',
+                          borderRadius: '18px 18px 6px 18px',
+                          boxShadow: '0 2px 12px rgba(102, 126, 234, 0.2)',
                         }}
                       >
                         <div
