@@ -1,29 +1,11 @@
-﻿f = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Views\Windows\AuthWindow.xaml', encoding='utf-8')
-c = f.read()
-f.close()
-old = '''                <Style TargetType="Viewbox">
-                    <Setter Property="HorizontalAlignment" Value="Left"/>
-                    <Setter Property="VerticalAlignment" Value="Top"/>
-                    <Setter Property="Margin" Value="{Binding FormMargin}"/>
-                    <Setter Property="MaxWidth" Value="1000"/>
-                </Style>'''
-new = '''                <Style TargetType="Viewbox">
-                    <Setter Property="HorizontalAlignment" Value="Center"/>
-                    <Setter Property="VerticalAlignment" Value="Center"/>
-                    <Setter Property="MaxWidth" Value="1000"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding CleanMode}" Value="True">
-                            <Setter Property="HorizontalAlignment" Value="Left"/>
-                            <Setter Property="VerticalAlignment" Value="Top"/>
-                            <Setter Property="Margin" Value="{Binding FormMargin}"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>'''
-count = c.count(old)
-print(f"Found {count} matches")
+﻿content = open(r'.\src\SionyxKiosk\Services\ChatService.cs', encoding='utf-8').read()
+old = '            if (toUser == _userId)'
+new = '            if (toUser == _userId && !isRead)'
+count = content.count(old)
+print(f"Found {count}")
 if count == 1:
-    c = c.replace(old, new, 1)
-    open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Views\Windows\AuthWindow.xaml', 'w', encoding='utf-8').write(c)
-    print("OK")
+    content = content.replace(old, new, 1)
+    open(r'.\src\SionyxKiosk\Services\ChatService.cs', 'w', encoding='utf-8').write(content)
+    print('OK')
 else:
-    print("NOT FOUND")
+    print('NOT FOUND')

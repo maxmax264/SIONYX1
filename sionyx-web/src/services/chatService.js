@@ -244,7 +244,7 @@ export const getUserReplies = async (orgId, userId) => {
     const replies = [];
     snapshot.forEach(child => {
       const data = child.val();
-      if (data.fromUserId === userId) {
+      if (data.fromUserId === userId && !data.fromSupervisorReply) {
         replies.push({ id: child.key, ...data, isReply: true });
       }
     });

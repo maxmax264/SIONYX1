@@ -140,7 +140,7 @@ const MessagesPage = () => {
       const msgs = msgsResult.success ? msgsResult.messages : [];
       const replies = repliesResult.success ? repliesResult.replies : [];
       const merged = [...msgs, ...replies].sort(
-        (a, b) => dayjs(a.timestamp).unix() - dayjs(b.timestamp).unix()
+        (a, b) => (a.timestamp || 0) - (b.timestamp || 0)
       );
       setUserMessages(merged);
     } catch (error) {
