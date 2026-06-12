@@ -1,7 +1,10 @@
 ﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-web\src\pages\MessagesPage.jsx', encoding='utf-8').read()
 
-old = "  deleteMessage,"
-new = "  deleteMessage,\n  deleteUserReply,"
+old = "  const [sending, setSending] = useState(false);"
+new = """  const [sending, setSending] = useState(false);
+  const [deletedIds, setDeletedIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('admin_deleted_ids') || '[]'); } catch { return []; }
+  });"""
 
 count = content.count(old)
 print(f"Found: {count}")

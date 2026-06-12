@@ -23,12 +23,13 @@ import {
   BankOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/he';
 import { getSupervisorOrgs, getOrgUsers } from '../services/supervisorOrgService';
-import { getOrgMessages, sendSupervisorMessage, getOrgUserReplies } from '../services/supervisorMessageService';
+import { getOrgMessages, sendSupervisorMessage, getOrgUserReplies, deleteSupervisorMessage, deleteSupervisorReply } from '../services/supervisorMessageService';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
 import { getAuth } from 'firebase/auth';
 
@@ -48,6 +49,9 @@ const SupervisorMessagesPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deletedIds, setDeletedIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sup_deleted_ids') || '[]'); } catch { return []; }
+  });
   const { message: antMsg } = App.useApp();
   const { token } = theme.useToken();
   const supervisor = useSupervisorAuthStore(s => s.supervisor);
@@ -107,15 +111,23 @@ const SupervisorMessagesPage = () => {
     setSending(false);
   };
 
+  const handleDelete = async (msg) => {
+    const newDeleted = [...deletedIds, msg.id];
+    setDeletedIds(newDeleted);
+    localStorage.setItem('sup_deleted_ids', JSON.stringify(newDeleted));
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    antMsg.success('ההודעה נמחקה');
+  };
+
   const getUserName = userId => {
     const u = users.find(u => u.uid === userId);
     if (!u) return userId;
     return `${(u.firstName || '').trim()} ${(u.lastName || '').trim()}`.trim() || u.phone || userId;
   };
 
-  const filteredMessages = selectedUserId
+  const filteredMessages = (selectedUserId
     ? messages.filter(m => m.toUserId === selectedUserId)
-    : messages;
+    : messages).filter(m => !deletedIds.includes(m.id));
 
   if (loading) {
     return (
@@ -226,39 +238,33 @@ const SupervisorMessagesPage = () => {
         ) : (
           <List
             dataSource={filteredMessages}
-            renderItem={msg => (
-              <List.Item
-                style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}
-              >
-                <div style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <Space size={4}>
-                      <UserOutlined style={{ color: token.colorTextTertiary }} />
-                      <Text strong style={{ fontSize: 13 }}>
-                        {getUserName(msg.toUserId)}
-                      </Text>
-                      {msg.fromSupervisor && (
-                        <Tag color='blue' style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>מפקח</Tag>
-                      )}
-                      {msg.isReply && (
-                        <Tag color='green' style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>תגובת לקוח</Tag>
-                      )}
-                    </Space>
-                    <Space size={8}>
-                      {msg.read ? (
-                        <CheckCircleOutlined style={{ color: token.colorSuccess, fontSize: 12 }} />
-                      ) : (
-                        <Badge status='processing' />
-                      )}
-                      <Text type='secondary' style={{ fontSize: 11 }}>
-                        {dayjs(msg.timestamp).fromNow()}
-                      </Text>
-                    </Space>
+            renderItem={msg => {
+                const isMine = msg.fromSupervisor;
+                return (
+              <List.Item style={{ padding: '4px 16px', border: 'none', display: 'block' }}>
+                <div style={{ display: 'flex', justifyContent: isMine ? 'flex-start' : 'flex-end' }}>
+                <div style={{ maxWidth: '70%', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
+                  <Text type='secondary' style={{ fontSize: 11, marginBottom: 2 }}>
+                    {isMine ? 'פיקוח' : getUserName(msg.toUserId)} · {dayjs(msg.timestamp).fromNow()}
+                  </Text>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexDirection: isMine ? 'row' : 'row-reverse' }}>
+                    <Button type='text' danger size='small' icon={<DeleteOutlined />} onClick={() => handleDelete(msg)} />
+                    <div style={{
+                      background: isMine ? token.colorPrimary : token.colorBgContainer,
+                      color: isMine ? '#fff' : token.colorText,
+                      border: isMine ? 'none' : `1px solid ${token.colorBorderSecondary}`,
+                      borderRadius: 12,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                    }}>
+                      {msg.message}
+                    </div>
                   </div>
-                  <Text style={{ fontSize: 13 }}>{msg.message}</Text>
+                </div>
                 </div>
               </List.Item>
-            )}
+            );
+          }}
           />
         )}
       </Card>

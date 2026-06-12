@@ -38,6 +38,7 @@ import {
   getMessagesForUser,
   sendMessage,
   deleteMessage,
+  deleteUserReply,
   getUserReplies,
   isUserActive,
   cleanupOldMessages,
@@ -78,6 +79,9 @@ const MessagesPage = () => {
   const [loadingChat, setLoadingChat] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [deletedIds, setDeletedIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('admin_deleted_ids') || '[]'); } catch { return []; }
+  });
   const chatEndRef = useRef(null);
 
   const { user } = useAuthStore();
@@ -153,14 +157,12 @@ const MessagesPage = () => {
 
   const handleDeleteMessage = async (msgId) => {
     try {
-      const result = await deleteMessage(orgId, msgId);
-      if (result.success) {
-        setUserMessages(prev => prev.filter(m => m.id !== msgId));
-        setMessages(prev => prev.filter(m => m.id !== msgId));
-        message.success('ההודעה נמחקה');
-      } else {
-        message.error('שגיאה במחיקה');
-      }
+      const newDeleted = [...deletedIds, msgId];
+      setDeletedIds(newDeleted);
+      localStorage.setItem('admin_deleted_ids', JSON.stringify(newDeleted));
+      setUserMessages(prev => prev.filter(m => m.id !== msgId));
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+      message.success('ההודעה נמחקה');
     } catch (error) {
       message.error('שגיאה במחיקה');
     }
@@ -681,7 +683,7 @@ const MessagesPage = () => {
             />
           ) : (
             <>
-              {userMessages.map((msg, index) => {
+              {userMessages.filter(m => !deletedIds.includes(m.id)).map((msg, index) => {
                 const showDate =
                   index === 0 ||
                   !dayjs(msg.timestamp).isSame(dayjs(userMessages[index - 1].timestamp), 'day');

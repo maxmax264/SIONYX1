@@ -1,4 +1,4 @@
-import { ref, get, push, set, update } from 'firebase/database';
+import { ref, get, push, set, update, remove } from 'firebase/database';
 import { database } from '../../config/firebase';
 
 export const getSupervisorDisplayName = async (supervisorId) => {
@@ -26,7 +26,7 @@ export const getOrgMessages = async orgId => {
 
     const data = snap.val();
     const messages = Object.entries(data)
-      .filter(([, msg]) => msg.fromSupervisor === true)
+      .filter(([, msg]) => msg.fromSupervisor === true && !msg.deleted)
       .map(([id, msg]) => ({ id, ...msg }));
     messages.sort((a, b) => b.timestamp - a.timestamp);
     return { success: true, messages };
@@ -40,7 +40,7 @@ export const getOrgUserReplies = async (orgId) => {
     const snap = await get(ref(database, `organizations/${orgId}/userReplies`));
     if (!snap.exists()) return { success: true, replies: [] };
     const replies = Object.entries(snap.val())
-      .filter(([, r]) => r.fromSupervisorReply === true)
+      .filter(([, r]) => r.fromSupervisorReply === true && !r.deleted)
       .map(([id, r]) => ({ id, ...r, isReply: true }));
     return { success: true, replies };
   } catch (error) {
@@ -63,6 +63,24 @@ export const sendSupervisorMessage = async (orgId, toUserId, messageText, superv
     });
 
     return { success: true, messageId: newRef.key };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteSupervisorMessage = async (orgId, messageId) => {
+  try {
+    await update(ref(database, `organizations/${orgId}/messages/${messageId}`), { deleted: true });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteSupervisorReply = async (orgId, replyId) => {
+  try {
+    await update(ref(database, `organizations/${orgId}/userReplies/${replyId}`), { deleted: true });
+    return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
