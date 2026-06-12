@@ -47,7 +47,7 @@ export const subscribeToMessages = (orgId, callback) => {
     snapshot => {
       if (snapshot.exists()) {
         const messages = snapshot.val();
-        const messageList = Object.keys(messages).map(id => ({ id, ...messages[id] }));
+        const messageList = Object.keys(messages).map(id => ({ id, ...messages[id] })).filter(m => !m.fromSupervisor);
         const prevCount = prevMessageCountByOrg.get(orgId) ?? 0;
         if (prevCount > 0 && messageList.length > prevCount) {
           useNotificationStore.getState().addNotification({

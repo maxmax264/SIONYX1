@@ -256,6 +256,16 @@ export const getUserReplies = async (orgId, userId) => {
 /**
  * Delete a message by ID
  */
+export const deleteUserReply = async (orgId, replyId) => {
+  try {
+    await remove(ref(database, `organizations/${orgId}/userReplies/${replyId}`));
+    return { success: true };
+  } catch (error) {
+    logger.error('Error deleting reply:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 export const deleteMessage = async (orgId, messageId) => {
   try {
     await remove(ref(database, `organizations/${orgId}/messages/${messageId}`));
