@@ -233,7 +233,8 @@ public partial class App : Application
                 services.AddTransient<HelpPage>();
                 services.AddTransient(sp => new MessagesPage(
                     sp.GetRequiredService<ChatService>(),
-                    sp.GetRequiredService<FirebaseClient>()));
+                    sp.GetRequiredService<FirebaseClient>(),
+                    sp.GetRequiredService<LocalDatabase>()));
                 services.AddTransient(sp => new ProfileViewModel(sp.GetRequiredService<AuthService>(), sp.GetRequiredService<ForceLogoutService>()));
                 services.AddTransient(sp => new ProfilePage(sp.GetRequiredService<ProfileViewModel>()));
             })
