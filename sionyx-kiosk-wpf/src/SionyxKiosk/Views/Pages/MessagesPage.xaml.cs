@@ -22,15 +22,18 @@ public partial class MessagesPage : Page
 {
     private readonly ChatService _chat;
     private readonly FirebaseClient _firebase;
+    private readonly LocalDatabase _localDb;
     private string _adminDisplayName = "מנהל";
     private string _supervisorDisplayName = "פיקוח";
     private List<KioskMessageItem> _adminMessages = new();
+    private readonly HashSet<string> _deletedIds = new();
     private List<KioskMessageItem> _supervisorMessages = new();
 
-    public MessagesPage(ChatService chat, FirebaseClient firebase)
+    public MessagesPage(ChatService chat, FirebaseClient firebase, LocalDatabase localDb)
     {
         _chat = chat;
         _firebase = firebase;
+        _localDb = localDb;
         InitializeComponent();
         Loaded += OnLoaded;
     }
@@ -57,6 +60,24 @@ public partial class MessagesPage : Page
         catch (Exception ex) { Log.Warning(ex, "Could not load admin display name"); }
     }
 
+    private async void DeleteMessage_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btn && btn.Tag is string msgId)
+        {
+            Serilog.Log.Information("[DELETE] msgId={MsgId} isReply={IsReply}", msgId, msgId.StartsWith("reply_"));
+            var isReply = msgId.StartsWith("reply_");
+            var path = isReply ? $"userReplies/{msgId}" : $"messages/{msgId}";
+            await _firebase.DbDeleteAsync(path);
+            _deletedIds.Add(msgId);
+            var existing = _localDb.Get("deleted_message_ids") ?? "";
+            _localDb.Set("deleted_message_ids", string.IsNullOrEmpty(existing) ? msgId : existing + "," + msgId);
+            _adminMessages.RemoveAll(m => m.Id == msgId);
+            _supervisorMessages.RemoveAll(m => m.Id == msgId);
+            UpdateAdminUI();
+            UpdateSupervisorUI();
+        }
+    }
+
     private async Task LoadMessagesAsync()
     {
         AdminLoadingPanel.Visibility = Visibility.Visible;
@@ -68,7 +89,13 @@ public partial class MessagesPage : Page
 
         try
         {
-            var result = await _chat.GetAllMessagesAsync();
+            // Load deleted IDs from local DB
+        var deletedRaw = _localDb.Get("deleted_message_ids");
+        if (!string.IsNullOrEmpty(deletedRaw))
+            foreach (var id in deletedRaw.Split(','))
+                if (!string.IsNullOrWhiteSpace(id)) _deletedIds.Add(id.Trim());
+
+        var result = await _chat.GetAllMessagesAsync();
             if (!result.IsSuccess) return;
 
             var allMsgs = (List<Dictionary<string, object?>>)result.Data!;
@@ -128,6 +155,7 @@ public partial class MessagesPage : Page
                     DisplayTime = timeDisplay, RawTimestamp = rawTs, FromSupervisor = fromSupervisor
                 };
 
+                if (_deletedIds.Contains(id)) continue;
                 if (fromSupervisor) _supervisorMessages.Add(item);
                 else _adminMessages.Add(item);
             }
@@ -165,6 +193,7 @@ public partial class MessagesPage : Page
                         FromSupervisor = isSupervisorReply,
                         IsUserReply = true
                     };
+                    if (_deletedIds.Contains(prop.Name)) continue;
                     if (isSupervisorReply) _supervisorMessages.Add(replyItem);
                     else _adminMessages.Add(replyItem);
                 }

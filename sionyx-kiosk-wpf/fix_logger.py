@@ -1,7 +1,7 @@
 ﻿content = open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml.cs', encoding='utf-8').read()
 
-old = '            System.Diagnostics.Debug.WriteLine($"[DELETE] msgId={msgId} tag={btn.Tag}");'
-new = '            Logger.Information("[DELETE] msgId={MsgId} isReply={IsReply}", msgId, msgId.StartsWith("reply_"));'
+old = '            Logger.Information("[DELETE] msgId={MsgId} isReply={IsReply}", msgId, msgId.StartsWith("reply_"));'
+new = '            Serilog.Log.Information("[DELETE] msgId={MsgId} isReply={IsReply}", msgId, msgId.StartsWith("reply_"));'
 
 count = content.count(old)
 print(f"Found: {count}")
