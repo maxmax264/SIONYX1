@@ -27,6 +27,7 @@ public partial class App : Application
     private SystemServicesManager? _systemServices;
     private SessionCoordinator? _sessionCoordinator;
     private TrayIconService? _trayIcon;
+    private bool _hasFrozenSession = false; // true when admin exits while client is logged in
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -590,12 +591,16 @@ public partial class App : Application
                     Log.Information("Admin exit: correct password, showing tray");
                     _ = Task.Run(async () =>
                     {
+                        // Check if a client session is active before stopping services
+                        var auth2 = _host?.Services.GetService<AuthService>();
+                        bool clientWasActive = auth2?.CurrentUser != null;
                         await StopSystemServicesAsync();
                         _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
                         await auth.LogoutAsync();
                         Current.Dispatcher.Invoke(() =>
                         {
-                            if (MainWindow is Views.Windows.MainWindow mainWin)
+                            _hasFrozenSession = clientWasActive;
+                            if (MainWindow is Views.Windows.MainWindow mainWin && !clientWasActive)
                             { mainWin.AllowClose(); mainWin.Close(); }
                             else if (MainWindow is AuthWindow aw)
                             { aw.AllowClose(); aw.Close(); }
@@ -604,7 +609,28 @@ public partial class App : Application
                             {
                                 _trayIcon?.Hide();
                                 _trayIcon = null;
-                                ShowAuthWindow();
+                                if (_hasFrozenSession)
+                                {
+                                    _hasFrozenSession = false;
+                                    // Restore to existing client session
+                                    Current.Dispatcher.Invoke(() =>
+                                    {
+                                        var mainWindow = _host?.Services.GetService<Views.Windows.MainWindow>();
+                                        if (mainWindow != null)
+                                        {
+                                            mainWindow.WindowState = System.Windows.WindowState.Maximized;
+                                            mainWindow.Topmost = true;
+                                            mainWindow.Show();
+                                            mainWindow.Activate();
+                                            MainWindow = mainWindow;
+                                            _systemServices?.StartGlobalHotkey();
+                                        }
+                                    });
+                                }
+                                else
+                                {
+                                    ShowAuthWindow();
+                                }
                             };
                             _trayIcon.OpenControlPanelRequested += () =>
                             {
