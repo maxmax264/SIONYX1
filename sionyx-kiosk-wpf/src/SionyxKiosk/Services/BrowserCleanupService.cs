@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using Microsoft.Win32;
 using Serilog;
 
 namespace SionyxKiosk.Services;
@@ -38,10 +39,33 @@ public class BrowserCleanupService
         "sessionstore.jsonlz4", "sessionstore-backups",
     ];
 
-    /// <summary>Delete all files in SionyxUser Downloads folder.</summary>
+    /// <summary>Returns true if running in dev/test mode — skips destructive cleanup.</summary>
+    private static bool IsDevMode()
+    {
+        var envVar = Environment.GetEnvironmentVariable("SIONYX_DEV_MODE");
+        if (envVar == "1" || string.Equals(envVar, "true", StringComparison.OrdinalIgnoreCase))
+            return true;
+        try
+        {
+            using var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                                       .OpenSubKey(@"SOFTWARE\SIONYX");
+            if (key?.GetValue("DevMode") is int val && val == 1)
+                return true;
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>Delete all files in user Downloads folder.</summary>
     public void CleanupDownloads()
     {
-        var downloadsPath = Path.Combine(@"C:\Users\SionyxUser\Downloads");
+        if (IsDevMode())
+        {
+            Logger.Information("Downloads cleanup skipped (DevMode)");
+            return;
+        }
+        var downloadsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
         if (!Directory.Exists(downloadsPath))
         {
             Logger.Information("Downloads folder not found, skipping");
@@ -64,6 +88,11 @@ public class BrowserCleanupService
     /// <summary>Close browsers first, then clean up. Recommended for session end.</summary>
     public Dictionary<string, object> CleanupWithBrowserClose()
     {
+        if (IsDevMode())
+        {
+            Logger.Information("=== BROWSER CLEANUP SKIPPED (DevMode) ===");
+            return new Dictionary<string, object> { ["success"] = true, ["skipped"] = true };
+        }
         Logger.Information("=== BROWSER CLEANUP STARTED ===");
 
         var closeResults = CloseBrowsers();
