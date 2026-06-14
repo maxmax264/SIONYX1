@@ -265,6 +265,15 @@ public partial class App : Application
                 browserCleanup.CleanupDownloads();
             }
             catch (Exception ex) { Log.Error(ex, "[Session] Startup cleanup failed"); }
+            // Clear stored tokens so previous client cannot auto-login
+            try
+            {
+                var localDb = _host!.Services.GetRequiredService<Infrastructure.LocalDatabase>();
+                localDb.Delete("refresh_token");
+                localDb.Delete("user_id");
+                Log.Information("[Session] Cleared stored tokens after stale session cleanup");
+            }
+            catch (Exception ex) { Log.Warning(ex, "[Session] Could not clear tokens"); }
             Services.SessionStateService.ClearSession();
         }
 
