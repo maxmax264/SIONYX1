@@ -253,6 +253,20 @@ public partial class App : Application
                 .WriteTo.File("logs/sionyx-.log", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+        // Check for stale session from power outage
+        if (Services.SessionStateService.HasActiveSession())
+        {
+            Log.Warning("[Session] Stale session detected on startup - running cleanup");
+            try
+            {
+                var browserCleanup = new Services.BrowserCleanupService();
+                browserCleanup.CleanupWithBrowserClose();
+                browserCleanup.CleanupDownloads();
+            }
+            catch (Exception ex) { Log.Error(ex, "[Session] Startup cleanup failed"); }
+            Services.SessionStateService.ClearSession();
+        }
+
         ShowAuthWindow();
     }
 
@@ -451,6 +465,7 @@ public partial class App : Application
                         var browserCleanup = _host!.Services.GetRequiredService<BrowserCleanupService>();
                         browserCleanup.CleanupWithBrowserClose();
                         browserCleanup.CleanupDownloads();
+                        Services.SessionStateService.ClearSession();
                     }
                     catch (Exception ex)
                     {
@@ -487,6 +502,9 @@ public partial class App : Application
                 Log.Warning("StartSystemServices called without a logged-in user");
                 return;
             }
+
+            // Mark session as active in Registry (survives power outage)
+            Services.SessionStateService.SetSessionActive(userId);
 
             var session = _host.Services.GetRequiredService<SessionService>();
             session.Reinitialize(userId);
