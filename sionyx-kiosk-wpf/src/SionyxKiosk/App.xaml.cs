@@ -463,8 +463,12 @@ public partial class App : Application
                     try
                     {
                         var browserCleanup = _host!.Services.GetRequiredService<BrowserCleanupService>();
-                        browserCleanup.CleanupWithBrowserClose();
-                        browserCleanup.CleanupDownloads();
+                        // Only clean browser/downloads if user actually entered desktop
+                        if (Services.SessionStateService.HasEnteredDesktop())
+                        {
+                            browserCleanup.CleanupWithBrowserClose();
+                            browserCleanup.CleanupDownloads();
+                        }
                         Services.SessionStateService.ClearSession();
                     }
                     catch (Exception ex)

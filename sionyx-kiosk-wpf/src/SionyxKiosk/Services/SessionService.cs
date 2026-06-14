@@ -146,6 +146,9 @@ public class SessionService : BaseService, ISessionService
         _warned5Min = false;
         _warned1Min = false;
 
+        // Mark that user entered desktop in Registry
+        SessionStateService.SetEnteredDesktop(true);
+
         // Start timers
         _countdownTimer.Start();
         _syncTimer.Start();
