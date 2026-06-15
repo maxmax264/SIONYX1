@@ -56,7 +56,8 @@ namespace SionyxInstaller
             session.Log("=== LaunchKiosk: START ===");
             try
             {
-                string installDir = session.CustomActionData["INSTALLDIR"];
+                // In immediate mode, read directly from session properties
+                string installDir = session["INSTALLFOLDER"] ?? session.CustomActionData["INSTALLDIR"] ?? @"C:\Program Files\SIONYX";
                 string appExe = Path.Combine(installDir, "SionyxKiosk.exe");
 
                 if (!File.Exists(appExe))

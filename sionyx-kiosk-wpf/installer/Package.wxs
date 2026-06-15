@@ -166,11 +166,9 @@
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
     <SetProperty Id="CA_VerifyInstallation" Before="CA_VerifyInstallation" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
-    <SetProperty Id="CA_LaunchKiosk"        Before="CA_LaunchKiosk"        Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
-
     <CustomAction Id="CA_SetupAutoStart"     BinaryRef="CustomActionsDll" DllEntry="SetupAutoStart"     Execute="deferred" Impersonate="no"  Return="check" />
     <CustomAction Id="CA_VerifyInstallation" BinaryRef="CustomActionsDll" DllEntry="VerifyInstallation" Execute="deferred" Impersonate="no"  Return="ignore" />
-    <CustomAction Id="CA_LaunchKiosk"        BinaryRef="CustomActionsDll" DllEntry="LaunchKiosk"        Execute="deferred" Impersonate="yes" Return="ignore" />
+    <CustomAction Id="CA_LaunchKiosk"        BinaryRef="CustomActionsDll" DllEntry="LaunchKiosk"        Execute="immediate" Return="ignore" />
 
     <!-- UNINSTALL -->
     <CustomAction Id="CA_StopProcesses"   BinaryRef="CustomActionsDll" DllEntry="StopProcesses"   Execute="deferred" Impersonate="no" Return="ignore" />
