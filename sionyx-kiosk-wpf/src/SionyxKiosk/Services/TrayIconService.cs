@@ -21,6 +21,7 @@ public class TrayIconService : IDisposable
     public event Action? CustomizeDesktopRequested;
     public event Action? SaveSnapshotRequested;
     public event Action? SettingsRequested;
+    public event Action? StartupSettingsRequested;
 
     private MenuItem? _customizeItem;
 
@@ -60,6 +61,9 @@ public class TrayIconService : IDisposable
                 }
             };
             menu.Items.Add(_customizeItem);
+            var startupItem = new MenuItem { Header = "הגדרות הפעלה אוטומטית", FlowDirection = FlowDirection.RightToLeft };
+            startupItem.Click += (s, e) => StartupSettingsRequested?.Invoke();
+            menu.Items.Add(startupItem);
             var settingsItem = new MenuItem { Header = "הגדרות", FlowDirection = FlowDirection.RightToLeft };
             settingsItem.Click += (s, e) => SettingsRequested?.Invoke();
             menu.Items.Add(settingsItem);
