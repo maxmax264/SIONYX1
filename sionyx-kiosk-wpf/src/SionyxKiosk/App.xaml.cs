@@ -683,6 +683,11 @@ public partial class App : Application
                                 var dlg = new Views.Dialogs.SettingsDialog();
                                 dlg.Show();
                             };
+                            _trayIcon.StartupSettingsRequested += () =>
+                            {
+                                var dlg = new Views.Dialogs.StartupSettingsDialog();
+                                dlg.Show();
+                            };
                             _trayIcon.ExitRequested += () =>
                             {
                                 _trayIcon.Hide();
