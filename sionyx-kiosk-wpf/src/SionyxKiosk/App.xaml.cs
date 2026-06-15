@@ -705,7 +705,7 @@ public partial class App : Application
                                 _trayIcon = null;
                                 Shutdown();
                             };
-                            _trayIcon.Show();
+                            _trayIcon.Show(GetVersion());
                         });
                     });
                 }

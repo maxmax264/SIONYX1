@@ -25,12 +25,24 @@ public class TrayIconService : IDisposable
 
     private MenuItem? _customizeItem;
 
-    public void Show()
+    public void Show(string version = "")
     {
         if (_trayIcon != null) return;
         Application.Current.Dispatcher.Invoke(() =>
         {
             var menu = new ContextMenu();
+            if (!string.IsNullOrEmpty(version))
+            {
+                var versionItem = new MenuItem
+                {
+                    Header = $"SIONYX v{version}",
+                    FlowDirection = FlowDirection.RightToLeft,
+                    IsEnabled = false,
+                    FontWeight = System.Windows.FontWeights.Bold
+                };
+                menu.Items.Add(versionItem);
+                menu.Items.Add(new Separator());
+            }
             var restoreItem = new MenuItem { Header = "החזר את התוכנה", FlowDirection = FlowDirection.RightToLeft };
             restoreItem.Click += (s, e) => RestoreRequested?.Invoke();
             var controlItem = new MenuItem { Header = "פתח לוח בקרה", FlowDirection = FlowDirection.RightToLeft };
