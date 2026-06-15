@@ -254,6 +254,17 @@ public partial class App : Application
                 .WriteTo.File("logs/sionyx-.log", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+        // Check for updates in background (non-blocking)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var version = GetVersion();
+                await Services.AutoUpdateService.CheckAndUpdateAsync(version);
+            }
+            catch (Exception ex) { Log.Warning(ex, "[Update] Background update check failed"); }
+        });
+
         // Check for stale session from power outage
         if (Services.SessionStateService.HasActiveSession())
         {
