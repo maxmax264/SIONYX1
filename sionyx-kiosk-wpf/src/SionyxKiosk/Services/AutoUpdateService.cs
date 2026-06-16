@@ -13,8 +13,7 @@ namespace SionyxKiosk.Services;
 public static class AutoUpdateService
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(AutoUpdateService));
-    private const string GitHubApiUrl = "https://api.github.com/repos/maxmax264/SIONYX1/releases/latest";
-    private const string AssetPrefix = "sionyx-installer-";
+    private const string UpdateServerUrl = "https://sionyx-auth-server.onrender.com/latest-version";
 
     public static async Task CheckAndUpdateAsync(string currentVersion)
     {
@@ -33,12 +32,18 @@ public static class AutoUpdateService
             http.DefaultRequestHeaders.Add("User-Agent", "SIONYX-Kiosk");
             http.Timeout = TimeSpan.FromSeconds(10);
 
-            var json = await http.GetStringAsync(GitHubApiUrl);
+            var json = await http.GetStringAsync(UpdateServerUrl);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var latestTag = root.GetProperty("tag_name").GetString() ?? "";
-            var latestVersion = latestTag.TrimStart('v');
+            var latestVersion = root.GetProperty("version").GetString() ?? "";
+            var downloadUrl = root.GetProperty("downloadUrl").GetString() ?? "";
+
+            if (string.IsNullOrEmpty(latestVersion) || string.IsNullOrEmpty(downloadUrl))
+            {
+                Logger.Information("[Update] No update info available");
+                return;
+            }
 
             Logger.Information("[Update] Latest version: {Latest}", latestVersion);
 
@@ -49,27 +54,6 @@ public static class AutoUpdateService
             }
 
             Logger.Information("[Update] New version available: {Latest} (current: {Current})", latestVersion, currentVersion);
-
-            // Find MSI asset
-            string? downloadUrl = null;
-            if (root.TryGetProperty("assets", out var assets))
-            {
-                foreach (var asset in assets.EnumerateArray())
-                {
-                    var name = asset.GetProperty("name").GetString() ?? "";
-                    if (name.StartsWith(AssetPrefix) && name.EndsWith(".msi"))
-                    {
-                        downloadUrl = asset.GetProperty("browser_download_url").GetString();
-                        break;
-                    }
-                }
-            }
-
-            if (string.IsNullOrEmpty(downloadUrl))
-            {
-                Logger.Warning("[Update] No MSI asset found in release");
-                return;
-            }
 
             // Download MSI
             var tempPath = Path.Combine(Path.GetTempPath(), $"sionyx_update_{latestVersion}.msi");
