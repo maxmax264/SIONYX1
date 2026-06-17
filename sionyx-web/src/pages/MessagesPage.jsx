@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Button,
@@ -43,7 +43,7 @@ import {
   isUserActive,
   cleanupOldMessages,
 } from '../services/chatService';
-import { subscribeToMessages, subscribeToUsers } from '../services/realtimeService';
+import { subscribeToMessages, subscribeToUsers, subscribeToComputers } from '../services/realtimeService';
 import { logger } from '../utils/logger';
 
 dayjs.extend(relativeTime);
@@ -52,7 +52,7 @@ dayjs.locale('he');
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// ── Design tokens ──────────────────────────────────────────
+// ג”€ג”€ Design tokens ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 const tokens = {
   primary: '#667eea',
   primaryDark: '#5a6fd6',
@@ -67,7 +67,7 @@ const tokens = {
   radiusSm: 10,
 };
 
-// ── MessagesPage ───────────────────────────────────────────
+// ג”€ג”€ MessagesPage ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 const MessagesPage = () => {
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
@@ -83,6 +83,7 @@ const MessagesPage = () => {
     try { return JSON.parse(localStorage.getItem('admin_deleted_ids') || '[]'); } catch { return []; }
   });
   const chatEndRef = useRef(null);
+  const [computers, setComputers] = useState([]);
 
   const { user } = useAuthStore();
   const adminUid = user?.uid || user?.admin?.uid || user?.admin?.uid;
@@ -100,9 +101,14 @@ const MessagesPage = () => {
       setUsers(data);
       setLoading(false);
     });
-    return () => {
+    const unsubComputers = subscribeToComputers(orgId, data => {
+      setComputers(data);
+    });
+
+        return () => {
       unsubMessages();
       unsubUsers();
+      unsubComputers();
     };
   }, [orgId]);
 
@@ -125,7 +131,7 @@ const MessagesPage = () => {
       if (messagesResult.success) setMessages(messagesResult.messages);
     } catch (error) {
       logger.error('Error loading data:', error);
-      message.error('שגיאה בטעינת הנתונים');
+      message.error('׳©׳’׳™׳׳” ׳‘׳˜׳¢׳™׳ ׳× ׳”׳ ׳×׳•׳ ׳™׳');
     } finally {
       setLoading(false);
     }
@@ -149,7 +155,7 @@ const MessagesPage = () => {
       setUserMessages(merged);
     } catch (error) {
       logger.error('Error loading chat:', error);
-      message.error('שגיאה בטעינת ההודעות');
+      message.error('׳©׳’׳™׳׳” ׳‘׳˜׳¢׳™׳ ׳× ׳”׳”׳•׳“׳¢׳•׳×');
     } finally {
       setLoadingChat(false);
     }
@@ -162,9 +168,9 @@ const MessagesPage = () => {
       localStorage.setItem('admin_deleted_ids', JSON.stringify(newDeleted));
       setUserMessages(prev => prev.filter(m => m.id !== msgId));
       setMessages(prev => prev.filter(m => m.id !== msgId));
-      message.success('ההודעה נמחקה');
+      message.success('׳”׳”׳•׳“׳¢׳” ׳ ׳׳—׳§׳”');
     } catch (error) {
-      message.error('שגיאה במחיקה');
+      message.error('׳©׳’׳™׳׳” ׳‘׳׳—׳™׳§׳”');
     }
   };
 
@@ -173,7 +179,13 @@ const MessagesPage = () => {
 
     setSending(true);
     try {
-      const result = await sendMessage(orgId, selectedUser.uid, newMessage.trim(), adminUid);
+      const adminName = user?.displayName || user?.admin?.displayName || user?.email || "מנהל";
+      const userComputer = computers.find(c => c.currentUserId === selectedUser.uid);
+      const computerName = userComputer?.computerName || "";
+      const messageWithComputer = computerName
+        ? `[מחשב: ${computerName}] ${newMessage.trim()}`
+        : newMessage.trim();
+      const result = await sendMessage(orgId, selectedUser.uid, messageWithComputer, adminUid, adminName);
       if (result.success) {
         setNewMessage('');
         const [msgResult2, repliesResult2] = await Promise.all([
@@ -187,19 +199,19 @@ const MessagesPage = () => {
         );
         setUserMessages(merged2);
         loadData();
-        message.success('הודעה נשלחה');
+        message.success('׳”׳•׳“׳¢׳” ׳ ׳©׳׳—׳”');
       } else {
-        message.error('שגיאה בשליחה');
+        message.error('׳©׳’׳™׳׳” ׳‘׳©׳׳™׳—׳”');
       }
     } catch (error) {
       logger.error('Error sending:', error);
-      message.error('שגיאה בשליחה');
+      message.error('׳©׳’׳™׳׳” ׳‘׳©׳׳™׳—׳”');
     } finally {
       setSending(false);
     }
   };
 
-  // ── Conversation summaries ─────────────────────────────
+  // ג”€ג”€ Conversation summaries ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const getUserConversations = () => {
     const userMap = new Map();
     messages.forEach(msg => {
@@ -229,7 +241,7 @@ const MessagesPage = () => {
         const userInfo = users.find(u => u.uid === conv.userId);
         return {
           ...conv,
-          userName: userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : 'משתמש לא ידוע',
+          userName: userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : '׳׳©׳×׳׳© ׳׳ ׳™׳“׳•׳¢',
           userPhone: userInfo?.phoneNumber || '',
           isActive: userInfo ? isUserActive(userInfo.lastSeen) : false,
           userInfo,
@@ -249,14 +261,14 @@ const MessagesPage = () => {
 
   const usersWithoutMessages = users.filter(u => !conversations.find(c => c.userId === u.uid));
 
-  // ── Helper: get user initials ──────────────────────────
+  // ג”€ג”€ Helper: get user initials ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const getInitials = name => {
     if (!name) return '?';
     const parts = name.trim().split(' ');
     return parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : parts[0][0];
   };
 
-  // ── Conversation list item ─────────────────────────────
+  // ג”€ג”€ Conversation list item ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const ConversationCard = ({ conv }) => (
     <div
       role="button"
@@ -328,13 +340,13 @@ const MessagesPage = () => {
             lineHeight: 1.4,
           }}
         >
-          {conv.latestMessage || 'אין הודעות'}
+          {conv.latestMessage || '׳׳™׳ ׳”׳•׳“׳¢׳•׳×'}
         </Paragraph>
       </div>
     </div>
   );
 
-  // ── Quick user avatar card ─────────────────────────────
+  // ג”€ג”€ Quick user avatar card ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const UserQuickCard = ({ userItem }) => {
     const active = isUserActive(userItem.lastSeen);
     const name = `${userItem.firstName} ${userItem.lastName || ''}`.trim();
@@ -396,7 +408,7 @@ const MessagesPage = () => {
     );
   };
 
-  // ── Stat pill ──────────────────────────────────────────
+  // ג”€ג”€ Stat pill ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
   const StatPill = ({ value, label, color }) => (
     <div style={{ textAlign: 'center', flex: 1 }}>
       <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2 }}>{value}</div>
@@ -406,10 +418,10 @@ const MessagesPage = () => {
     </div>
   );
 
-  // ═════════════════════════ RENDER ═════════════════════════
+  // ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• RENDER ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•
   return (
     <div style={{ direction: 'rtl' }}>
-      {/* ── Page Header ──────────────────────────────────── */}
+      {/* ג”€ג”€ Page Header ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
       <div
         style={{
           display: 'flex',
@@ -434,7 +446,7 @@ const MessagesPage = () => {
             }}
           >
             <MessageOutlined style={{ color: tokens.primary }} />
-            הודעות
+            ׳”׳•׳“׳¢׳•׳×
             {totalUnread > 0 && (
               <Badge
                 count={totalUnread}
@@ -448,7 +460,7 @@ const MessagesPage = () => {
             )}
           </Title>
           <Text style={{ color: tokens.textSecondary, fontSize: 14 }}>
-            שלח הודעות למשתמשים וצפה בשיחות
+            ׳©׳׳— ׳”׳•׳“׳¢׳•׳× ׳׳׳©׳×׳׳©׳™׳ ׳•׳¦׳₪׳” ׳‘׳©׳™׳—׳•׳×
           </Text>
         </div>
         <Button
@@ -457,11 +469,11 @@ const MessagesPage = () => {
           loading={loading}
           style={{ borderRadius: tokens.radiusSm }}
         >
-          רענן
+          ׳¨׳¢׳ ׳
         </Button>
       </div>
 
-      {/* ── Content ──────────────────────────────────────── */}
+      {/* ג”€ג”€ Content ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
       {loading ? (
         <Row gutter={[20, 20]}>
           <Col xs={24} lg={16}>
@@ -481,18 +493,18 @@ const MessagesPage = () => {
         </Row>
       ) : (
         <Row gutter={[20, 20]}>
-          {/* ── Conversations List ────────────────────────── */}
+          {/* ג”€ג”€ Conversations List ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
           <Col xs={24} lg={16}>
             <Card
               title={
                 <span style={{ fontSize: 15, fontWeight: 600, color: tokens.textPrimary }}>
                   <MessageOutlined style={{ color: tokens.primary, marginLeft: 8 }} />
-                  שיחות ({conversations.length})
+                  ׳©׳™׳—׳•׳× ({conversations.length})
                 </span>
               }
               extra={
                 <Input
-                  placeholder="חפש משתמש..."
+                  placeholder="׳—׳₪׳© ׳׳©׳×׳׳©..."
                   prefix={<SearchOutlined style={{ color: tokens.textSecondary }} />}
                   value={searchText}
                   onChange={e => setSearchText(e.target.value)}
@@ -515,7 +527,7 @@ const MessagesPage = () => {
             >
               {filteredConversations.length === 0 ? (
                 <Empty
-                  description="אין שיחות"
+                  description="׳׳™׳ ׳©׳™׳—׳•׳×"
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   style={{ padding: '48px 0' }}
                 />
@@ -527,14 +539,14 @@ const MessagesPage = () => {
             </Card>
           </Col>
 
-          {/* ── Sidebar ──────────────────────────────────── */}
+          {/* ג”€ג”€ Sidebar ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
           <Col xs={24} lg={8}>
             {/* Quick access */}
             <Card
               title={
                 <span style={{ fontSize: 15, fontWeight: 600, color: tokens.textPrimary }}>
                   <UserOutlined style={{ color: tokens.primary, marginLeft: 8 }} />
-                  שלח הודעה חדשה
+                  ׳©׳׳— ׳”׳•׳“׳¢׳” ׳—׳“׳©׳”
                 </span>
               }
               styles={{
@@ -547,7 +559,7 @@ const MessagesPage = () => {
               style={{ borderRadius: tokens.radius, border: `1px solid ${tokens.surfaceBorder}` }}
             >
               {usersWithoutMessages.length === 0 && conversations.length === 0 ? (
-                <Empty description="אין משתמשים" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description="׳׳™׳ ׳׳©׳×׳׳©׳™׳" image={Empty.PRESENTED_IMAGE_SIMPLE} />
               ) : (
                 <Row gutter={[4, 4]}>
                   {users.slice(0, 12).map(userItem => (
@@ -569,22 +581,22 @@ const MessagesPage = () => {
               styles={{ body: { padding: '20px 16px' } }}
             >
               <div style={{ display: 'flex', gap: 8 }}>
-                <StatPill value={messages.length} label="סך הכל" color={tokens.primary} />
+                <StatPill value={messages.length} label="׳¡׳ ׳”׳›׳" color={tokens.primary} />
                 <div
                   style={{ width: 1, background: tokens.surfaceBorder, alignSelf: 'stretch' }}
                 />
-                <StatPill value={totalUnread} label="לא נקראו" color="#faad14" />
+                <StatPill value={totalUnread} label="׳׳ ׳ ׳§׳¨׳׳•" color="#faad14" />
                 <div
                   style={{ width: 1, background: tokens.surfaceBorder, alignSelf: 'stretch' }}
                 />
-                <StatPill value={conversations.length} label="שיחות" color="#52c41a" />
+                <StatPill value={conversations.length} label="׳©׳™׳—׳•׳×" color="#52c41a" />
               </div>
             </Card>
           </Col>
         </Row>
       )}
 
-      {/* ═══════════════ Chat Drawer ═══════════════════════ */}
+      {/* ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• Chat Drawer ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג•ג• */}
       <Drawer
         title={
           selectedUser && (
@@ -633,7 +645,7 @@ const MessagesPage = () => {
                         margin: 0,
                       }}
                     >
-                      פעיל
+                      ׳₪׳¢׳™׳
                     </Tag>
                   )}
                 </div>
@@ -662,7 +674,7 @@ const MessagesPage = () => {
           },
         }}
       >
-        {/* ── Messages Area ──────────────────────────────── */}
+        {/* ג”€ג”€ Messages Area ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
         <div
           style={{
             flex: 1,
@@ -677,7 +689,7 @@ const MessagesPage = () => {
             </div>
           ) : userMessages.length === 0 ? (
             <Empty
-              description="אין הודעות עדיין"
+              description="׳׳™׳ ׳”׳•׳“׳¢׳•׳× ׳¢׳“׳™׳™׳"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               style={{ marginTop: 48 }}
             />
@@ -762,7 +774,7 @@ const MessagesPage = () => {
                           )}
                         </div>
                       </div>
-                      <Tooltip title="מחק הודעה">
+                      <Tooltip title="׳׳—׳§ ׳”׳•׳“׳¢׳”">
                         <button
                           onClick={() => handleDeleteMessage(msg.id)}
                           style={{
@@ -792,7 +804,7 @@ const MessagesPage = () => {
           )}
         </div>
 
-        {/* ── Message Input ──────────────────────────────── */}
+        {/* ג”€ג”€ Message Input ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
         <div
           style={{
             padding: '12px 16px',
@@ -815,7 +827,7 @@ const MessagesPage = () => {
             <TextArea
               value={newMessage}
               onChange={e => setNewMessage(e.target.value)}
-              placeholder="הקלד הודעה..."
+              placeholder="׳”׳§׳׳“ ׳”׳•׳“׳¢׳”..."
               autoSize={{ minRows: 1, maxRows: 4 }}
               onPressEnter={e => {
                 if (!e.shiftKey) {
@@ -864,3 +876,6 @@ const MessagesPage = () => {
 };
 
 export default MessagesPage;
+
+
+
