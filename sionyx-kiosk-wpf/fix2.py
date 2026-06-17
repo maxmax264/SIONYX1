@@ -1,8 +1,10 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
-
-old = '                            _trayIcon.RestoreRequested += () =>\n                            {\n                                _trayIcon.Hide();\n                                _trayIcon = null;\n                                var authWindow = new AuthWindow();\n                                MainWindow = authWindow;\n                                authWindow.Show();\n                            };'
-new = '                            _trayIcon.RestoreRequested += () =>\n                            {\n                                _trayIcon.Hide();\n                                _trayIcon = null;\n                                var authVm = _host!.Services.GetRequiredService<ViewModels.AuthViewModel>();\n                                var authWindow = new AuthWindow(authVm);\n                                MainWindow = authWindow;\n                                authWindow.Show();\n                            };'
-assert content.count(old) == 1, "not found"
-content = content.replace(old, new)
-open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
-print('OK')
+﻿content = open(r'src\SionyxKiosk\Views\Pages\MessagesPage.xaml', encoding='utf-8').read()
+old = 'Binding="{Binding FromSupervisor}" Value="True"><Setter Property="Visibility" Value="Visible"/>'
+new = 'Binding="{Binding IsUserReply}" Value="False"><Setter Property="Visibility" Value="Visible"/>'
+# מחפש את הגרסה הארוכה עם newlines
+old2 = '<DataTrigger Binding="{Binding FromSupervisor}" Value="True">\n                                                                    <Setter Property="Visibility" Value="Visible"/>\n                                                                </DataTrigger>'
+new2 = '<DataTrigger Binding="{Binding IsUserReply}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger>'
+count = content.count(old2)
+print(f"Found long: {count}")
+count2 = content.count(old)
+print(f"Found short: {count2}")

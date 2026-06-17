@@ -1,8 +1,11 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
-
-old = '                            _trayIcon.RestoreRequested += () =>\n                            {\n                                _trayIcon.Hide();\n                                _trayIcon = null;\n                                var authVm = _host!.Services.GetRequiredService<ViewModels.AuthViewModel>();\n                                var authWindow = new AuthWindow(authVm);\n                                MainWindow = authWindow;\n                                authWindow.Show();\n                            };'
-new = '                            _trayIcon.RestoreRequested += () =>\n                            {\n                                _trayIcon.Hide();\n                                _trayIcon = null;\n                                var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName;\n                                System.Diagnostics.Process.Start(exe);\n                                Shutdown();\n                            };'
-assert content.count(old) == 1, "not found"
-content = content.replace(old, new)
-open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
-print('OK')
+﻿content = open(r'src\SionyxKiosk\Views\Pages\MessagesPage.xaml', encoding='utf-8').read()
+old = '<DataTrigger Binding="{Binding FromSupervisor}" Value="True">\n                                                                    <Setter Property="Visibility" Value="Visible"/>\n                                                                </DataTrigger>'
+new = '<DataTrigger Binding="{Binding IsUserReply}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger>'
+count = content.count(old)
+print(f"Found {count} matches")
+if count == 1:
+    content = content.replace(old, new, 1)
+    open(r'src\SionyxKiosk\Views\Pages\MessagesPage.xaml', 'w', encoding='utf-8').write(content)
+    print('OK')
+else:
+    print('NOT FOUND')

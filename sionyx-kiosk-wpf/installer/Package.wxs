@@ -168,7 +168,7 @@
     <SetProperty Id="CA_VerifyInstallation" Before="CA_VerifyInstallation" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
     <CustomAction Id="CA_SetupAutoStart"     BinaryRef="CustomActionsDll" DllEntry="SetupAutoStart"     Execute="deferred" Impersonate="no"  Return="check" />
     <CustomAction Id="CA_VerifyInstallation" BinaryRef="CustomActionsDll" DllEntry="VerifyInstallation" Execute="deferred" Impersonate="no"  Return="ignore" />
-    <CustomAction Id="CA_LaunchKiosk"        BinaryRef="CustomActionsDll" DllEntry="LaunchKiosk"        Execute="immediate" Return="ignore" />
+    <CustomAction Id="CA_LaunchKiosk" BinaryRef="CustomActionsDll" DllEntry="LaunchKiosk" Execute="immediate" Return="ignore" />
 
     <!-- UNINSTALL -->
     <CustomAction Id="CA_StopProcesses"   BinaryRef="CustomActionsDll" DllEntry="StopProcesses"   Execute="deferred" Impersonate="no" Return="ignore" />
@@ -179,13 +179,16 @@
       <!-- INSTALL -->
       <Custom Action="CA_SetupAutoStart"     After="InstallFiles"         Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
-      <Custom Action="CA_LaunchKiosk"        After="CA_VerifyInstallation" Condition="NOT REMOVE" />
 
       <!-- UNINSTALL -->
       <Custom Action="CA_StopProcesses"   Before="RemoveFiles"           Condition="REMOVE = &quot;ALL&quot;" />
       <Custom Action="CA_RemoveAutoStart" After="CA_StopProcesses"       Condition="REMOVE = &quot;ALL&quot;" />
       <Custom Action="CA_RevertSecurity"  After="CA_RemoveAutoStart"     Condition="REMOVE = &quot;ALL&quot;" />
     </InstallExecuteSequence>
+
+  <InstallUISequence>
+    <Custom Action="CA_LaunchKiosk" After="ExecuteAction" Condition="NOT REMOVE" />
+  </InstallUISequence>
 
   </Package>
 </Wix>
