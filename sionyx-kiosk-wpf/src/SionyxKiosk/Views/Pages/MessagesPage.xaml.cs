@@ -24,7 +24,6 @@ public partial class MessagesPage : Page
     private readonly FirebaseClient _firebase;
     private readonly LocalDatabase _localDb;
     private string _adminDisplayName = "׳׳ ׳”׳";
-    private string _supervisorDisplayName = "׳₪׳™׳§׳•׳—";
     private List<KioskMessageItem> _adminMessages = new();
     private readonly HashSet<string> _deletedIds = new();
     private List<KioskMessageItem> _supervisorMessages = new();
@@ -325,5 +324,6 @@ public partial class MessagesPage : Page
         }
     }
 }
+
 
 
