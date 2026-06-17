@@ -53,6 +53,25 @@ namespace SionyxInstaller
                 // Allow blank-password accounts to appear on login screen
                 SetLimitBlankPasswordUse(session, enabled: false);
 
+                // Clean up stale profile folders (SionyxUser.* and TEMP.*)
+                string usersDir = @"C:\Users";
+                foreach (var dir in System.IO.Directory.GetDirectories(usersDir))
+                {
+                    string name = System.IO.Path.GetFileName(dir);
+                    if (name.StartsWith(KioskUsername + ".") || name.StartsWith("TEMP."))
+                    {
+                        try
+                        {
+                            System.IO.Directory.Delete(dir, true);
+                            session.Log($"[OK] Removed stale profile folder: {name}");
+                        }
+                        catch (Exception ex)
+                        {
+                            session.Log($"[WARN] Could not remove {name}: {ex.Message}");
+                        }
+                    }
+                }
+
                 bool exists = UserExists(KioskUsername, session);
 
                 if (exists)
@@ -79,6 +98,24 @@ namespace SionyxInstaller
                 RunCommand("net", $"localgroup Administrators \"{KioskUsername}\" /delete", session);
                 RunCommand("net", $"localgroup Users \"{KioskUsername}\" /add", session);
 
+                // Skip OOBE for all new profiles on this machine
+                try
+                {
+                    using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                    using (var oobeKey = baseKey.CreateSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\FirstLogonCommands", true))
+                    {
+                        // No commands needed - just ensure key exists
+                    }
+                    using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                    using (var oobeKey = baseKey.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE", true))
+                    {
+                        oobeKey.SetValue("SkipMachineOOBE", 1, RegistryValueKind.DWord);
+                        oobeKey.SetValue("SkipUserOOBE", 1, RegistryValueKind.DWord);
+                        session.Log("[OK] OOBE skip flags set in HKLM");
+                    }
+                }
+                catch (Exception ex) { session.Log($"[WARN] OOBE skip: {ex.Message}"); }
+
                 session.Log($"[OK] Kiosk user account ready ({sw.ElapsedMilliseconds}ms)");
                 return ActionResult.Success;
             }
@@ -99,6 +136,7 @@ namespace SionyxInstaller
         {
             var sw = Stopwatch.StartNew();
             session.Log("=== ApplySecurityRestrictions: START ===");
+            session.Log("[DBG] Profile check running");
 
             try
             {
@@ -135,6 +173,14 @@ namespace SionyxInstaller
                     SetUserRegistryPolicy(session, tempHiveKey,
                         @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System",
                         "DisableTaskMgr", 1);
+
+                    // Skip Windows OOBE ("Getting Windows ready") on first logon
+                    SetUserRegistryPolicy(session, tempHiveKey,
+                        @"SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE",
+                        "SkipUserOOBE", 1);
+                    SetUserRegistryPolicy(session, tempHiveKey,
+                        @"SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE",
+                        "SkipMachineOOBE", 1);
 
                     // Ensure .txt ShellNew exists so "New > Text Document" appears in context menu
                     using (var hku = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Registry64))
@@ -216,35 +262,66 @@ namespace SionyxInstaller
         {
             var sw = Stopwatch.StartNew();
             session.Log("=== InitializeProfile: START ===");
+                File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] InitializeProfile: START\n");
 
             try
             {
                 string installDir = session.CustomActionData["INSTALLDIR"];
                 string profilePath = $@"C:\Users\{KioskUsername}";
 
-                if (!File.Exists(Path.Combine(profilePath, "ntuser.dat")))
+                // Delete old profile folder before CreateProfile so it uses the correct path
+                if (Directory.Exists(profilePath))
                 {
-                    string sid = GetUserSid(KioskUsername);
-                    if (sid != null)
+                    // Unload SionyxUser registry hive before deleting (prevents UsrClass.dat lock)
+                    try
                     {
-                        session.Log($"SID for {KioskUsername}: {sid}");
-
-                        var pathBuf = new StringBuilder(260);
-                        int hr = CreateProfile(sid, KioskUsername, pathBuf, 260);
-
-                        if (hr == 0)
-                            session.Log($"[OK] Profile created at: {pathBuf}");
+                        string sidForUnload = GetUserSid(KioskUsername);
+                        if (sidForUnload != null)
+                        {
+                            int unloadResult = RunCommand("reg", $"unload \"HKU\\{sidForUnload}\"", session);
+                            session.Log($"[INFO] reg unload result: {unloadResult}");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] reg unload result={unloadResult}\n");
+                            System.Threading.Thread.Sleep(500);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        session.Log($"[WARN] reg unload failed: {ex.Message}");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] reg unload failed: {ex.Message}\n");
+                    }
+                    try
+                    {
+                        int rmResult = RunCommand("cmd", $"/c rmdir /s /q \"{profilePath}\"", session);
+                        if (rmResult == 0)
+                        {
+                            session.Log($"[OK] Deleted old profile folder: {profilePath}");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Deleted old profile folder\n");
+                        }
                         else
-                            session.Log($"[WARN] CreateProfile HRESULT: 0x{hr:X8} (profile may already exist)");
+                        {
+                            session.Log($"[WARN] rmdir returned {rmResult} - continuing anyway");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] WARNING: rmdir failed, continuing\n");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        session.Log("[WARN] Could not resolve SID — profile will be created on first logon");
+                        session.Log($"[WARN] Could not delete profile folder: {ex.Message} - continuing");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] WARNING: could not delete profile folder\n");
                     }
+                }
+
+                // Create the profile via Win32 API so Windows does not show "Getting Windows ready"
+                var profilePathBuilder = new StringBuilder(260);
+                string userSid = GetUserSid(KioskUsername);
+                if (userSid != null)
+                {
+                    int cpResult = CreateProfile(userSid, KioskUsername, profilePathBuilder, (uint)profilePathBuilder.Capacity);
+                    session.Log($"[INFO] CreateProfile API result: {cpResult} path: {profilePathBuilder}");
+                    File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] CreateProfile result={cpResult} path={profilePathBuilder}\n");
                 }
                 else
                 {
-                    session.Log("[INFO] Profile already exists");
+                    session.Log("[WARN] Could not get SID for CreateProfile — skipping API call");
                 }
 
                 // Ensure ProfileList registry entry exists regardless
@@ -303,10 +380,29 @@ namespace SionyxInstaller
                 string sionyxDir = Path.Combine(profilePath, ".sionyx");
                 string logsDir = Path.Combine(profilePath, @"AppData\Local\SIONYX\logs");
 
-                Directory.CreateDirectory(startupPath);
+                // Create all standard Windows profile directories
+                var standardDirs = new[]
+                {
+                    @"Desktop",
+                    @"Documents",
+                    @"Downloads",
+                    @"Pictures",
+                    @"Music",
+                    @"Videos",
+                    @"AppData\Local",
+                    @"AppData\Local\Microsoft\Windows",
+                    @"AppData\Local\Temp",
+                    @"AppData\LocalLow",
+                    @"AppData\Roaming",
+                    @"AppData\Roaming\Microsoft\Windows\Start Menu\Programs",
+                    @"AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup",
+                };
+                foreach (var dir in standardDirs)
+                    Directory.CreateDirectory(Path.Combine(profilePath, dir));
                 Directory.CreateDirectory(sionyxDir);
                 Directory.CreateDirectory(logsDir);
                 session.Log("[OK] Profile directories created");
+                File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Profile dirs created\n");
 
                 string shortcutPath = Path.Combine(startupPath, "SIONYX.lnk");
                 string targetExe = Path.Combine(installDir, "SionyxKiosk.exe");
@@ -502,6 +598,68 @@ namespace SionyxInstaller
             {
                 session.Log($"[ERROR] VerifyInstallation failed: {ex}");
                 return ActionResult.Success;
+            }
+        }
+
+
+        /// <summary>
+        /// Sets up AutoLogon for SionyxUser once, so Windows creates a full profile on first boot.
+        /// A first-logon script disables AutoLogon after the profile is created.
+        /// </summary>
+        [CustomAction]
+        public static ActionResult SetupFirstLogon(Session session)
+        {
+            var sw = Stopwatch.StartNew();
+            session.Log("=== SetupFirstLogon: START ===");
+                File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] SetupFirstLogon: START\n");
+            try
+            {
+                string installDir = session.CustomActionData["INSTALLDIR"];
+
+                // Write a PowerShell script that runs on first logon and disables AutoLogon
+                string scriptContent = @"
+# Disable AutoLogon after first logon
+reg delete ""HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"" /v AutoAdminLogon /f 2>$null
+reg delete ""HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"" /v DefaultPassword /f 2>$null
+reg delete ""HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"" /v AutoLogonCount /f 2>$null
+# Remove this script from startup
+schtasks /delete /tn ""SIONYX_FirstLogon"" /f 2>$null
+";
+                string scriptPath = System.IO.Path.Combine(installDir, "first_logon.ps1");
+                File.WriteAllText(scriptPath, scriptContent);
+                session.Log("[OK] First logon script written to: " + scriptPath);
+
+                // Create scheduled task to run script on first logon of SionyxUser
+                string psCmd = "-ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + scriptPath + "\"";
+                string fullCmd = "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '" + psCmd + "'; " +
+                    "$trigger = New-ScheduledTaskTrigger -AtLogOn -User 'SionyxUser'; " +
+                    "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries; " +
+                    "$principal = New-ScheduledTaskPrincipal -UserId 'SionyxUser' -LogonType Interactive -RunLevel Highest; " +
+                    "Register-ScheduledTask -TaskName 'SIONYX_FirstLogon' -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force";
+
+                int rc = RunCommand("powershell.exe", "-ExecutionPolicy Bypass -NoProfile -Command \"" + fullCmd + "\"", session);
+                session.Log("[OK] First logon task created, exit=" + rc);
+
+                // Enable AutoLogon for SionyxUser (one time)
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true))
+                {
+                    key.SetValue("AutoAdminLogon", "1", RegistryValueKind.String);
+                    key.SetValue("DefaultUserName", "SionyxUser", RegistryValueKind.String);
+                    key.SetValue("DefaultPassword", "", RegistryValueKind.String);
+                    key.SetValue("AutoLogonCount", 1, RegistryValueKind.DWord);
+                    key.SetValue("EnableFirstLogonAnimation", 1, RegistryValueKind.DWord);
+                    session.Log("[OK] AutoLogon configured for SionyxUser (1 time)");
+                    File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] AutoLogon configured\n");
+                }
+
+                session.Log("=== SetupFirstLogon: DONE (" + sw.ElapsedMilliseconds + "ms) ===");
+                return ActionResult.Success;
+            }
+            catch (Exception ex)
+            {
+                session.Log("[ERROR] SetupFirstLogon failed: " + ex.Message);
+                return ActionResult.Failure;
             }
         }
 
@@ -773,59 +931,186 @@ namespace SionyxInstaller
 
         private static void RemoveUserAndProfile(string username, Session session)
         {
+            session.Log($"=== RemoveUserAndProfile: cleaning everything for {username} ===");
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] === UNINSTALL START for {username} ===\n");
             string sid = GetUserSid(username);
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] SID={sid}\n");
 
+            // 1. Delete user account
             if (UserExists(username, session))
             {
                 RunCommand("net", $"user \"{username}\" /delete", session);
                 session.Log($"[OK] User account '{username}' deleted");
             }
+            else
+            {
+                session.Log($"[INFO] User '{username}' not found — skipping");
+            }
 
+            // 2. Delete ProfileList entries (normal + .bak)
             if (sid != null)
             {
-                try
+                foreach (var suffix in new[] { "", ".bak" })
                 {
-                    using (var searcher = new ManagementObjectSearcher(
-                        $"SELECT * FROM Win32_UserProfile WHERE SID = '{sid}'"))
+                    string regPath = $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}{suffix}";
+                    try
                     {
-                        foreach (ManagementObject profile in searcher.Get())
+                        using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                         {
-                            profile.Delete();
-                            session.Log($"[OK] WMI profile removed for SID {sid}");
+                            baseKey.DeleteSubKeyTree(regPath, false);
+                            session.Log($"[OK] ProfileList entry removed: {sid}{suffix}");
                         }
                     }
+                    catch { session.Log($"[INFO] ProfileList entry not found: {sid}{suffix}"); }
+                }
+            }
+
+            // 3. Delete main profile folder + stale SionyxUser.* / TEMP.* folders
+            string mainProfile = System.IO.Path.Combine(@"C:\Users", username);
+            if (Directory.Exists(mainProfile))
+            {
+                // Force-unload user hive before delete (ntuser.dat / UsrClass.dat stay locked after logoff)
+                try
+                {
+                    if (sid != null)
+                    {
+                        RunCommand("reg", $"unload \"HKU\\{sid}\"", session);
+                        RunCommand("reg", $"unload \"HKU\\{sid}_Classes\"", session);
+                        System.Threading.Thread.Sleep(1500);
+                        session.Log("[INFO] Hive unload attempted before profile delete");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] Hive unload attempted\n");
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    int rmrc = RunCommand("cmd", $"/c rmdir /s /q \"{mainProfile}\"", session);
+                    if (rmrc == 0)
+                        session.Log($"[OK] Deleted main profile folder: {mainProfile}");
+                    else
+                        throw new Exception($"rmdir exit code {rmrc}");
                 }
                 catch (Exception ex)
                 {
-                    session.Log($"[WARN] WMI profile removal failed: {ex.Message}");
-                }
-
-                string profileRegPath = $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}";
-                try
-                {
-                    using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                    session.Log($"[WARN] Could not delete {mainProfile} (locked): {ex.Message}");
+                    try
                     {
-                        baseKey.DeleteSubKeyTree(profileRegPath, false);
-                        session.Log("[OK] ProfileList registry entry removed");
+                        using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                        using (var regKey = baseKey.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager", writable: true))
+                        {
+                            if (regKey == null) throw new Exception("Session Manager key not found");
+                            var existing = regKey.GetValue("PendingFileRenameOperations") as string[] ?? new string[0];
+                            var newList = new System.Collections.Generic.List<string>(existing);
+                            newList.Add(@"\??\" + mainProfile);
+                            newList.Add("");
+                            regKey.SetValue("PendingFileRenameOperations", newList.ToArray(), RegistryValueKind.MultiString);
+                            session.Log($"[OK] Scheduled {mainProfile} for deletion on next reboot");
+                            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] PendingRename registered for {mainProfile}\n");
+                        }
+                    }
+                    catch (Exception rex)
+                    {
+                        session.Log($"[WARN] PendingRename failed: {rex.Message}");
+                        File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] PendingRename FAILED: {rex.Message}\n");
                     }
                 }
-                catch { /* already clean */ }
+            }
+            string usersDir = @"C:\Users";
+            foreach (var dir in Directory.GetDirectories(usersDir))
+            {
+                string name = Path.GetFileName(dir);
+                if (name.StartsWith(username + ".") || name.StartsWith("TEMP."))
+                {
+                    try
+                    {
+                        Directory.Delete(dir, true);
+                        session.Log($"[OK] Deleted folder: {name}");
+                    }
+                    catch
+                    {
+                        RunCommand("cmd", $"/c rmdir /s /q \"{dir}\"", session);
+                        session.Log($"[OK] Deleted folder via cmd: {name}");
+                    }
+                }
             }
 
-            string profilePath = $@"C:\Users\{username}";
-            if (Directory.Exists(profilePath))
+            // 3b. Restore LimitBlankPasswordUse to system default (1)
+            try
             {
-                try
+                using (var lsaKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                                               .OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Lsa", true))
                 {
-                    Directory.Delete(profilePath, true);
-                    session.Log($"[OK] Profile folder deleted: {profilePath}");
-                }
-                catch
-                {
-                    session.Log($"[WARN] Could not fully delete {profilePath} — may need reboot");
-                    RunCommand("cmd", $"/c rmdir /s /q \"{profilePath}\"", session);
+                    lsaKey?.SetValue("LimitBlankPasswordUse", 1, RegistryValueKind.DWord);
+                    session.Log("[OK] LimitBlankPasswordUse restored to 1");
                 }
             }
+            catch (Exception ex) { session.Log($"[WARN] LimitBlankPasswordUse restore: {ex.Message}"); }
+
+            // 4. Disable AutoLogon
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue("AutoAdminLogon", "0", RegistryValueKind.String);
+                        try { key.DeleteValue("DefaultPassword", false); } catch { }
+                        try { key.DeleteValue("AutoLogonCount", false); } catch { }
+                        session.Log("[OK] AutoLogon disabled");
+                    }
+                }
+            }
+            catch (Exception ex) { session.Log($"[WARN] AutoLogon cleanup: {ex.Message}"); }
+
+            // 5. Remove FirstLogon scheduled task
+            // 4. Clean AutoLogon registry entries
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue("AutoAdminLogon", "0", RegistryValueKind.String);
+                        try { key.DeleteValue("DefaultPassword", false); } catch { }
+                        try { key.DeleteValue("DefaultUserName", false); } catch { }
+                        try { key.DeleteValue("AutoLogonSID", false); } catch { }
+                        try { key.DeleteValue("AutoLogonCount", false); } catch { }
+                        try { key.DeleteValue("EnableFirstLogonAnimation", false); } catch { }
+                        session.Log("[OK] AutoLogon cleaned");
+                    }
+                }
+            }
+            catch (Exception ex) { session.Log($"[WARN] AutoLogon cleanup: {ex.Message}"); }
+
+            // 5. Clean SpecialAccounts
+            try
+            {
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList", true))
+                {
+                    if (key != null)
+                    {
+                        try { key.DeleteValue(username, false); } catch { }
+                        session.Log("[OK] SpecialAccounts cleaned");
+                    }
+                }
+            }
+            catch (Exception ex) { session.Log($"[WARN] SpecialAccounts cleanup: {ex.Message}"); }
+
+            // 6. Remove scheduled tasks
+            RunCommand("schtasks", "/delete /tn \"SIONYX_FirstLogon\" /f", session);
+            session.Log("[OK] SIONYX_FirstLogon task removed (if existed)");
+
+            session.Log("=== RemoveUserAndProfile: DONE ===");
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] === UNINSTALL DONE ===\n");
+            // Check what remains
+            bool folderExists = System.IO.Directory.Exists($@"C:\Users\{username}");
+            bool userExists = false;
+            try { new System.Security.Principal.NTAccount(username).Translate(typeof(System.Security.Principal.SecurityIdentifier)); userExists = true; } catch { }
+            File.AppendAllText(@"C:\Users\user\Desktop\sionyx_debug.log", $"[{DateTime.Now}] After cleanup — folder exists: {folderExists}, user exists: {userExists}\n");
         }
     }
 }

@@ -1,8 +1,17 @@
 {
+<<<<<<< HEAD
     "version":  "3.4.155",
     "major":  3,
     "minor":  4,
     "patch":  155,
     "buildNumber":  259,
     "lastBuildDate":  "2026-06-17T20:37:25.5798940+03:00"
+=======
+    "version":  "3.4.150",
+    "major":  3,
+    "minor":  4,
+    "patch":  150,
+    "buildNumber":  262,
+    "lastBuildDate":  "2026-06-17T10:50:20.5904965+03:00"
+>>>>>>> d82e28093333a1ccd75a5882946789702310029a
 }

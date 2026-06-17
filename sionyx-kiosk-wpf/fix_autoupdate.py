@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿new_content = """using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -13,7 +13,8 @@ namespace SionyxKiosk.Services;
 public static class AutoUpdateService
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(AutoUpdateService));
-    private const string UpdateServerUrl = "https://sionyx-auth-server.onrender.com/latest-version";
+    private const string GitHubApiUrl = "https://api.github.com/repos/maxmax264/SIONYX1/releases/latest";
+    private const string AssetPrefix = "sionyx-installer-";
 
     public static async Task CheckAndUpdateAsync(string currentVersion)
     {
@@ -32,18 +33,12 @@ public static class AutoUpdateService
             http.DefaultRequestHeaders.Add("User-Agent", "SIONYX-Kiosk");
             http.Timeout = TimeSpan.FromSeconds(10);
 
-            var json = await http.GetStringAsync(UpdateServerUrl);
+            var json = await http.GetStringAsync(GitHubApiUrl);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var latestVersion = root.GetProperty("version").GetString() ?? "";
-            var downloadUrl = root.GetProperty("downloadUrl").GetString() ?? "";
-
-            if (string.IsNullOrEmpty(latestVersion) || string.IsNullOrEmpty(downloadUrl))
-            {
-                Logger.Information("[Update] No update info available");
-                return;
-            }
+            var latestTag = root.GetProperty("tag_name").GetString() ?? "";
+            var latestVersion = latestTag.TrimStart('v');
 
             Logger.Information("[Update] Latest version: {Latest}", latestVersion);
 
@@ -54,6 +49,27 @@ public static class AutoUpdateService
             }
 
             Logger.Information("[Update] New version available: {Latest} (current: {Current})", latestVersion, currentVersion);
+
+            // Find MSI asset
+            string? downloadUrl = null;
+            if (root.TryGetProperty("assets", out var assets))
+            {
+                foreach (var asset in assets.EnumerateArray())
+                {
+                    var name = asset.GetProperty("name").GetString() ?? "";
+                    if (name.StartsWith(AssetPrefix) && name.EndsWith(".msi"))
+                    {
+                        downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                        break;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(downloadUrl))
+            {
+                Logger.Warning("[Update] No MSI asset found in release");
+                return;
+            }
 
             // Download MSI
             var tempPath = Path.Combine(Path.GetTempPath(), $"sionyx_update_{latestVersion}.msi");
@@ -68,7 +84,7 @@ public static class AutoUpdateService
             var psi = new ProcessStartInfo
             {
                 FileName = "msiexec.exe",
-                Arguments = $"/i \"{tempPath}\" /quiet /norestart",
+                Arguments = $"/i \\\"{tempPath}\\\" /quiet /norestart",
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
@@ -100,3 +116,9 @@ public static class AutoUpdateService
         }
     }
 }
+"""
+
+path = r'.\\src\\SionyxKiosk\\Services\\AutoUpdateService.cs'
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(new_content)
+print("DONE")

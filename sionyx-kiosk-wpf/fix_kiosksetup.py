@@ -1,4 +1,6 @@
-using System;
+﻿import os
+
+new_content = r"""using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -54,24 +56,14 @@ namespace SionyxInstaller
         public static ActionResult LaunchKiosk(Session session)
         {
             session.Log("=== LaunchKiosk: START ===");
-            string logFile = @"C:\Users\user\Desktop\sionyx_launch.log";
             try
             {
-                string installDir = session.CustomActionData["INSTALLDIR"] ?? @"C:\Program Files\SIONYX\";
+                string installDir = session.CustomActionData["INSTALLDIR"];
                 string appExe = Path.Combine(installDir, "SionyxKiosk.exe");
-
-                File.AppendAllText(logFile, $"[{DateTime.Now}] LaunchKiosk START\n");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] INSTALLDIR={installDir}\n");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] appExe={appExe}\n");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] Exe exists={File.Exists(appExe)}\n");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] CurrentUser={Environment.UserName}\n");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] SessionId={System.Diagnostics.Process.GetCurrentProcess().SessionId}\n");
-                session.Log($"[INFO] LaunchKiosk: appExe={appExe} exists={File.Exists(appExe)}");
 
                 if (!File.Exists(appExe))
                 {
                     session.Log($"[WARN] Exe not found: {appExe}");
-                    File.AppendAllText(logFile, $"[{DateTime.Now}] ERROR: Exe not found\n");
                     return ActionResult.Success;
                 }
 
@@ -81,17 +73,13 @@ namespace SionyxInstaller
                     Arguments = "--kiosk",
                     UseShellExecute = true,
                 };
-                File.AppendAllText(logFile, $"[{DateTime.Now}] Calling Process.Start...\n");
-                var proc = Process.Start(psi);
-                File.AppendAllText(logFile, $"[{DateTime.Now}] Process.Start returned: {(proc == null ? "null" : proc.Id.ToString())}\n");
-                session.Log($"[OK] Kiosk launched: {appExe} pid={proc?.Id}");
+                Process.Start(psi);
+                session.Log($"[OK] Kiosk launched: {appExe}");
                 return ActionResult.Success;
             }
             catch (Exception ex)
             {
-                session.Log($"[WARN] LaunchKiosk failed: {ex.Message}");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] EXCEPTION: {ex.Message}\n");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] StackTrace: {ex.StackTrace}\n");
+                session.Log($"[WARN] LaunchKiosk failed (non-fatal): {ex.Message}");
                 return ActionResult.Success;
             }
         }
@@ -280,3 +268,9 @@ namespace SionyxInstaller
         }
     }
 }
+"""
+
+path = r'.\installer\CustomActions\KioskSetupActions.cs'
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(new_content)
+print("DONE")

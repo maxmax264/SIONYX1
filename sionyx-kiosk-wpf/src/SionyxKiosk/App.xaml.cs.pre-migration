@@ -27,7 +27,6 @@ public partial class App : Application
     private SystemServicesManager? _systemServices;
     private SessionCoordinator? _sessionCoordinator;
     private TrayIconService? _trayIcon;
-    private bool _hasFrozenSession = false; // true when admin exits while client is logged in
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -254,40 +253,6 @@ public partial class App : Application
                 .WriteTo.File("logs/sionyx-.log", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
-        // Check for updates in background (non-blocking)
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var version = GetVersion();
-                await Services.AutoUpdateService.CheckAndUpdateAsync(version);
-            }
-            catch (Exception ex) { Log.Warning(ex, "[Update] Background update check failed"); }
-        });
-
-        // Check for stale session from power outage
-        if (Services.SessionStateService.HasActiveSession())
-        {
-            Log.Warning("[Session] Stale session detected on startup - running cleanup");
-            try
-            {
-                var browserCleanup = new Services.BrowserCleanupService();
-                browserCleanup.CleanupWithBrowserClose();
-                browserCleanup.CleanupDownloads();
-            }
-            catch (Exception ex) { Log.Error(ex, "[Session] Startup cleanup failed"); }
-            // Clear stored tokens so previous client cannot auto-login
-            try
-            {
-                var localDb = _host!.Services.GetRequiredService<Infrastructure.LocalDatabase>();
-                localDb.Delete("refresh_token");
-                localDb.Delete("user_id");
-                Log.Information("[Session] Cleared stored tokens after stale session cleanup");
-            }
-            catch (Exception ex) { Log.Warning(ex, "[Session] Could not clear tokens"); }
-            Services.SessionStateService.ClearSession();
-        }
-
         ShowAuthWindow();
     }
 
@@ -484,13 +449,8 @@ public partial class App : Application
                     try
                     {
                         var browserCleanup = _host!.Services.GetRequiredService<BrowserCleanupService>();
-                        // Only clean browser/downloads if user actually entered desktop
-                        if (Services.SessionStateService.HasEnteredDesktop())
-                        {
-                            browserCleanup.CleanupWithBrowserClose();
-                            browserCleanup.CleanupDownloads();
-                        }
-                        Services.SessionStateService.ClearSession();
+                        browserCleanup.CleanupWithBrowserClose();
+                        browserCleanup.CleanupDownloads();
                     }
                     catch (Exception ex)
                     {
@@ -527,9 +487,6 @@ public partial class App : Application
                 Log.Warning("StartSystemServices called without a logged-in user");
                 return;
             }
-
-            // Mark session as active in Registry (survives power outage)
-            Services.SessionStateService.SetSessionActive(userId);
 
             var session = _host.Services.GetRequiredService<SessionService>();
             session.Reinitialize(userId);
@@ -611,16 +568,12 @@ public partial class App : Application
                     Log.Information("Admin exit: correct password, showing tray");
                     _ = Task.Run(async () =>
                     {
-                        // Check if a client session is active before stopping services
-                        var auth2 = _host?.Services.GetService<AuthService>();
-                        bool clientWasActive = auth2?.CurrentUser != null;
                         await StopSystemServicesAsync();
                         _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
                         await auth.LogoutAsync();
                         Current.Dispatcher.Invoke(() =>
                         {
-                            _hasFrozenSession = clientWasActive;
-                            if (MainWindow is Views.Windows.MainWindow mainWin && !clientWasActive)
+                            if (MainWindow is Views.Windows.MainWindow mainWin)
                             { mainWin.AllowClose(); mainWin.Close(); }
                             else if (MainWindow is AuthWindow aw)
                             { aw.AllowClose(); aw.Close(); }
@@ -629,28 +582,7 @@ public partial class App : Application
                             {
                                 _trayIcon?.Hide();
                                 _trayIcon = null;
-                                if (_hasFrozenSession)
-                                {
-                                    _hasFrozenSession = false;
-                                    // Restore to existing client session
-                                    Current.Dispatcher.Invoke(() =>
-                                    {
-                                        var mainWindow = _host?.Services.GetService<Views.Windows.MainWindow>();
-                                        if (mainWindow != null)
-                                        {
-                                            mainWindow.WindowState = System.Windows.WindowState.Maximized;
-                                            mainWindow.Topmost = true;
-                                            mainWindow.Show();
-                                            mainWindow.Activate();
-                                            MainWindow = mainWindow;
-                                            _systemServices?.StartGlobalHotkey();
-                                        }
-                                    });
-                                }
-                                else
-                                {
-                                    ShowAuthWindow();
-                                }
+                                ShowAuthWindow();
                             };
                             _trayIcon.OpenControlPanelRequested += () =>
                             {
@@ -694,18 +626,13 @@ public partial class App : Application
                                 var dlg = new Views.Dialogs.SettingsDialog();
                                 dlg.Show();
                             };
-                            _trayIcon.StartupSettingsRequested += () =>
-                            {
-                                var dlg = new Views.Dialogs.StartupSettingsDialog();
-                                dlg.Show();
-                            };
                             _trayIcon.ExitRequested += () =>
                             {
                                 _trayIcon.Hide();
                                 _trayIcon = null;
                                 Shutdown();
                             };
-                            _trayIcon.Show(GetVersion());
+                            _trayIcon.Show();
                         });
                     });
                 }
