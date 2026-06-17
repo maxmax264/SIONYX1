@@ -24,10 +24,6 @@ public partial class MessagesPage : Page
     private readonly FirebaseClient _firebase;
     private readonly LocalDatabase _localDb;
     private string _adminDisplayName = "׳׳ ׳”׳";
-<<<<<<< HEAD
-    private string _supervisorDisplayName = "׳₪׳™׳§׳•׳—";
-=======
->>>>>>> d82e28093333a1ccd75a5882946789702310029a
     private List<KioskMessageItem> _adminMessages = new();
     private readonly HashSet<string> _deletedIds = new();
     private List<KioskMessageItem> _supervisorMessages = new();
@@ -131,13 +127,9 @@ public partial class MessagesPage : Page
                 string senderName;
                 if (fromSupervisor)
                 {
-<<<<<<< HEAD
-                    senderName = $"׳₪׳™׳§׳•׳— {_supervisorDisplayName}";
-=======
                     senderName = "פיקוח";
                     var directName = msg.TryGetValue("fromName", out var fn) ? fn?.ToString() ?? "" : "";
                     if (!string.IsNullOrWhiteSpace(directName)) senderName = $"פיקוח {directName}";
->>>>>>> d82e28093333a1ccd75a5882946789702310029a
                     var fromId = msg.TryGetValue("fromAdminId", out var fid) ? fid?.ToString() ?? "" : "";
                     if (!string.IsNullOrEmpty(fromId))
                     {
@@ -333,9 +325,6 @@ public partial class MessagesPage : Page
     }
 }
 
-<<<<<<< HEAD
-=======
 
 
 
->>>>>>> d82e28093333a1ccd75a5882946789702310029a
