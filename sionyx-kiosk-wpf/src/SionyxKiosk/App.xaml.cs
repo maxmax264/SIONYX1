@@ -88,6 +88,7 @@ public partial class App : Application
 
         // ── Host + DI Container ──────────────────────────────────
         _host = Host.CreateDefaultBuilder()
+            .UseContentRoot(AppContext.BaseDirectory)
             .UseSerilog()
             .ConfigureServices((_, services) =>
             {
