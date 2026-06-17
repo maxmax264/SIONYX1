@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿new_content = r"""<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
@@ -146,7 +146,7 @@
     <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf" />
 
     <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT"
-              Value="SIONYX is installed and ready!" />
+              Value="SIONYX מותקן ומוכן לשימוש!" />
 
     <ui:WixUI Id="WixUI_InstallDir" />
 
@@ -166,9 +166,10 @@
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
     <SetProperty Id="CA_VerifyInstallation" Before="CA_VerifyInstallation" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
+    <SetProperty Id="CA_LaunchKiosk"        Before="CA_LaunchKiosk"        Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
+
     <CustomAction Id="CA_SetupAutoStart"     BinaryRef="CustomActionsDll" DllEntry="SetupAutoStart"     Execute="deferred" Impersonate="no"  Return="check" />
     <CustomAction Id="CA_VerifyInstallation" BinaryRef="CustomActionsDll" DllEntry="VerifyInstallation" Execute="deferred" Impersonate="no"  Return="ignore" />
-    <SetProperty Id="CA_LaunchKiosk" Before="CA_LaunchKiosk" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
     <CustomAction Id="CA_LaunchKiosk"        BinaryRef="CustomActionsDll" DllEntry="LaunchKiosk"        Execute="deferred" Impersonate="yes" Return="ignore" />
 
     <!-- UNINSTALL -->
@@ -190,3 +191,9 @@
 
   </Package>
 </Wix>
+"""
+
+path = r'.\installer\Package.wxs'
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(new_content)
+print("DONE")

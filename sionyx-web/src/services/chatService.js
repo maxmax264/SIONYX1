@@ -1,4 +1,4 @@
-import {
+﻿import {
   ref,
   get,
   set,
@@ -16,13 +16,14 @@ import { logger } from '../utils/logger';
 /**
  * Send a message from admin to user
  */
-export const sendMessage = async (orgId, toUserId, message, fromAdminId) => {
+export const sendMessage = async (orgId, toUserId, message, fromAdminId, fromName = "") => {
   try {
     const messagesRef = ref(database, `organizations/${orgId}/messages`);
     const newMessageRef = push(messagesRef);
 
     const messageData = {
       fromAdminId,
+      fromName: fromName || "",
       toUserId,
       message: message.trim(),
       timestamp: Date.now(),
@@ -348,3 +349,5 @@ export const cleanupOldMessages = async (orgId, retentionDays = 30) => {
     return { success: false, error: error.message, deleted: 0 };
   }
 };
+
+

@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Serilog;
@@ -23,8 +23,8 @@ public partial class MessagesPage : Page
     private readonly ChatService _chat;
     private readonly FirebaseClient _firebase;
     private readonly LocalDatabase _localDb;
-    private string _adminDisplayName = "מנהל";
-    private string _supervisorDisplayName = "פיקוח";
+    private string _adminDisplayName = "׳׳ ׳”׳";
+    private string _supervisorDisplayName = "׳₪׳™׳§׳•׳—";
     private List<KioskMessageItem> _adminMessages = new();
     private readonly HashSet<string> _deletedIds = new();
     private List<KioskMessageItem> _supervisorMessages = new();
@@ -118,7 +118,7 @@ public partial class MessagesPage : Page
                         var dt = DateTimeOffset.FromUnixTimeMilliseconds(rawTs).LocalDateTime;
                         var now = DateTime.Now;
                         timeDisplay = dt.Date == now.Date ? dt.ToString("HH:mm")
-                            : dt.Date == now.Date.AddDays(-1) ? $"אתמול {dt:HH:mm}"
+                            : dt.Date == now.Date.AddDays(-1) ? $"׳׳×׳׳•׳ {dt:HH:mm}"
                             : dt.ToString("dd/MM HH:mm");
                     }
                 }
@@ -127,7 +127,9 @@ public partial class MessagesPage : Page
                 string senderName;
                 if (fromSupervisor)
                 {
-                    senderName = $"פיקוח {_supervisorDisplayName}";
+                    senderName = "פיקוח";
+                    var directName = msg.TryGetValue("fromName", out var fn) ? fn?.ToString() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(directName)) senderName = $"פיקוח {directName}";
                     var fromId = msg.TryGetValue("fromAdminId", out var fid) ? fid?.ToString() ?? "" : "";
                     if (!string.IsNullOrEmpty(fromId))
                     {
@@ -138,7 +140,7 @@ public partial class MessagesPage : Page
                                 && se.ValueKind == System.Text.Json.JsonValueKind.String)
                             {
                                 var sn = se.GetString();
-                                if (!string.IsNullOrWhiteSpace(sn)) senderName = $"פיקוח {sn}";
+                                if (!string.IsNullOrWhiteSpace(sn)) senderName = $"׳₪׳™׳§׳•׳— {sn}";
                             }
                         }
                         catch { }
@@ -180,13 +182,13 @@ public partial class MessagesPage : Page
                         var dt = DateTimeOffset.FromUnixTimeMilliseconds(replyTs).LocalDateTime;
                         var now2 = DateTime.Now;
                         replyTime = dt.Date == now2.Date ? dt.ToString("HH:mm")
-                            : dt.Date == now2.Date.AddDays(-1) ? $"אתמול {dt:HH:mm}"
+                            : dt.Date == now2.Date.AddDays(-1) ? $"׳׳×׳׳•׳ {dt:HH:mm}"
                             : dt.ToString("dd/MM HH:mm");
                     }
                     var replyItem = new KioskMessageItem
                     {
                         Id = prop.Name,
-                        SenderName = "אתה",
+                        SenderName = "׳׳×׳”",
                         DisplayBody = replyBody,
                         DisplayTime = replyTime,
                         RawTimestamp = replyTs,
@@ -248,8 +250,8 @@ public partial class MessagesPage : Page
     {
         var adminCount = _adminMessages.Count;
         var supCount = _supervisorMessages.Count;
-        AdminTab.Header = adminCount > 0 ? $"הודעות ממנהל ({adminCount})" : "הודעות ממנהל";
-        SupervisorTab.Header = supCount > 0 ? $"הודעות מהפיקוח ({supCount})" : "הודעות מהפיקוח";
+        AdminTab.Header = adminCount > 0 ? $"׳”׳•׳“׳¢׳•׳× ׳׳׳ ׳”׳ ({adminCount})" : "׳”׳•׳“׳¢׳•׳× ׳׳׳ ׳”׳";
+        SupervisorTab.Header = supCount > 0 ? $"׳”׳•׳“׳¢׳•׳× ׳׳”׳₪׳™׳§׳•׳— ({supCount})" : "׳”׳•׳“׳¢׳•׳× ׳׳”׳₪׳™׳§׳•׳—";
     }
 
     private async void AdminSendBtn_Click(object sender, RoutedEventArgs e)
@@ -301,7 +303,7 @@ public partial class MessagesPage : Page
             var replyItem = new KioskMessageItem
             {
                 Id = replyKey,
-                SenderName = "אתה",
+                SenderName = "׳׳×׳”",
                 DisplayBody = text,
                 DisplayTime = now.ToString("HH:mm"),
                 RawTimestamp = now.ToUnixTimeMilliseconds(),
@@ -312,8 +314,8 @@ public partial class MessagesPage : Page
             else { _adminMessages.Add(replyItem); UpdateAdminUI(); }
 
             Views.Controls.FloatingNotification.Show(
-                toSupervisor ? "תגובה נשלחה לפיקוח"
-                             : "תגובה נשלחה למנהל",
+                toSupervisor ? "׳×׳’׳•׳‘׳” ׳ ׳©׳׳—׳” ׳׳₪׳™׳§׳•׳—"
+                             : "׳×׳’׳•׳‘׳” ׳ ׳©׳׳—׳” ׳׳׳ ׳”׳",
                 text.Length > 40 ? text[..40] + "..." : text,
                 Views.Controls.FloatingNotification.NotificationType.Success, 3000);
         }
@@ -323,3 +325,5 @@ public partial class MessagesPage : Page
         }
     }
 }
+
+
