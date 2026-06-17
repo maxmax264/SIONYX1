@@ -1,0 +1,6 @@
+﻿content = open(r'.\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
+idx = content.find('_trayIcon.RestoreRequested')
+print(content[idx:idx+300])
+print("---")
+idx2 = content.find('RestoreRequested +=')
+print(content[idx2:idx2+200])

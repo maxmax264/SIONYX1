@@ -1,3 +1,3 @@
 ﻿content = open(r'.\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
-idx = content.find('OnLogoutRequested')
-print(content[idx:idx+800])
+idx = content.find('RestoreRequested += () =>')
+print(content[idx:idx+600])
