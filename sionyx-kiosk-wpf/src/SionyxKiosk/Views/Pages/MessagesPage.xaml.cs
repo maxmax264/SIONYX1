@@ -104,6 +104,7 @@ public partial class MessagesPage : Page
             foreach (var msg in allMsgs)
             {
                 var fromSupervisor = msg.TryGetValue("fromSupervisor", out var fs) && fs is bool b && b;
+                var isUserReply = msg.TryGetValue("isUserReply", out var iur) && iur is bool ur && ur;
                 var body = msg.TryGetValue("message", out var m) ? m?.ToString() ?? "" : "";
                 var id = msg.TryGetValue("id", out var mid) ? mid?.ToString() ?? "" : "";
                 long rawTs = 0;
@@ -153,8 +154,7 @@ public partial class MessagesPage : Page
                 var item = new KioskMessageItem
                 {
                     Id = id, SenderName = senderName, DisplayBody = body,
-                    DisplayTime = timeDisplay, RawTimestamp = rawTs, FromSupervisor = fromSupervisor
-                };
+                    DisplayTime = timeDisplay, RawTimestamp = rawTs, FromSupervisor = fromSupervisor, IsUserReply = isUserReply};
 
                 if (_deletedIds.Contains(id)) continue;
                 if (fromSupervisor) _supervisorMessages.Add(item);
@@ -324,6 +324,7 @@ public partial class MessagesPage : Page
         }
     }
 }
+
 
 
 
