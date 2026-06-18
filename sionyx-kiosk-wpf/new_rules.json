@@ -246,7 +246,10 @@
           ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
           ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
           "settings": {
-            ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists()"
+            ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists()",
+            "adminExitPassword": {
+              ".read": true
+            }
           },
           "name": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
