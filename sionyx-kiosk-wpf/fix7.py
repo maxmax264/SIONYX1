@@ -1,16 +1,63 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', encoding='utf-8').read()
+﻿content = open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml', encoding='utf-8').read()
 
-# 1. Fix RestoreRequested - just show auth window instead of restart
-old = '                            _trayIcon.RestoreRequested += () =>\n                            {\n                                var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName;\n                                System.Diagnostics.Process.Start(exe);\n                                System.Threading.Thread.Sleep(1500);\n                                _trayIcon?.Hide();\n                                _trayIcon = null;\n                                Shutdown();\n                            };'
-new = '                            _trayIcon.RestoreRequested += () =>\n                            {\n                                _trayIcon?.Hide();\n                                _trayIcon = null;\n                                ShowAuthWindow();\n                            };'
-assert content.count(old) == 1, "restore not found"
-content = content.replace(old, new)
+# תיקון מנהל — רקע אפור בולט יותר
+old = '''                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsUserReply}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding SenderName}"
+                                                                   FontSize="11" FontWeight="Bold"
+                                                                   Foreground="#6366F1" Margin="0,0,0,3"/>'''
+new = '''                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Setter Property="Background" Value="#E8EAF6"/>
+                                                            <Setter Property="BorderBrush" Value="#6366F1"/>
+                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsUserReply}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding SenderName}"
+                                                                   FontSize="11" FontWeight="Bold"
+                                                                   Foreground="#6366F1" Margin="0,0,0,3"/>'''
+count = content.count(old)
+print(f"Fix admin: Found {count} matches")
+if count == 1:
+    content = content.replace(old, new, 1)
+    print("Fix admin: OK")
+else:
+    print("Fix admin: NOT FOUND")
 
-# 2. Fix OpenControlPanel - open Windows control panel
-old = '                            _trayIcon.OpenControlPanelRequested += () =>\n                            {\n                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo\n                                {\n                                    FileName = "https://pc-sion.web.app",\n                                    UseShellExecute = true\n                                });\n                            };'
-new = '                            _trayIcon.OpenControlPanelRequested += () =>\n                            {\n                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo\n                                {\n                                    FileName = "control.exe",\n                                    UseShellExecute = true\n                                });\n                            };\n                            _trayIcon.OpenDashboardRequested += () =>\n                            {\n                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo\n                                {\n                                    FileName = "https://pc-sion.web.app",\n                                    UseShellExecute = true\n                                });\n                            };'
-assert content.count(old) == 1, "control panel not found"
-content = content.replace(old, new)
+# תיקון פיקוח — רקע ירוק בולט יותר
+old2 = '''                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Setter Property="Background" Value="#F0FDF4"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsUserReply}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>'''
+new2 = '''                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Setter Property="Background" Value="#D1FAE5"/>
+                                                            <Setter Property="BorderBrush" Value="#059669"/>
+                                                            <Setter Property="BorderThickness" Value="1.5"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsUserReply}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>'''
+count2 = content.count(old2)
+print(f"Fix supervisor: Found {count2} matches")
+if count2 == 1:
+    content = content.replace(old2, new2, 1)
+    print("Fix supervisor: OK")
+else:
+    print("Fix supervisor: NOT FOUND")
 
-open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\App.xaml.cs', 'w', encoding='utf-8').write(content)
-print('OK')
+open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml', 'w', encoding='utf-8').write(content)
+print('Done')

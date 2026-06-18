@@ -18,8 +18,8 @@ public sealed class LocalDatabase : IDisposable
     {
         var path = dbPath ?? GetDefaultPath();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        _db = new LiteDatabase(path);
-        Logger.Debug("LocalDatabase opened at {Path}", path);
+        _db = new LiteDatabase(new ConnectionString(path) { Connection = ConnectionType.Shared });
+        try { Logger.Debug("LocalDatabase opened at {Path}", path); } catch { }
     }
 
     /// <summary>Get a typed collection from the database.</summary>

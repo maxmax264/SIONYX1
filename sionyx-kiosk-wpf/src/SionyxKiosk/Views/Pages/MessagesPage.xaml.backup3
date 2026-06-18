@@ -98,17 +98,14 @@
                                 <ItemsControl x:Name="AdminMessagesList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,0,0,10" FlowDirection="LeftToRight">
+                                            <Grid Margin="0,0,0,10">
                                                 <!-- הודעה מהמנהל - שמאל, אפור -->
-                                                <Border CornerRadius="14" Padding="14,12"
-                                                        MaxWidth="380" MinWidth="160" HorizontalAlignment="Left"
+                                                <Border CornerRadius="14" Padding="12,10"
+                                                        MaxWidth="280" HorizontalAlignment="Left"
                                                         Background="#F1F5F9" Margin="0,0,80,0">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Setter Property="Background" Value="#E8EAF6"/>
-                                                            <Setter Property="BorderBrush" Value="#6366F1"/>
-                                                            <Setter Property="BorderThickness" Value="1.5"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsUserReply}" Value="False">
                                                                     <Setter Property="Visibility" Value="Visible"/>
@@ -131,9 +128,8 @@
 
                                                 <!-- תגובת המשתמש - ימין, סגול -->
                                                 <Border CornerRadius="14" Padding="12,10"
-                                                        MaxWidth="280" HorizontalAlignment="Right"
-                                                        FlowDirection="LeftToRight"
-                                                        Margin="80,0,0,0">
+                                                        MaxWidth="280" HorizontalAlignment="Left"
+                                                        Margin="0,0,80,0">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -261,18 +257,14 @@
                                 <ItemsControl x:Name="SupervisorMessagesList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,0,0,10" FlowDirection="LeftToRight">
+                                            <Grid Margin="0,0,0,10">
                                                 <!-- הודעה מהפיקוח - שמאל, ירוק בהיר -->
-                                                <Border CornerRadius="14" Padding="14,12"
-                                                        MaxWidth="380" MinWidth="160" HorizontalAlignment="Left"
-                                                        Margin="0,0,80,0"
-                                                        FlowDirection="LeftToRight">
+                                                <Border CornerRadius="14" Padding="12,10"
+                                                        MaxWidth="280" HorizontalAlignment="Left"
+                                                        Background="#F0FDF4" Margin="80,0,0,0">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Setter Property="Background" Value="#D1FAE5"/>
-                                                            <Setter Property="BorderBrush" Value="#059669"/>
-                                                            <Setter Property="BorderThickness" Value="1.5"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsUserReply}" Value="False">
                                                                     <Setter Property="Visibility" Value="Visible"/>
@@ -298,8 +290,7 @@
                                                 <!-- תגובת המשתמש - ימין, ירוק כהה -->
                                                 <Border CornerRadius="14" Padding="12,10"
                                                         MaxWidth="280" HorizontalAlignment="Right"
-                                                        FlowDirection="LeftToRight"
-                                                        Margin="80,0,0,0">
+                                                        Margin="0,0,80,0">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
