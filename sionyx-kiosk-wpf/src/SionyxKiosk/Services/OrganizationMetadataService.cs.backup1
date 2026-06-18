@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using SionyxKiosk.Infrastructure;
 
@@ -147,6 +147,26 @@ public class OrganizationMetadataService : BaseService
         }
     }
 
+    public async Task<ServiceResult> GetAdminExitPasswordAsync()
+    {
+        try
+        {
+            var config = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+            using var http = new System.Net.Http.HttpClient();
+            http.Timeout = TimeSpan.FromSeconds(5);
+            var url = $"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/settings/adminExitPassword.json";
+            var response = await http.GetStringAsync(url);
+            var password = response.Trim().Trim('"');
+            if (string.IsNullOrEmpty(password) || password == "null")
+                return Error("not found");
+            return Success(password);
+        }
+        catch (Exception)
+        {
+            return Error("firebase error");
+        }
+    }
+
     public async Task<ServiceResult> GetAdminContactAsync()
     {
         try
@@ -169,3 +189,6 @@ public class OrganizationMetadataService : BaseService
         }
     }
 }
+
+
+

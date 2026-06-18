@@ -1,26 +1,19 @@
-﻿content = open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml', encoding='utf-8').read()
-
-# תיקון מנהל — תגובת המשתמש: FlowDirection + ימין אמיתי
-old = '                                                <Border CornerRadius="14" Padding="12,10"\n                                                        MaxWidth="280" HorizontalAlignment="Right"\n                                                        Margin="80,0,0,0">'
-new = '                                                <Border CornerRadius="14" Padding="12,10"\n                                                        MaxWidth="280" HorizontalAlignment="Right"\n                                                        FlowDirection="LeftToRight"\n                                                        Margin="80,0,0,0">'
+﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\OrganizationMetadataService.cs', encoding='utf-8').read()
+old = '''    public async Task<ServiceResult> GetAdminExitPasswordAsync()
+    {
+        try
+        {
+            var result = await Firebase.DbGetAsync("metadata/settings/adminExitPassword");'''
+new = '''    public async Task<ServiceResult> GetAdminExitPasswordAsync()
+    {
+        try
+        {
+            var result = await Firebase.DbGetPublicAsync("metadata/settings/adminExitPassword");'''
 count = content.count(old)
-print(f"Fix1: Found {count} matches")
+print(f"Found {count} matches")
 if count == 1:
     content = content.replace(old, new, 1)
-    print("Fix1: OK")
+    open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\OrganizationMetadataService.cs', 'w', encoding='utf-8').write(content)
+    print('OK')
 else:
-    print("Fix1: NOT FOUND")
-
-# תיקון פיקוח — תגובת המשתמש: FlowDirection + ימין אמיתי
-old2 = '                                                <Border CornerRadius="14" Padding="12,10"\n                                                        MaxWidth="280" HorizontalAlignment="Right"\n                                                        Margin="0,0,80,0">'
-new2 = '                                                <Border CornerRadius="14" Padding="12,10"\n                                                        MaxWidth="280" HorizontalAlignment="Right"\n                                                        FlowDirection="LeftToRight"\n                                                        Margin="0,0,80,0">'
-count2 = content.count(old2)
-print(f"Fix2: Found {count2} matches")
-if count2 == 1:
-    content = content.replace(old2, new2, 1)
-    print("Fix2: OK")
-else:
-    print("Fix2: NOT FOUND")
-
-open(r'.\src\SionyxKiosk\Views\Pages\MessagesPage.xaml', 'w', encoding='utf-8').write(content)
-print('Done')
+    print('NOT FOUND')

@@ -182,6 +182,26 @@ public sealed class FirebaseClient : IFirebaseClient
         return FirebaseResult.Ok();
     }
 
+    public async Task<FirebaseResult> DbGetPublicAsync(string path)
+    {
+        var orgPath = GetOrgPath(path);
+        var url = $"{_databaseUrl}/{orgPath}.json";
+        try
+        {
+            var response = await _http.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JsonSerializer.Deserialize<JsonElement>(json);
+            Logger.Debug("DB public read: {Path}", orgPath);
+            return FirebaseResult.Ok(data);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "DB public read failed: {Path}", orgPath);
+            return FirebaseResult.Fail(ex.Message);
+        }
+    }
+
     public async Task<FirebaseResult> DbGetAsync(string path)
     {
         if (!await EnsureValidTokenAsync())
