@@ -623,6 +623,8 @@ public partial class App : Application
                             _hasFrozenSession = clientWasActive;
                             if (MainWindow is Views.Windows.MainWindow mainWin && !clientWasActive)
                             { mainWin.AllowClose(); mainWin.Close(); }
+                            else if (MainWindow is Views.Windows.MainWindow mainWinActive && clientWasActive)
+                            { mainWinActive.Topmost = false; mainWinActive.WindowState = WindowState.Minimized; }
                             else if (MainWindow is AuthWindow aw)
                             { aw.AllowClose(); aw.Close(); }
                             _trayIcon = new TrayIconService();
