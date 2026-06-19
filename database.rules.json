@@ -314,6 +314,12 @@
           ".write": "auth.uid === $userId"
         }
       }
+    },
+    "system": {
+      "update": {
+        ".read": true,
+        ".write": false
+      }
     }
   }
 }

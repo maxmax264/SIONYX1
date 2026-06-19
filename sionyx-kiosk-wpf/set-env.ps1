@@ -11,3 +11,5 @@ $env:ADMIN_EXIT_PASSWORD = "1234"
 Write-Host "[OK] Environment variables loaded" -ForegroundColor Green
 
 $env:FIREBASE_DB_SECRET = "8USLAyobQ1EM8xQnCm8FhZMyHNzRIlZQdEJCfQb8"
+
+$env:GITHUB_TOKEN = "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"

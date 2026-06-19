@@ -169,7 +169,9 @@
     <CustomAction Id="CA_SetupAutoStart"     BinaryRef="CustomActionsDll" DllEntry="SetupAutoStart"     Execute="deferred" Impersonate="no"  Return="check" />
     <CustomAction Id="CA_VerifyInstallation" BinaryRef="CustomActionsDll" DllEntry="VerifyInstallation" Execute="deferred" Impersonate="no"  Return="ignore" />
     <SetProperty Id="CA_LaunchKiosk" Before="CA_LaunchKiosk" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
+    <SetProperty Id="CA_SetupUpdateTask" Before="CA_SetupUpdateTask" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
     <CustomAction Id="CA_LaunchKiosk"        BinaryRef="CustomActionsDll" DllEntry="LaunchKiosk"        Execute="deferred" Impersonate="yes" Return="ignore" />
+    <CustomAction Id="CA_SetupUpdateTask"  BinaryRef="CustomActionsDll" DllEntry="SetupUpdateTask"  Execute="deferred" Impersonate="no"  Return="ignore" />
 
     <!-- UNINSTALL -->
     <CustomAction Id="CA_StopProcesses"   BinaryRef="CustomActionsDll" DllEntry="StopProcesses"   Execute="deferred" Impersonate="no" Return="ignore" />
@@ -181,6 +183,7 @@
       <Custom Action="CA_SetupAutoStart"     After="InstallFiles"         Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk"        After="CA_VerifyInstallation"  Condition="NOT REMOVE" />
+      <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE" />
 
       <!-- UNINSTALL -->
       <Custom Action="CA_StopProcesses"   Before="RemoveFiles"           Condition="REMOVE = &quot;ALL&quot;" />

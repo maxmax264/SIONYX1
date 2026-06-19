@@ -177,6 +177,8 @@ public class SessionCoordinator
             CloseFloatingTimerInternal();
             RestoreMainWindow?.Invoke();
         });
+        // Install pending update after session ends
+        _ = Task.Run(async () => await AutoUpdateService.TryInstallPendingUpdateAsync());
     }
 
     private void OnWarning5Min()
