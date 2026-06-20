@@ -1,7 +1,6 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Reflection;
 
 namespace SionyxKiosk.Views.Dialogs;
 
@@ -29,7 +28,6 @@ public class AboutDialog : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 0, 0, 8)
         };
-
         var org = new TextBlock
         {
             Text = orgName,
@@ -38,7 +36,6 @@ public class AboutDialog : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 0, 0, 4)
         };
-
         var ver = new TextBlock
         {
             Text = $"גרסה {version}",
@@ -47,7 +44,6 @@ public class AboutDialog : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 0, 0, 24)
         };
-
         var closeBtn = new Button
         {
             Content = "סגור",

@@ -1,124 +1,59 @@
-﻿new_content = """using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
-using System.Text.Json;
-using Serilog;
-
-namespace SionyxKiosk.Services;
-
-/// <summary>
-/// Checks GitHub Releases for a newer version and installs it silently.
-/// Only runs when no client session is active.
-/// </summary>
-public static class AutoUpdateService
-{
-    private static readonly ILogger Logger = Log.ForContext(typeof(AutoUpdateService));
-    private const string GitHubApiUrl = "https://api.github.com/repos/maxmax264/SIONYX1/releases/latest";
-    private const string AssetPrefix = "sionyx-installer-";
-
-    public static async Task CheckAndUpdateAsync(string currentVersion)
+﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\AutoUpdateService.cs', encoding='utf-8').read()
+old = '    /// <summary>Called by SessionCoordinator after session ends.</summary>\n    public static async Task TryInstallPendingUpdateAsync()'
+new = '''    /// <summary>Check now and return result without installing.</summary>
+    public static async Task<(bool hasUpdate, string latestVersion, string downloadUrl)> CheckForUpdateNowAsync(string currentVersion)
     {
         try
         {
-            // Never update during an active client session
-            if (SessionStateService.HasActiveSession())
-            {
-                Logger.Information("[Update] Skipping update check - active session");
-                return;
-            }
-
-            Logger.Information("[Update] Checking for updates (current: {Version})", currentVersion);
-
             using var http = new HttpClient();
             http.DefaultRequestHeaders.Add("User-Agent", "SIONYX-Kiosk");
             http.Timeout = TimeSpan.FromSeconds(10);
-
-            var json = await http.GetStringAsync(GitHubApiUrl);
+            var json = await http.GetStringAsync(UpdateServerUrl);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-
-            var latestTag = root.GetProperty("tag_name").GetString() ?? "";
-            var latestVersion = latestTag.TrimStart('v');
-
-            Logger.Information("[Update] Latest version: {Latest}", latestVersion);
-
-            if (!IsNewerVersion(latestVersion, currentVersion))
-            {
-                Logger.Information("[Update] Already up to date");
-                return;
-            }
-
-            Logger.Information("[Update] New version available: {Latest} (current: {Current})", latestVersion, currentVersion);
-
-            // Find MSI asset
-            string? downloadUrl = null;
-            if (root.TryGetProperty("assets", out var assets))
-            {
-                foreach (var asset in assets.EnumerateArray())
-                {
-                    var name = asset.GetProperty("name").GetString() ?? "";
-                    if (name.StartsWith(AssetPrefix) && name.EndsWith(".msi"))
-                    {
-                        downloadUrl = asset.GetProperty("browser_download_url").GetString();
-                        break;
-                    }
-                }
-            }
-
-            if (string.IsNullOrEmpty(downloadUrl))
-            {
-                Logger.Warning("[Update] No MSI asset found in release");
-                return;
-            }
-
-            // Download MSI
-            var tempPath = Path.Combine(Path.GetTempPath(), $"sionyx_update_{latestVersion}.msi");
-            Logger.Information("[Update] Downloading {Url} to {Path}", downloadUrl, tempPath);
-
-            var msiBytes = await http.GetByteArrayAsync(downloadUrl);
-            await File.WriteAllBytesAsync(tempPath, msiBytes);
-
-            Logger.Information("[Update] Download complete ({Size} MB), installing...", msiBytes.Length / 1024 / 1024);
-
-            // Install silently
-            var psi = new ProcessStartInfo
-            {
-                FileName = "msiexec.exe",
-                Arguments = $"/i \\\"{tempPath}\\\" /quiet /norestart",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            var proc = Process.Start(psi);
-            proc?.WaitForExit(300000); // 5 min timeout
-
-            Logger.Information("[Update] Install complete (exit={Code})", proc?.ExitCode);
-
-            // Cleanup temp file
-            try { File.Delete(tempPath); } catch { }
+            var latestVersion = root.GetProperty("version").GetString() ?? "";
+            var downloadUrl = root.GetProperty("downloadUrl").GetString() ?? "";
+            if (string.IsNullOrEmpty(latestVersion) || string.IsNullOrEmpty(downloadUrl))
+                return (false, "", "");
+            var hasUpdate = IsNewerVersion(latestVersion, currentVersion);
+            return (hasUpdate, latestVersion, downloadUrl);
         }
         catch (Exception ex)
         {
-            Logger.Warning(ex, "[Update] Update check failed (non-fatal)");
+            Logger.Warning(ex, "[Update] CheckForUpdateNow failed");
+            return (false, "", "");
         }
     }
 
-    private static bool IsNewerVersion(string latest, string current)
+    /// <summary>Force download and install immediately (called from tray menu).</summary>
+    public static async Task ForceUpdateNowAsync(string currentVersion, Action<string>? statusCallback = null)
     {
         try
         {
-            var l = Version.Parse(latest);
-            var c = Version.Parse(current);
-            return l > c;
+            statusCallback?.Invoke("בודק עדכון...");
+            var (hasUpdate, latestVersion, downloadUrl) = await CheckForUpdateNowAsync(currentVersion);
+            if (!hasUpdate)
+            {
+                statusCallback?.Invoke("מעודכן לגרסה האחרונה");
+                return;
+            }
+            statusCallback?.Invoke($"מוריד גרסה {latestVersion}...");
+            await DownloadAndInstallAsync(downloadUrl, latestVersion, currentVersion);
         }
-        catch
+        catch (Exception ex)
         {
-            return string.Compare(latest, current, StringComparison.Ordinal) > 0;
+            Logger.Error(ex, "[Update] ForceUpdateNow failed");
+            statusCallback?.Invoke("שגיאה בעדכון");
         }
     }
-}
-"""
 
-path = r'.\\src\\SionyxKiosk\\Services\\AutoUpdateService.cs'
-with open(path, 'w', encoding='utf-8') as f:
-    f.write(new_content)
-print("DONE")
+    /// <summary>Called by SessionCoordinator after session ends.</summary>
+    public static async Task TryInstallPendingUpdateAsync()'''
+count = content.count(old)
+print(f"Found {count} matches")
+if count == 1:
+    content = content.replace(old, new, 1)
+    open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\AutoUpdateService.cs', 'w', encoding='utf-8').write(content)
+    print('OK')
+else:
+    print('NOT FOUND')
