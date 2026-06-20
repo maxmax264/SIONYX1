@@ -702,6 +702,31 @@ public partial class App : Application
                                 var dlg = new Views.Dialogs.StartupSettingsDialog();
                                 dlg.Show();
                             };
+                            _trayIcon.CheckUpdateRequested += () =>
+                            {
+                                _ = Task.Run(async () =>
+                                {
+                                    var version = GetVersion();
+                                    var (hasUpdate, latestVersion, _) = await Services.AutoUpdateService.CheckForUpdateNowAsync(version);
+                                    var msg = hasUpdate ? $"יש גרסה חדשה: {latestVersion}" : "מעודכן לגרסה האחרונה";
+                                    Current.Dispatcher.Invoke(() => _trayIcon?.ShowBalloon("בדיקת עדכון", msg));
+                                });
+                            };
+                            _trayIcon.ForceUpdateRequested += () =>
+                            {
+                                _ = Task.Run(async () =>
+                                {
+                                    var version = GetVersion();
+                                    await Services.AutoUpdateService.ForceUpdateNowAsync(version, status =>
+                                    {
+                                        Current.Dispatcher.Invoke(() =>
+                                        {
+                                            _trayIcon?.SetUpdateStatus(status);
+                                            _trayIcon?.ShowBalloon("עדכון SIONYX", status);
+                                        });
+                                    });
+                                });
+                            };
                             _trayIcon.ExitRequested += () =>
                             {
                                 _trayIcon.Hide();
