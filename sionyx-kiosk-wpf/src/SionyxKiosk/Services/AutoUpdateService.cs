@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -192,11 +192,16 @@ public static class AutoUpdateService
             _pendingUpdatePath = null;
             _pendingUpdateVersion = null;
             await LogUpdateToFirebase("installed", version);
-            Logger.Information("[Update] Install complete — restarting");
+            Logger.Information("[Update] Install complete — restarting kiosk");
 
-            // Restart after install
+            // Restart kiosk only (no full machine restart)
             await Task.Delay(3000);
-            Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 10 /c \"SIONYX Update\"") { UseShellExecute = true });
+            var exePath = Process.GetCurrentProcess().MainModule?.FileName;
+            if (!string.IsNullOrEmpty(exePath))
+                Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
+
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Shutdown());
         }
         catch (Exception ex)
         {
