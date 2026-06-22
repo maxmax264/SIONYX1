@@ -255,6 +255,35 @@ public partial class App : Application
                 .WriteTo.File("logs/sionyx-.log", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+        // Subscribe to update progress events (single registration)
+        Views.Windows.UpdateProgressWindow? _updateWin = null;
+
+        Services.AutoUpdateService.UpdateStarted += (version) =>
+        {
+            Current.Dispatcher.Invoke(() =>
+            {
+                if (_updateWin != null) return; // already showing
+                _updateWin = new Views.Windows.UpdateProgressWindow();
+                _updateWin.SetVersion(version);
+                _updateWin.Show();
+                MainWindow = _updateWin;
+            });
+        };
+
+        Services.AutoUpdateService.ProgressChanged += (percent, status) =>
+        {
+            Current.Dispatcher.Invoke(() => _updateWin?.SetProgress(percent, status));
+        };
+
+        Services.AutoUpdateService.UpdateCompleted += () =>
+        {
+            Current.Dispatcher.Invoke(() =>
+            {
+                _updateWin?.SetComplete();
+                _updateWin = null;
+            });
+        };
+
         // Check for updates in background (non-blocking)
         _ = Task.Run(async () =>
         {
@@ -789,15 +818,26 @@ public partial class App : Application
 
     private static string GetVersion()
     {
+        // First try Registry (production installs write version here)
+        try
+        {
+            var regVersion = Infrastructure.RegistryConfig.ReadValue("Version");
+            if (!string.IsNullOrWhiteSpace(regVersion)) return regVersion;
+        }
+        catch { }
+
+        // Fallback: version.json (development builds)
         try
         {
             var path = Path.Combine(AppContext.BaseDirectory, "version.json");
-            if (!File.Exists(path)) return "1.0.0";
-            var json = File.ReadAllText(path);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("version", out var ver) && ver.ValueKind == JsonValueKind.String)
-                return ver.GetString() ?? "1.0.0";
+            if (File.Exists(path))
+            {
+                var json = File.ReadAllText(path);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("version", out var ver) && ver.ValueKind == JsonValueKind.String)
+                    return ver.GetString() ?? "1.0.0";
+            }
         }
         catch (Exception ex)
         {

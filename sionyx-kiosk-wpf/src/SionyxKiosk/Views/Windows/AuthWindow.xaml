@@ -7,9 +7,6 @@
         FlowDirection="RightToLeft">
 
     <Window.Resources>
-        <!-- Slide-in animation for the brand overlay panel -->
-        <!-- Login state: overlay at LEFT (0), covering register form.
-             Register state: overlay slides to RIGHT (450), covering login form. -->
         <Storyboard x:Key="SlideToLogin">
             <DoubleAnimation Storyboard.TargetName="BrandOverlay"
                              Storyboard.TargetProperty="(Canvas.Left)"
@@ -40,7 +37,6 @@
                              Storyboard.TargetProperty="Opacity"
                              To="0" Duration="0:0:0.2" />
         </Storyboard>
-        <!-- Dynamic primary button that uses OverlayGradient from Firebase -->
         <Style x:Key="BtnPrimaryDynamic" TargetType="Button" BasedOn="{StaticResource BtnPrimary}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -66,13 +62,20 @@
     </Window.Resources>
 
     <Grid Background="{StaticResource AuthPageBg}">
-        <!-- Background image - shown only when kioskBackgroundEnabled=true -->
+        <!-- Bottom-left version watermark -->
+        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left"
+                    Margin="16,0,0,12" Orientation="Horizontal" Panel.ZIndex="10">
+            <TextBlock Text="SIONYX" FontSize="12" FontWeight="Bold"
+                       Foreground="#99FFFFFF" Margin="0,0,6,0" />
+            <TextBlock Text="{Binding AppVersion}" FontSize="12"
+                       Foreground="#66FFFFFF" />
+        </StackPanel>
+
         <Image x:Name="BgImage"
                Source="{Binding BackgroundImageSource}"
                Stretch="{Binding BgStretch}"
                Visibility="{Binding HasBackgroundImage, Converter={StaticResource BoolToVis}}"
                Opacity="{Binding BgOpacity}" Panel.ZIndex="0" />
-        <!-- Viewbox scales the auth card on screens smaller than 1000x700 -->
         <Viewbox Stretch="Uniform" StretchDirection="DownOnly"
                  MaxHeight="700">
             <Viewbox.Style>
@@ -107,10 +110,8 @@
                 <DropShadowEffect BlurRadius="120" ShadowDepth="0" Opacity="0.35" Color="#6366F1" />
             </Border.Effect>
 
-            <!-- Canvas uses LTR so pixel coordinates work predictably.
-                 Each form panel sets RTL for Hebrew content. -->
             <Canvas FlowDirection="LeftToRight">
-                <!-- LOGIN form (right side, position 500..1000) -->
+                <!-- LOGIN form -->
                 <StackPanel x:Name="LoginPanel" Canvas.Top="0"
                             Width="500" Height="700" Opacity="1"
                             FlowDirection="RightToLeft">
@@ -128,6 +129,10 @@
                                   HorizontalScrollBarVisibility="Disabled"
                                   Height="700">
                         <StackPanel VerticalAlignment="Center" Margin="60,60">
+                            <TextBlock Text="SIONYX" FontSize="28" FontWeight="ExtraBold"
+                                       Foreground="{Binding OverlayGradient}"
+                                       HorizontalAlignment="Center" Margin="0,0,0,20"
+                                       Visibility="{Binding CleanMode, Converter={StaticResource BoolToVis}}" />
                             <TextBlock Text="{Binding WelcomeText}" Style="{StaticResource TextH1}" Margin="0,0,0,6" />
                             <TextBlock Text="{Binding WelcomeSubtext}"
                                        Style="{StaticResource TextSubtitle}" Margin="0,0,0,36" />
@@ -171,7 +176,7 @@
                     </ScrollViewer>
                 </StackPanel>
 
-                <!-- REGISTER form (left side, position 0..500) -->
+                <!-- REGISTER form -->
                 <StackPanel x:Name="RegisterPanel" Canvas.Left="0" Canvas.Top="0"
                             Width="500" Height="700" Opacity="0" IsHitTestVisible="False"
                             FlowDirection="RightToLeft">
@@ -216,23 +221,32 @@
                     </ScrollViewer>
                 </StackPanel>
 
-                <!-- BRAND OVERLAY — oversized by 3px on each edge so outer corners bleed
-                     past the parent ClipToBounds. Only the interior rounded corners remain visible.
-                     Login: Left=-3 (outer left/top/bottom clipped, right interior corners show).
-                     Register: Left=450 (outer right/top/bottom clipped, left interior corners show). -->
+                <!-- BRAND OVERLAY -->
                 <Border x:Name="BrandOverlay" Canvas.Left="-3" Canvas.Top="-3"
                         Visibility="{Binding CleanMode, Converter={StaticResource InverseBoolToVis}}"
                         Width="503" Height="706"
                         CornerRadius="20"
                         Background="{Binding OverlayGradient}">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="48"
-                                Visibility="{Binding CleanMode, Converter={StaticResource InverseBoolToVis}}">
-                        <TextBlock Text="SIONYX" FontSize="46" FontWeight="ExtraBold"
-                                   Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,16" />
-                        <TextBlock x:Name="BrandSubtitleBlock" Text="{Binding BrandSubtitle}" FontSize="18"
-                                   Foreground="#DDFFFFFF" HorizontalAlignment="Center"
-                                   TextAlignment="Center" FontWeight="Light" />
-                    </StackPanel>
+                    <Grid>
+                        <!-- Logo + subtitle in center -->
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="48"
+                                    Visibility="{Binding CleanMode, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Text="SIONYX" FontSize="46" FontWeight="ExtraBold"
+                                       Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,16" />
+                            <TextBlock x:Name="BrandSubtitleBlock" Text="{Binding BrandSubtitle}" FontSize="18"
+                                       Foreground="#DDFFFFFF" HorizontalAlignment="Center"
+                                       TextAlignment="Center" FontWeight="Light" />
+                        </StackPanel>
+
+                        <!-- Version number bottom center -->
+                        <TextBlock Text="{Binding AppVersion}"
+                                   VerticalAlignment="Bottom"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,20"
+                                   FontSize="13"
+                                   Foreground="#88FFFFFF"
+                                   FontWeight="Light" />
+                    </Grid>
                 </Border>
             </Canvas>
         </Border>
