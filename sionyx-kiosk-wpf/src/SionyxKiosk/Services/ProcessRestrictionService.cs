@@ -25,6 +25,7 @@ public class ProcessRestrictionService : IDisposable
         "certutil.exe", "bitsadmin.exe", "wmic.exe",
         // Remote access
         "teamviewer.exe", "anydesk.exe", "ultraviewer.exe",
+        "systemsettings.exe",
     };
 
     private readonly HashSet<string> _blacklist;
@@ -165,3 +166,4 @@ public class ProcessRestrictionService : IDisposable
         _recentlyBlocked.IntersectWith(runningPids);
     }
 }
+

@@ -1,0 +1,24 @@
+﻿
+>     private static async Task InstallAsync(string msiPath, string version)
+      {
+          try
+          {
+              await LogUpdateToFirebase("installing", version);
+  
+              var taskResult = TryRunViaScheduledTask(msiPath);
+              
+  
+              _pendingUpdatePath = null;
+              _pendingUpdateVersion = null;
+              await LogUpdateToFirebase("installed", version);
+              Logger.Information("[Update] Install complete — restarting kiosk");
+  
+              UpdateCompleted?.Invoke();
+              await Task.Delay(3000);
+              var exePath = Process.GetCurrentProcess().MainModule?.FileName;
+              if (!string.IsNullOrEmpty(exePath))
+                  Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
+  
+              System.Windows.Application.Current.Dispatcher.Invoke(() =>
+
+
