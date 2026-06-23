@@ -77,6 +77,7 @@ public class SystemServicesManager
 
         if (isKiosk)
         {
+            KioskPolicyService.Apply();
             _processRestriction.Start();
             _keyboard.Start();
         }
@@ -117,6 +118,7 @@ public class SystemServicesManager
             _operatingHours.StopMonitoring();
             _processRestriction.Stop();
             _keyboard.Stop();
+            KioskPolicyService.Remove();
             _printMonitor.StopMonitoring();
 
             if (session.IsActive)
@@ -168,3 +170,4 @@ public class SystemServicesManager
         _globalHotkey.AdminExitRequested += _adminExitHandler;
     }
 }
+

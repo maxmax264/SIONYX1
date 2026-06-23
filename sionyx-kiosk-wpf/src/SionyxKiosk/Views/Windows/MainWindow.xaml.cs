@@ -36,7 +36,7 @@ public partial class MainWindow : Window
             {
                 _trayIcon = new SionyxKiosk.Services.TrayIconService();
                 _trayIcon.RestoreRequested += () => Dispatcher.Invoke(() => { WindowState = System.Windows.WindowState.Maximized; Topmost = true; Activate(); });
-                _trayIcon.OpenControlPanelRequested += () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("control.exe") { UseShellExecute = true });
+                _trayIcon.OpenControlPanelRequested += () => Services.KioskPolicyService.RunWithControlPanel(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("control.exe") { UseShellExecute = true }));
                 _trayIcon.Show();
             }
         };
