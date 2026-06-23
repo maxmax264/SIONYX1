@@ -23,7 +23,7 @@ public partial class PrintHistoryViewModel : ObservableObject, IDisposable
     public ObservableCollection<PrintJobRecord> Jobs => _history.Jobs;
     public bool HasJobs => Jobs.Count > 0;
 
-    public PrintHistoryViewModel(PrintHistoryService history, string userId, FirebaseClient? firebase = null)
+    public PrintHistoryViewModel(PrintHistoryService history, string userId = "", FirebaseClient? firebase = null)
     {
         _history = history;
         _userId = userId;
