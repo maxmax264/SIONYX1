@@ -155,7 +155,7 @@ if exist ""{triggerFile}"" (
 
                 string launchTaskXml = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
 <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
-  <Principals><Principal id=""Author""><UserId>{currentUser}</UserId><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Principals><Principal id=""Author""><UserId>{currentUser}</UserId><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries></Settings>
   <Triggers/>
   <Actions Context=""Author""><Exec><Command>{appExe}</Command><Arguments>--kiosk</Arguments></Exec></Actions>
