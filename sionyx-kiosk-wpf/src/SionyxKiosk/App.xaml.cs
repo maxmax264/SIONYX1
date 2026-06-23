@@ -688,11 +688,12 @@ public partial class App : Application
                             };
                             _trayIcon.OpenControlPanelRequested += () =>
                             {
-                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                                {
-                                    FileName = "control.exe",
-                                    UseShellExecute = true
-                                });
+                                Services.KioskPolicyService.RunWithControlPanel(() =>
+                                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                                    {
+                                        FileName = "control.exe",
+                                        UseShellExecute = true
+                                    }));
                             };
                             _trayIcon.OpenDashboardRequested += () =>
                             {
