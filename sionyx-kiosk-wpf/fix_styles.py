@@ -1,5 +1,0 @@
-﻿content = open(r'.\src\SionyxKiosk\Views\Pages\ProfilePage.xaml', encoding='utf-8').read()
-content = content.replace('Style="{StaticResource ModernTextBox}"', 'Style="{StaticResource FrostInput}"')
-content = content.replace('Style="{StaticResource ModernPasswordBox}"', 'Style="{StaticResource FrostPasswordBox}"')
-open(r'.\src\SionyxKiosk\Views\Pages\ProfilePage.xaml', 'w', encoding='utf-8').write(content)
-print('OK')

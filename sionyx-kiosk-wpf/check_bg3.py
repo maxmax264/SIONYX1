@@ -1,5 +1,0 @@
-﻿f = open(r'.\src\SionyxKiosk\ViewModels\AuthViewModel.cs', encoding='utf-8')
-c = f.read()
-f.close()
-idx = c.find('[BG]')
-print(c[idx-300:idx+600])

@@ -1,8 +1,0 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\BrowserCleanupService.cs', encoding='utf-8').read()
-
-old = '    /// <summary>Close browsers first, then clean up. Recommended for session end.</summary>\n    public Dictionary<string, object> CleanupWithBrowserClose()'
-new = '    /// <summary>Delete all files in SionyxUser Downloads folder.</summary>\n    public void CleanupDownloads()\n    {\n        var downloadsPath = Path.Combine(@"C:\\Users\\SionyxUser\\Downloads");\n        if (!Directory.Exists(downloadsPath))\n        {\n            Logger.Information("Downloads folder not found, skipping");\n            return;\n        }\n        var deleted = 0;\n        foreach (var file in Directory.GetFiles(downloadsPath, "*", SearchOption.AllDirectories))\n        {\n            try { File.Delete(file); deleted++; }\n            catch (Exception ex) { Logger.Warning("Could not delete {File}: {Err}", file, ex.Message); }\n        }\n        foreach (var dir in Directory.GetDirectories(downloadsPath))\n        {\n            try { Directory.Delete(dir, recursive: true); deleted++; }\n            catch (Exception ex) { Logger.Warning("Could not delete {Dir}: {Err}", dir, ex.Message); }\n        }\n        Logger.Information("Downloads cleanup: {Count} items deleted", deleted);\n    }\n\n    /// <summary>Close browsers first, then clean up. Recommended for session end.</summary>\n    public Dictionary<string, object> CleanupWithBrowserClose()'
-assert content.count(old) == 1, "not found"
-content = content.replace(old, new)
-open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\src\SionyxKiosk\Services\BrowserCleanupService.cs', 'w', encoding='utf-8').write(content)
-print('OK')

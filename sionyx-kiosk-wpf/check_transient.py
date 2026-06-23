@@ -1,5 +1,0 @@
-﻿f = open(r'.\src\SionyxKiosk\App.xaml.cs', encoding='utf-8')
-c = f.read()
-f.close()
-idx = c.find('AddTransient<AuthViewModel>')
-print(c[idx-50:idx+200])
