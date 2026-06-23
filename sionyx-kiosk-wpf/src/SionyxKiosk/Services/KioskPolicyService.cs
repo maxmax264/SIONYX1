@@ -1,16 +1,29 @@
 using Microsoft.Win32;
 using Serilog;
+using System.Diagnostics;
 
 namespace SionyxKiosk.Services;
 
-/// <summary>
-/// Applies and removes Windows Registry policies for kiosk mode.
-/// Currently manages: NoControlPanel (blocks Control Panel and PC Settings).
-/// </summary>
 public static class KioskPolicyService
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(KioskPolicyService));
     private const string PolicyKey = @"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer";
+
+    private static void RestartExplorer()
+    {
+        try
+        {
+            foreach (var p in Process.GetProcessesByName("explorer"))
+                p.Kill();
+            System.Threading.Thread.Sleep(500);
+            Process.Start("explorer.exe");
+            Logger.Information("[KioskPolicy] Explorer restarted");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "[KioskPolicy] Failed to restart explorer");
+        }
+    }
 
     public static void Apply()
     {
@@ -18,6 +31,7 @@ public static class KioskPolicyService
         {
             using var key = Registry.CurrentUser.CreateSubKey(PolicyKey, writable: true);
             key.SetValue("NoControlPanel", 1, RegistryValueKind.DWord);
+            RestartExplorer();
             Logger.Information("[KioskPolicy] NoControlPanel applied");
         }
         catch (Exception ex)
@@ -34,6 +48,7 @@ public static class KioskPolicyService
             if (key?.GetValue("NoControlPanel") != null)
             {
                 key.DeleteValue("NoControlPanel");
+                RestartExplorer();
                 Logger.Information("[KioskPolicy] NoControlPanel removed");
             }
         }
@@ -43,9 +58,6 @@ public static class KioskPolicyService
         }
     }
 
-    /// <summary>
-    /// Temporarily removes the policy, runs the action, then restores.
-    /// </summary>
     public static void RunWithControlPanel(Action action)
     {
         Remove();
