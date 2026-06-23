@@ -1,5 +1,0 @@
-﻿f = open(r'.\src\SionyxKiosk\Views\Pages\HistoryPage.xaml', encoding='utf-8')
-c = f.read()
-f.close()
-idx = c.find('IsOperatorTopup')
-print(c[idx-100:idx+100])

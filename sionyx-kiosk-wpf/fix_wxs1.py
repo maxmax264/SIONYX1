@@ -1,9 +1,0 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\installer\Package.wxs', encoding='utf-8').read()
-old = '    <SetProperty Id="CA_LaunchKiosk" Before="CA_LaunchKiosk" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />'
-new = '    <SetProperty Id="CA_LaunchKiosk" Before="CA_LaunchKiosk" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />\n    <SetProperty Id="CA_SetupUpdateTask" Before="CA_SetupUpdateTask" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />'
-count = content.count(old)
-print(f"Found {count} matches")
-if count == 1:
-    content = content.replace(old, new, 1)
-    open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-kiosk-wpf\installer\Package.wxs', 'w', encoding='utf-8').write(content)
-    print('OK')

@@ -1,5 +1,0 @@
-﻿content = open(r'.\src\SionyxKiosk\Services\ForceLogoutService.cs', encoding='utf-8').read()
-content = content.replace('$"users/{userId}/forceLogout"', '$"organizations/sionov/users/{userId}/forceLogout"')
-content = content.replace('$"users/{_userId}/forceLogout"', '$"organizations/sionov/users/{_userId}/forceLogout"')
-open(r'.\src\SionyxKiosk\Services\ForceLogoutService.cs', 'w', encoding='utf-8').write(content)
-print('OK')

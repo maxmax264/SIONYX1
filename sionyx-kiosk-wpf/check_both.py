@@ -1,5 +1,0 @@
-﻿content = open(r'C:\Users\user\Desktop\SIONYX-clean\sionyx-web\src\pages\MessagesPage.jsx', encoding='utf-8').read()
-print("=== pos 3694 ===")
-print(repr(content[3550:3900]))
-print("=== pos 5083 ===")
-print(repr(content[4950:5350]))
