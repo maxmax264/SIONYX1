@@ -18,8 +18,12 @@
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <Property Id="ORGID" Secure="yes" />
-    <Property Id="COMPUTERNAME_CUSTOM" Secure="yes" />
+    <Property Id="ORGID" Secure="yes">
+      <RegistrySearch Id="OrgIdSearch" Root="HKLM" Key="SOFTWARE\SIONYX" Name="OrgId" Type="raw" />
+    </Property>
+    <Property Id="COMPUTERNAME_CUSTOM" Secure="yes">
+      <RegistrySearch Id="ComputerNameSearch" Root="HKLM" Key="SOFTWARE\SIONYX" Name="ComputerName" Type="raw" />
+    </Property>
 
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="SIONYX">
@@ -182,8 +186,8 @@
       <!-- INSTALL -->
       <Custom Action="CA_SetupAutoStart"     After="InstallFiles"         Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
-      <Custom Action="CA_LaunchKiosk"        After="CA_VerifyInstallation"  Condition="NOT REMOVE" />
-      <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE" />
+      <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
+      <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
 
       <!-- UNINSTALL -->
       <Custom Action="CA_StopProcesses"   Before="RemoveFiles"           Condition="REMOVE = &quot;ALL&quot;" />
@@ -195,3 +199,5 @@
 
   </Package>
 </Wix>
+
+
