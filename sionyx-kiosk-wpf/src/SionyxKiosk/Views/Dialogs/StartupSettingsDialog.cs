@@ -122,6 +122,12 @@ public partial class StartupSettingsDialog : Window
         }
         catch { }
 
+        // Filter out system accounts
+        users.RemoveAll(u => u.Equals("Administrator", System.StringComparison.OrdinalIgnoreCase)
+            || u.Equals("Guest", System.StringComparison.OrdinalIgnoreCase)
+            || u.Equals("DefaultAccount", System.StringComparison.OrdinalIgnoreCase)
+            || u.Equals("WDAGUtilityAccount", System.StringComparison.OrdinalIgnoreCase));
+
         if (users.Count == 0)
             users.Add(Environment.UserName);
 
