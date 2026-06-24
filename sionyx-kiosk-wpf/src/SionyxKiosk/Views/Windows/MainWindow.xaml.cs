@@ -32,13 +32,7 @@ public partial class MainWindow : Window
         {
             Dispatcher.InvokeAsync(() => NavigateToPage("Home"), System.Windows.Threading.DispatcherPriority.Loaded);
             UpdateAvatarInitials();
-            if (viewModel.CurrentUser?.IsAdmin == true)
-            {
-                _trayIcon = new SionyxKiosk.Services.TrayIconService();
-                _trayIcon.RestoreRequested += () => Dispatcher.Invoke(() => { WindowState = System.Windows.WindowState.Maximized; Topmost = true; Activate(); });
-                _trayIcon.OpenControlPanelRequested += () => Services.KioskPolicyService.RunWithControlPanel(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("control.exe") { UseShellExecute = true }));
-                _trayIcon.Show();
-            }
+
         };
 
         viewModel.PropertyChanged += (_, e) =>
