@@ -83,10 +83,12 @@ public partial class StartupSettingsDialog : Window
         btnCancel.Click += (s, e) => Close();
         btnSave.Click += (s, e) =>
         {
+            string? autoLoginUser = null;
             foreach (var (username, cb) in checkBoxes)
             {
-                SetStartupForUser(username, cb.IsChecked == true);
+                if (cb.IsChecked == true) { autoLoginUser = username; break; }
             }
+            SetAutoLogin(autoLoginUser ?? string.Empty);
             MessageBox.Show("\u05d4\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea \u05e0\u05e9\u05de\u05e8\u05d5!", "\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea", MessageBoxButton.OK, MessageBoxImage.Information);
             Close();
         };
@@ -132,6 +134,33 @@ public partial class StartupSettingsDialog : Window
             users.Add(Environment.UserName);
 
         return users;
+    }
+
+    private static void SetAutoLogin(string username)
+    {
+        try
+        {
+            using var baseKey = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
+            using var winlogon = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true);
+            using var runKey = baseKey.OpenSubKey(RunKey, true);
+            if (winlogon == null) return;
+
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
+
+            if (!string.IsNullOrEmpty(username))
+            {
+                winlogon.SetValue("AutoAdminLogon", "1", RegistryValueKind.String);
+                winlogon.SetValue("DefaultUserName", username, RegistryValueKind.String);
+                winlogon.DeleteValue("DefaultPassword", false);
+                runKey?.SetValue(RunValueName, $"\"{exePath}\" --kiosk", RegistryValueKind.String);
+            }
+            else
+            {
+                winlogon.SetValue("AutoAdminLogon", "0", RegistryValueKind.String);
+                runKey?.DeleteValue(RunValueName, false);
+            }
+        }
+        catch { }
     }
 
     private static bool IsStartupEnabledForUser(string username)
