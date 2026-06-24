@@ -33,7 +33,7 @@
       </Directory>
     </StandardDirectory>
 
-    <StandardDirectory Id="DesktopFolder" />
+    
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ProgramMenuDir" Name="SIONYX" />
     </StandardDirectory>
@@ -48,31 +48,6 @@
         <File Id="AppIconIco"
               Source="$(var.SourceDir)\app-logo.ico"
               KeyPath="yes" />
-      </Component>
-    </ComponentGroup>
-
-    <ComponentGroup Id="Shortcuts" Directory="INSTALLFOLDER">
-      <Component Id="DesktopShortcutComp" Guid="*">
-        <Shortcut Id="DesktopShortcut"
-                  Directory="DesktopFolder"
-                  Name="SIONYX"
-                  Target="[INSTALLFOLDER]SionyxKiosk.exe"
-                  Icon="AppIcon"
-                  IconIndex="0"
-                  WorkingDirectory="INSTALLFOLDER" />
-        <RegistryValue Root="HKCU" Key="Software\SIONYX" Name="DesktopShortcut"
-                       Type="integer" Value="1" KeyPath="yes" />
-      </Component>
-      <Component Id="StartMenuShortcutComp" Guid="*">
-        <Shortcut Id="StartMenuShortcut"
-                  Directory="ProgramMenuDir"
-                  Name="SIONYX"
-                  Target="[INSTALLFOLDER]SionyxKiosk.exe"
-                  Icon="AppIcon"
-                  IconIndex="0"
-                  WorkingDirectory="INSTALLFOLDER" />
-        <RegistryValue Root="HKCU" Key="Software\SIONYX" Name="StartMenuShortcut"
-                       Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
@@ -135,7 +110,7 @@
     <Feature Id="ProductFeature" Title="SIONYX Kiosk" Level="1">
       <ComponentGroupRef Id="MainFiles" />
       <ComponentGroupRef Id="TemplateFiles" />
-      <ComponentGroupRef Id="Shortcuts" />
+      
       <ComponentGroupRef Id="UninstallShortcut" />
       <ComponentGroupRef Id="RegistryConfig" />
     </Feature>
