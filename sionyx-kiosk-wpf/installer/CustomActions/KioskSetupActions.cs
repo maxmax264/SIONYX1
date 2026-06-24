@@ -34,16 +34,14 @@ namespace SionyxInstaller
                 // Configure Auto-login for kiosk user
                 try
                 {
-                    string currentUser = Environment.UserName;
                     using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                     using (var winlogon = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon", true))
                     {
                         if (winlogon != null)
                         {
                             winlogon.SetValue("AutoAdminLogon", "1", RegistryValueKind.String);
-                            winlogon.SetValue("DefaultUserName", currentUser, RegistryValueKind.String);
-                            winlogon.SetValue("DefaultPassword", "", RegistryValueKind.String);
-                            session.Log($"[OK] Auto-login configured for user: {currentUser}");
+                            winlogon.DeleteValue("DefaultPassword", false);
+                            session.Log("[OK] Auto-login configured");
                         }
                     }
                 }
