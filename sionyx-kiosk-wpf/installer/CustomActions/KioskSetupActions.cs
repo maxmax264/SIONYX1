@@ -39,7 +39,34 @@ namespace SionyxInstaller
                     {
                         if (winlogon != null)
                         {
+                            // Get the actual logged-in user via query user
+                            string loggedInUser = "";
+                            try
+                            {
+                                var psi = new System.Diagnostics.ProcessStartInfo("query", "user")
+                                {
+                                    UseShellExecute = false,
+                                    RedirectStandardOutput = true,
+                                    CreateNoWindow = true
+                                };
+                                var proc = System.Diagnostics.Process.Start(psi);
+                                var output = proc != null ? proc.StandardOutput.ReadToEnd() : "";
+                                if (proc != null) proc.WaitForExit(5000);
+                                foreach (var line in output.Split('\n'))
+                                {
+                                    var trimmed = line.TrimStart('>').Trim();
+                                    if (trimmed.StartsWith("USERNAME") || string.IsNullOrWhiteSpace(trimmed)) continue;
+                                    var parts = trimmed.Split(new char[]{' '}, System.StringSplitOptions.RemoveEmptyEntries);
+                                    if (parts.Length > 0) loggedInUser = parts[0].TrimStart('>');
+                                    break;
+                                }
+                            }
+                            catch { }
+                            session.Log($"[INFO] Logged-in user: {loggedInUser}");
+
                             winlogon.SetValue("AutoAdminLogon", "1", RegistryValueKind.String);
+                            if (!string.IsNullOrEmpty(loggedInUser))
+                                winlogon.SetValue("DefaultUserName", loggedInUser, RegistryValueKind.String);
                             winlogon.DeleteValue("DefaultPassword", false);
                             session.Log("[OK] Auto-login configured");
                         }
