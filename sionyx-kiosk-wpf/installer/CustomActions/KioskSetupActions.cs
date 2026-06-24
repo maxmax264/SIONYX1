@@ -200,7 +200,7 @@ if exist ""{triggerFile}"" (
 <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
   <Principals><Principal id=""Author""><UserId>{currentUser}</UserId><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries></Settings>
-  <Triggers/>
+  <Triggers><LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers>
   <Actions Context=""Author""><Exec><Command>{appExe}</Command><Arguments>--kiosk</Arguments></Exec></Actions>
 </Task>";
                 string launchXmlPath = Path.Combine(Path.GetTempPath(), "sionyx_launch_task.xml");
