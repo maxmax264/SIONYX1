@@ -5,7 +5,7 @@
         Title="SIONYX"
         WindowState="Maximized" Topmost="True"
         WindowStyle="None" ResizeMode="NoResize"
-        FlowDirection="RightToLeft">
+        FlowDirection="RightToLeft" ShowInTaskbar="False">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
