@@ -37,7 +37,7 @@ public partial class App : Application
         _singleInstanceMutex = new Mutex(true, "SionyxKiosk_SingleInstance", out bool isNew);
         if (!isNew)
         {
-            MessageBox.Show("SIONYX λαψ τεςμ.", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("SIONYX Χ›Χ‘Χ¨ Χ¤Χ•ΧΆΧ.", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown();
             return;
         }
@@ -355,8 +355,8 @@ public partial class App : Application
 
         _systemServices.ForceLogoutReceived += async () =>
         {
-            AlertDialog.Show("πιϊεχ ςμ ιγι ξπδμ",
-                "δεϊπχϊ ξδξςψλϊ ςμ ιγι ξπδμ. ΰπΰ δϊηαψ ξηγω.",
+            AlertDialog.Show("Χ Χ™ΧªΧ•Χ§ ΧΆΧ Χ™Χ“Χ™ ΧΧ Χ”Χ",
+                "Χ”Χ•ΧªΧ Χ§Χª ΧΧ”ΧΧΆΧ¨Χ›Χª ΧΆΧ Χ™Χ“Χ™ ΧΧ Χ”Χ. ΧΧ Χ Χ”ΧªΧ—Χ‘Χ¨ ΧΧ—Χ“Χ©.",
                 AlertDialog.AlertType.Warning, MainWindow);
             await StopSystemServicesAsync();
             _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
@@ -396,13 +396,13 @@ public partial class App : Application
         {
             try
             {
-                Log.Information("Login succeeded — checking phone verification");
+                Log.Information("Login succeeded β€” checking phone verification");
                 var auth = _host!.Services.GetRequiredService<AuthService>();
                 var (required, verified) = await auth.CheckPhoneVerificationAsync();
 
                 if (required && !verified)
                 {
-                    Log.Information("Phone verification required — showing waiting screen");
+                    Log.Information("Phone verification required β€” showing waiting screen");
                     var firebase = _host!.Services.GetRequiredService<FirebaseClient>();
                     var userId = auth.CurrentUser?.Uid ?? "";
                     var phone = "0775022924";
@@ -428,7 +428,7 @@ public partial class App : Application
                     return;
                 }
 
-                Log.Information("Phone OK — closing auth window, opening main window");
+                Log.Information("Phone OK β€” closing auth window, opening main window");
 
                 if (MainWindow is AuthWindow aw)
                 {
@@ -442,7 +442,7 @@ public partial class App : Application
                 Log.Fatal(ex, "Failed to transition from auth to main window");
                 // Re-show the auth window so the user isn't stuck with an invisible app
                 try { ShowAuthWindow(); }
-                catch (Exception ex2) { Log.Fatal(ex2, "Recovery failed — app is in a broken state"); }
+                catch (Exception ex2) { Log.Fatal(ex2, "Recovery failed β€” app is in a broken state"); }
             }
         });
     }
@@ -461,7 +461,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Auto-login failed — staying on auth window");
+            Log.Error(ex, "Auto-login failed β€” staying on auth window");
         }
     }
 
@@ -686,14 +686,9 @@ public partial class App : Application
                                     ShowAuthWindow();
                                 }
                             };
-                            _trayIcon.OpenControlPanelRequested += () =>
+                            _trayIcon.OpenControlPanelRequested += async () =>
                             {
-                                Services.KioskPolicyService.RunWithControlPanel(() =>
-                                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                                    {
-                                        FileName = "control.exe",
-                                        UseShellExecute = true
-                                    }));
+                                await Services.KioskPolicyService.RunWithControlPanelAsync();
                             };
                             _trayIcon.OpenDashboardRequested += () =>
                             {
@@ -740,8 +735,8 @@ public partial class App : Application
                                 {
                                     var version = GetVersion();
                                     var (hasUpdate, latestVersion, _) = await Services.AutoUpdateService.CheckForUpdateNowAsync(version);
-                                    var msg = hasUpdate ? $"ιω βψρδ ηγωδ: {latestVersion}" : "ξςεγλο μβψρδ δΰηψεπδ";
-                                    Current.Dispatcher.Invoke(() => _trayIcon?.ShowBalloon("αγιχϊ ςγλεο", msg));
+                                    var msg = hasUpdate ? $"Χ™Χ© Χ’Χ¨Χ΅Χ” Χ—Χ“Χ©Χ”: {latestVersion}" : "ΧΧΆΧ•Χ“Χ›Χ ΧΧ’Χ¨Χ΅Χ” Χ”ΧΧ—Χ¨Χ•Χ Χ”";
+                                    Current.Dispatcher.Invoke(() => _trayIcon?.ShowBalloon("Χ‘Χ“Χ™Χ§Χª ΧΆΧ“Χ›Χ•Χ", msg));
                                 });
                             };
                             _trayIcon.ForceUpdateRequested += () =>
@@ -754,7 +749,7 @@ public partial class App : Application
                                         Current.Dispatcher.Invoke(() =>
                                         {
                                             _trayIcon?.SetUpdateStatus(status);
-                                            _trayIcon?.ShowBalloon("ςγλεο SIONYX", status);
+                                            _trayIcon?.ShowBalloon("ΧΆΧ“Χ›Χ•Χ SIONYX", status);
                                         });
                                     });
                                 });
@@ -772,7 +767,7 @@ public partial class App : Application
                 else
                 {
                     Log.Warning("Admin exit: incorrect password");
-                    MessageBox.Show("ριρξδ ωβειδ", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Χ΅Χ™Χ΅ΧΧ” Χ©Χ’Χ•Χ™Χ”", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
         }
