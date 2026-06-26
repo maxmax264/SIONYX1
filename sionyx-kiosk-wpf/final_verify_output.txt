@@ -1,0 +1,12 @@
+﻿Line 40:             MessageBox.Show("SIONYX δß° ⌠σ≥∞.", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Information);
+Line 358:             AlertDialog.Show("≡Θ·σ≈ ≥∞ ΘπΘ ε≡Σ∞",
+Line 359:                 "Σσ·≡≈· εΣε≥°δ· ≥∞ ΘπΘ ε≡Σ∞. α≡α Σ·τß° ετπ∙.",
+Line 399:                 Log.Information("Login succeeded ק checking phone verification");
+Line 405:                     Log.Information("Phone verification required ק showing waiting screen");
+Line 431:                 Log.Information("Phone OK ק closing auth window, opening main window");
+Line 445:                 catch (Exception ex2) { Log.Fatal(ex2, "Recovery failed ק app is in a broken state"); }
+Line 464:             Log.Error(ex, "Auto-login failed ק staying on auth window");
+Line 743:                                     var msg = hasUpdate ? $"Θ∙ Γ°±Σ τπ∙Σ: {latestVersion}" : "ε≥σπδ∩ ∞Γ°±Σ Σατ°σ≡Σ";
+Line 744:                                     Current.Dispatcher.Invoke(() => _trayIcon?.ShowBalloon("ßπΘ≈· ≥πδσ∩", msg));
+Line 757:                                             _trayIcon?.ShowBalloon("≥πδσ∩ SIONYX", status);
+Line 775:                     MessageBox.Show("±Θ±εΣ ∙ΓσΘΣ", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Warning);

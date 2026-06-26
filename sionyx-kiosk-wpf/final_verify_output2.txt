@@ -1,0 +1,12 @@
+Line 40:             MessageBox.Show("SIONYX כבר פועל.", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Information);
+Line 358:             AlertDialog.Show("ניתוק על ידי מנהל",
+Line 359:                 "הותנקת מהמערכת על ידי מנהל. אנא התחבר מחדש.",
+Line 399:                 Log.Information("Login succeeded — checking phone verification");
+Line 405:                     Log.Information("Phone verification required — showing waiting screen");
+Line 431:                 Log.Information("Phone OK — closing auth window, opening main window");
+Line 445:                 catch (Exception ex2) { Log.Fatal(ex2, "Recovery failed — app is in a broken state"); }
+Line 464:             Log.Error(ex, "Auto-login failed — staying on auth window");
+Line 743:                                     var msg = hasUpdate ? $"יש גרסה חדשה: {latestVersion}" : "מעודכן לגרסה האחרונה";
+Line 744:                                     Current.Dispatcher.Invoke(() => _trayIcon?.ShowBalloon("בדיקת עדכון", msg));
+Line 757:                                             _trayIcon?.ShowBalloon("עדכון SIONYX", status);
+Line 775:                     MessageBox.Show("סיסמה שגויה", "SIONYX", MessageBoxButton.OK, MessageBoxImage.Warning);
