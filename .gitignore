@@ -427,3 +427,7 @@ sionyx-kiosk-wpf/coverage-report/
 # ========================================
 # Note: .env.example should be committed (not ignored)
 sionyx-kiosk-wpf/set-env.ps1
+
+# Plain 'env' file (no dot) - contains real Firebase config, never commit
+env
+
