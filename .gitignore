@@ -425,5 +425,8 @@ sionyx-kiosk-wpf/coverage-report/
 # ========================================
 # Miscellaneous
 # ========================================
-# Note: .env.example should be committed (not ignored)
+# Note: .env.example / set-env.ps1.example should be committed (not ignored)
 sionyx-kiosk-wpf/set-env.ps1
+
+# Root env config file (use env.example as the template; never commit real config)
+/env
