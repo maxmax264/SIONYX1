@@ -87,7 +87,10 @@ def main():
         "releasedAt": datetime.datetime.utcnow().isoformat() + "Z"
     }
 
-    admin_secret = os.environ.get("SIONYX_ADMIN_SECRET", "sionyx-admin-2026")
+    admin_secret = os.environ.get("SIONYX_ADMIN_SECRET")
+    if not admin_secret:
+        print("ERROR: SIONYX_ADMIN_SECRET env var not set")
+        sys.exit(1)
     db_resp = requests.post(
         "https://sionyx-auth-server.onrender.com/set-latest-version",
         json=update_data,
