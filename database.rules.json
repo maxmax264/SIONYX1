@@ -30,7 +30,7 @@
       }
     },
     "organizations": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('owners').child(auth.uid).exists()",
       ".write": false,
       "$orgId": {
         "users": {
@@ -248,7 +248,7 @@
           "settings": {
             ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists()",
             "adminExitPassword": {
-              ".read": true
+              ".validate": "newData.isString() && newData.val().length <= 200"
             }
           },
           "name": {
@@ -291,7 +291,7 @@
     },
     "systemSettings": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('owners').child(auth.uid).exists()"
     },
     "owners": {
       ".read": "auth != null",
