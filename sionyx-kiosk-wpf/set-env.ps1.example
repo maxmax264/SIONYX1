@@ -1,0 +1,23 @@
+# Local development environment for the SIONYX kiosk build.
+# Copy this file to `set-env.ps1` (which is gitignored) and fill in real values.
+# NEVER commit real values. The two marked SENSITIVE below grant real access — keep them out of git.
+
+$env:FIREBASE_API_KEY            = "your-firebase-web-api-key"        # public (ships in client) — not secret
+$env:FIREBASE_AUTH_DOMAIN        = "your-project.firebaseapp.com"
+$env:FIREBASE_PROJECT_ID         = "your-project-id"
+$env:FIREBASE_DATABASE_URL       = "https://your-project-default-rtdb.firebaseio.com"
+$env:FIREBASE_STORAGE_BUCKET     = "your-project.firebasestorage.app"
+$env:FIREBASE_MESSAGING_SENDER_ID = "000000000000"
+$env:FIREBASE_APP_ID             = "1:000000000000:web:xxxxxxxxxxxxxxxx"
+$env:FIREBASE_MEASUREMENT_ID     = "G-XXXXXXXXXX"
+
+# SENSITIVE — legacy DB secret grants full admin read/write to the whole database. Rotate if ever exposed.
+$env:FIREBASE_DB_SECRET          = "REPLACE-WITH-LEGACY-DB-SECRET"
+
+$env:NEDARIM_CALLBACK_URL        = "https://us-central1-your-project.cloudfunctions.net/nedarimCallback"
+$env:ADMIN_EXIT_PASSWORD         = "change-me"
+
+# SENSITIVE — GitHub PAT used by upload_release.py. Use a fine-scoped token; never commit.
+$env:GITHUB_TOKEN                = "ghp_your_personal_access_token"
+
+Write-Host "[OK] Environment variables loaded" -ForegroundColor Green
