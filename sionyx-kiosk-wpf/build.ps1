@@ -285,7 +285,7 @@ function Invoke-Upload([string]$installerPath, $versionData) {
     $ver = $versionData.version
     $buildNum = $versionData.buildNumber
 
-    python $uploadScript $installerPath $ver $buildNum
+    python $uploadScript $installerPath $ver $buildNum | Out-Host
     if ($LASTEXITCODE -ne 0) {
         Write-Err "Upload failed"
         return $false

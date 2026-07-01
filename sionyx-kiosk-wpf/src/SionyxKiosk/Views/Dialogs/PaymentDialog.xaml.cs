@@ -408,15 +408,25 @@ public partial class PaymentDialog : Window
                 return;
             }
 
-            // The function returns { success, message/error, correlationId }
+            // The function returns { success, message/error, correlationId, optionUsed }
+            // optionUsed tells us which of the numbered TashlumBodedNew parameter
+            // strategies (see chargeWithSavedCard in functions/index.js) actually
+            // got a response from Nedarim. Logged here too so it shows up in the
+            // kiosk's own public logs (C:\Users\Public\Documents\SIONYX\logs\)
+            // alongside everything else - once one option is confirmed working
+            // consistently in production, the others should be deleted from the
+            // Cloud Function.
             var resultData = (JsonElement)callResult.Data!;
             var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
             var correlationId = resultData.TryGetProperty("correlationId", out var cEl) ? cEl.GetString() : null;
+            var optionUsed = resultData.TryGetProperty("optionUsed", out var oEl) && oEl.ValueKind == JsonValueKind.Number
+                ? oEl.GetInt32().ToString()
+                : "none-succeeded";
 
             if (success)
             {
-                Logger.Information("Saved-card charge succeeded server-side. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
-                    _purchaseId, correlationId);
+                Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
+                    optionUsed, _purchaseId, correlationId);
                 PaymentSucceeded = true;
                 var successMsg = JsonSerializer.Serialize(new { action = "showSuccess" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(successMsg));
@@ -424,8 +434,8 @@ public partial class PaymentDialog : Window
             else
             {
                 var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "שגיאה" : "שגיאה";
-                Logger.Warning("Saved-card charge declined by server. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
-                    _purchaseId, errorText, correlationId);
+                Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
+                    optionUsed, _purchaseId, errorText, correlationId);
                 var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = errorText });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
             }

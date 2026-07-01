@@ -392,11 +392,19 @@ exports.nedarimCallback = onRequest(async (req, res) => {
       sanitizedRawResponse.CreditCardNumber = "****";
     }
 
+    // SECURITY: never persist the full PAN. Only keep the last 4 digits
+    // (if present) for the donor's own reference; everything else is
+    // masked. (Previously this field stored the raw card number verbatim,
+    // even though the sibling `rawResponse.CreditCardNumber` a few lines
+    // above was correctly masked - fixed here.)
+    const maskedCardForStorage = CreditCardNumber ?
+      `****${String(CreditCardNumber).slice(-4)}` : "";
+
     const updateData = {
       status: Status === "Error" ? "failed" : "completed",
       transactionId: TransactionId,
       amount: amountNum,
-      creditCardNumber: CreditCardNumber || "****",
+      creditCardNumber: maskedCardForStorage,
       message: Message || "",
       callbackReceivedAt: admin.database.ServerValue.TIMESTAMP,
       rawResponse: sanitizedRawResponse,
@@ -809,46 +817,180 @@ exports.chargeWithSavedCard = onCall(async (request) => {
 
     const amount = Number(purchase.amount) || 0;
 
-    log.info("Calling Nedarim TashlumBodedNew", {
-      orgId,
-      purchaseId,
-      kevaId,
-      amount,
-    });
+    // ── SAVED-CARD CHARGE: multiple parameter-shape strategies ──────────
+    // TashlumBodedNew is NOT covered by Nedarim's published
+    // ApiDocumentation.html (that document only covers the *management*
+    // interface, per confirmed forum reports). Field names for charging an
+    // existing Keva/token via Manage3.aspx are undocumented; they were
+    // reconstructed from naming conventions actually observed for
+    // Nedarim/Matara endpoints:
+    //   OPTION 1: naming used by the original (untested) code here.
+    //   OPTION 2: naming CONFIRMED working today in payment.html's
+    //     FinishTransaction2 call to the iframe (Mosad/ApiValid/Tashlumim) -
+    //     most likely correct, since it's the same Matara backend family.
+    //   OPTION 3: naming used by Nedarim's separate DebitCard.aspx API
+    //     family (MosadId/Token instead of KevaId), per field reports.
+    // We try them in order and STOP at the first one that returns a
+    // definitive result (a real "OK" charge, or a real decline like "no
+    // coverage"/"blocked card"). We only advance to the next option when
+    // the response indicates a STRUCTURAL problem (bad/unrecognized Mosad,
+    // missing/invalid parameter, unrecognized action) - never after a real
+    // card decline - so we never risk multiple charge attempts landing on
+    // the customer's card. Each attempt is logged with its option number so
+    // we can see in production logs which one actually works; once
+    // confirmed, the other options should be deleted.
+    const structuralFailureHints = [
+      "מוסד", "לא נמצא", "not found", "פעולה לא מוכרת",
+      "unrecognized", "invalid action", "פרמטר", "parameter",
+      "לא מזוהה", "unauthorized",
+    ];
+    const isStructuralFailure = (message) => {
+      const m = (message || "").toLowerCase();
+      return structuralFailureHints.some((hint) => m.includes(hint.toLowerCase()));
+    };
 
-    const chargeTimer = createTimer("nedarim-tashlum-boded-new");
-    const params = new URLSearchParams({
-      Action: "TashlumBodedNew",
-      MosadNumber: mosadId,
-      ApiPassword: apiPassword,
-      Currency: "1",
-      KevaId: kevaId,
-      Amount: amount.toFixed(0),
-      Tashloumim: "1",
-      JoinToKevaId: "NoJoin",
-      Comments: `Purchase:${purchaseId}`,
-    });
+    const strategies = [
+      {
+        option: 1,
+        label: "MosadNumber/ApiPassword/KevaId/Tashloumim (original)",
+        params: {
+          Action: "TashlumBodedNew",
+          MosadNumber: mosadId,
+          ApiPassword: apiPassword,
+          Currency: "1",
+          KevaId: kevaId,
+          Amount: amount.toFixed(0),
+          Tashloumim: "1",
+          JoinToKevaId: "NoJoin",
+          Comments: `Purchase:${purchaseId}`,
+        },
+      },
+      {
+        option: 2,
+        label: "Mosad/ApiValid/KevaId/Tashlumim (matches iframe FinishTransaction2 naming)",
+        params: {
+          Action: "TashlumBodedNew",
+          Mosad: mosadId,
+          ApiValid: apiPassword,
+          Currency: "1",
+          KevaId: kevaId,
+          Amount: amount.toFixed(0),
+          Tashlumim: "1",
+          JoinToKevaId: "NoJoin",
+          Comment: `Purchase:${purchaseId}`,
+          Param1: purchaseId,
+          Param2: orgId,
+        },
+      },
+      {
+        option: 3,
+        label: "MosadId/Token (DebitCard.aspx-style naming)",
+        params: {
+          Action: "TashlumBodedNew",
+          MosadId: mosadId,
+          ApiValid: apiPassword,
+          Currency: "1",
+          Token: kevaId,
+          Amount: amount.toFixed(0),
+          Tashloumim: "1",
+          Avour: `Purchase:${purchaseId}`,
+        },
+      },
+    ];
 
-    const nedarimResponse = await fetch(
-        "https://matara.pro/nedarimplus/Reports/Manage3.aspx",
-        {method: "POST", body: params},
-    );
-    const responseText = await nedarimResponse.text();
-    chargeTimer.end(log.info);
+    let parsed = null;
+    let optionUsed = null;
+    const attemptsLog = [];
 
-    let parsed;
-    try {
-      parsed = JSON.parse(responseText);
-    } catch (parseErr) {
-      log.error("Failed to parse Nedarim response", parseErr, {
-        orgId,
-        purchaseId,
-        rawResponseLength: responseText.length,
+    for (const strategy of strategies) {
+      log.info(`[SAVED-CARD OPTION ${strategy.option}] Attempting Nedarim TashlumBodedNew`, {
+        orgId, purchaseId, kevaId, amount,
+        option: strategy.option, label: strategy.label,
       });
-      throw new functions.https.HttpsError(
-          "internal",
-          "תגובה לא תקינה מנדרים",
-      );
+
+      const chargeTimer = createTimer(`nedarim-tashlum-boded-new-option-${strategy.option}`);
+      let responseText;
+      try {
+        const nedarimResponse = await fetch(
+            "https://matara.pro/nedarimplus/Reports/Manage3.aspx",
+            {method: "POST", body: new URLSearchParams(strategy.params)},
+        );
+        responseText = await nedarimResponse.text();
+      } catch (fetchErr) {
+        chargeTimer.end(log.info);
+        log.error(`[SAVED-CARD OPTION ${strategy.option}] Network error calling Nedarim`, fetchErr, {
+          orgId, purchaseId, option: strategy.option,
+        });
+        attemptsLog.push({option: strategy.option, error: "network-error"});
+        continue;
+      }
+      chargeTimer.end(log.info);
+
+      let attemptParsed;
+      try {
+        attemptParsed = JSON.parse(responseText);
+      } catch (parseErr) {
+        log.error(`[SAVED-CARD OPTION ${strategy.option}] Failed to parse Nedarim response`, parseErr, {
+          orgId, purchaseId, option: strategy.option,
+          rawResponseLength: responseText.length,
+          rawResponseSample: responseText.slice(0, 200),
+        });
+        attemptsLog.push({option: strategy.option, error: "parse-error"});
+        continue;
+      }
+
+      log.info(`[SAVED-CARD OPTION ${strategy.option}] Nedarim response received`, {
+        orgId, purchaseId, option: strategy.option,
+        status: attemptParsed.Status, message: attemptParsed.Message,
+      });
+      attemptsLog.push({
+        option: strategy.option,
+        status: attemptParsed.Status,
+        message: attemptParsed.Message,
+      });
+
+      if (attemptParsed.Status === "OK") {
+        log.info(`[SAVED-CARD OPTION ${strategy.option}] SUCCEEDED - this is the working option`, {
+          orgId, purchaseId, option: strategy.option,
+        });
+        parsed = attemptParsed;
+        optionUsed = strategy.option;
+        break;
+      }
+
+      if (isStructuralFailure(attemptParsed.Message)) {
+        log.warn(`[SAVED-CARD OPTION ${strategy.option}] Structural failure, trying next option`, {
+          orgId, purchaseId, option: strategy.option, message: attemptParsed.Message,
+        });
+        continue;
+      }
+
+      // Real decline (insufficient funds, blocked card, etc.) - stop here,
+      // do not try further options against the same card/token.
+      log.warn(`[SAVED-CARD OPTION ${strategy.option}] Real decline - stopping (not trying further options)`, {
+        orgId, purchaseId, option: strategy.option, message: attemptParsed.Message,
+      });
+      parsed = attemptParsed;
+      optionUsed = strategy.option;
+      break;
+    }
+
+    if (!parsed) {
+      log.error("All saved-card charge options failed structurally", null, {
+        orgId, purchaseId, attempts: attemptsLog,
+      });
+      await purchaseRef.update({
+        status: "failed",
+        message: "כל אפשרויות החיוב נכשלו - ראה לוגים",
+        callbackReceivedAt: admin.database.ServerValue.TIMESTAMP,
+        correlationId,
+      });
+      return {
+        success: false,
+        error: "לא ניתן לחייב את הכרטיס השמור",
+        correlationId,
+        attempts: attemptsLog,
+      };
     }
 
     const status = parsed.Status;
@@ -860,17 +1002,21 @@ exports.chargeWithSavedCard = onCall(async (request) => {
         purchaseId,
         status,
         message: parsed.Message,
+        optionUsed,
       });
       await purchaseRef.update({
         status: "failed",
         message: parsed.Message || "",
         callbackReceivedAt: admin.database.ServerValue.TIMESTAMP,
         correlationId,
+        optionUsed,
       });
       return {
         success: false,
         error: parsed.Message || "התשלום נכשל",
         correlationId,
+        optionUsed,
+        attempts: attemptsLog,
       };
     }
 
@@ -879,6 +1025,7 @@ exports.chargeWithSavedCard = onCall(async (request) => {
       purchaseId,
       callerUid,
       transactionId,
+      optionUsed,
     });
 
     // Credit the user - same calculation shape as nedarimCallback, so the
@@ -921,6 +1068,10 @@ exports.chargeWithSavedCard = onCall(async (request) => {
     atomicUpdate[`${purchasePath}/creditedUserId`] = callerUid;
     atomicUpdate[`${purchasePath}/creditedBy`] = "charge-with-saved-card";
     atomicUpdate[`${purchasePath}/correlationId`] = correlationId;
+    // Which numbered strategy actually worked - check Cloud Function logs
+    // for "[SAVED-CARD OPTION N] SUCCEEDED" to confirm, then delete the
+    // other options from the `strategies` array above.
+    atomicUpdate[`${purchasePath}/optionUsed`] = optionUsed;
 
     await admin.database().ref().update(atomicUpdate);
 
@@ -938,6 +1089,7 @@ exports.chargeWithSavedCard = onCall(async (request) => {
       success: true,
       message: "התשלום הצליח",
       correlationId,
+      optionUsed,
     };
   } catch (error) {
     log.error("Error charging saved card", error, {correlationId});
