@@ -208,6 +208,11 @@ exports.nedarimCallback = onRequest(async (req, res) => {
   };
   log.debug("Request payload (masked)", {payload: maskedBody});
 
+  // DIAGNOSTIC: log just the field names Nedarim sent us. Useful for confirming whether a
+  // saved-card token (KevaId / Token / similar) is ever present on this server-side callback,
+  // as opposed to only being returned client-side via the iframe postMessage.
+  log.info("Nedarim callback field names received", {fields: Object.keys(req.body || {})});
+
   try {
     // CALLBACK_SECRET: validate secret from query param or header
     const callbackSecret = process.env.CALLBACK_SECRET;
@@ -242,6 +247,13 @@ exports.nedarimCallback = onRequest(async (req, res) => {
       Param2, // orgId (MULTI-TENANCY)
       Message,
     } = paymentData;
+
+    // When PaymentType=CreateToken was used (save-card checkbox), Nedarim
+    // returns the new token under the field name "Token" - NOT "KevaId".
+    // ("KevaId" is what we send as a *request* param when charging an
+    // existing token via TashlumBodedNew; "Token" is what comes back when a
+    // *new* one is created.) Confirmed from a live callback log.
+    const newCardToken = paymentData.Token || paymentData.KevaId || "";
 
     TransactionId = paymentData.TransactionId;
     Status = paymentData.Status;
@@ -536,6 +548,21 @@ exports.nedarimCallback = onRequest(async (req, res) => {
             });
           }
 
+          // If this transaction created a new saved-card token (user had
+          // the "save card" checkbox on), persist it server-side. This is
+          // the authoritative write for savedCard - the client should never
+          // need to write this itself.
+          if (newCardToken) {
+            updatePayload.savedCard = {
+              kevaId: newCardToken,
+              savedAt: new Date().toISOString(),
+            };
+            log.info("Persisting new saved-card token", {
+              userId: purchase.userId,
+              orgId,
+            });
+          }
+
           // Atomic multi-path update: credit user + mark purchase as credited
           // Prevents inconsistency if the process crashes between operations
           const userUpdateTimer = createTimer("user-crediting-update");
@@ -629,6 +656,300 @@ exports.nedarimCallback = onRequest(async (req, res) => {
     });
 
     res.status(500).json(errorResponse);
+  }
+});
+
+/**
+ * Charge With Saved Card Function
+ * Charges an existing Nedarim Keva (saved card token) on behalf of the
+ * authenticated kiosk user, server-side.
+ *
+ * This REPLACES the previous client-side flow that called Nedarim's
+ * TashlumBodedNew endpoint directly from the WPF app. Moving it here fixes
+ * two critical issues:
+ *   1. ApiPassword (a real Nedarim business secret) no longer needs to be
+ *      readable by the kiosk client at all - it stays server-side.
+ *   2. Crediting now goes through the same idempotency + amount-verification
+ *      path as nedarimCallback, instead of crediting blindly right after a
+ *      synchronous "OK" response.
+ *
+ * Expected request.data: { orgId, purchaseId, kevaId }
+ * The caller must be authenticated (Firebase Auth) as a user belonging to
+ * organizations/{orgId}/users/{request.auth.uid}.
+ */
+exports.chargeWithSavedCard = onCall(async (request) => {
+  const correlationId = generateCorrelationId();
+  const log = createLogger({
+    correlationId,
+    service: "charge-with-saved-card",
+  });
+
+  log.info("Saved-card charge request received", {
+    hasAuth: !!request.auth,
+    hasData: !!request.data,
+  });
+
+  try {
+    if (!request.auth) {
+      throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Must be authenticated to charge a saved card",
+      );
+    }
+
+    const callerUid = request.auth.uid;
+    const {orgId, purchaseId, kevaId} = request.data || {};
+
+    if (!orgId || !purchaseId || !kevaId) {
+      throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Missing required fields: orgId, purchaseId, kevaId",
+      );
+    }
+
+    log.info("Validating purchase and caller", {
+      callerUid,
+      orgId,
+      purchaseId,
+    });
+
+    // Load the pending purchase - this also tells us the amount/minutes/
+    // printBudget to credit, so the client never gets to dictate the amount.
+    const purchaseRef = admin
+        .database()
+        .ref(`organizations/${orgId}/purchases/${purchaseId}`);
+    const purchaseSnapshot = await purchaseRef.once("value");
+    const purchase = purchaseSnapshot.val();
+
+    if (!purchase) {
+      log.warn("Purchase not found", {orgId, purchaseId});
+      throw new functions.https.HttpsError(
+          "not-found",
+          "הרכישה לא נמצאה",
+      );
+    }
+
+    // Verify the caller owns this purchase (a user can only charge their
+    // own pending purchase, never someone else's).
+    if (purchase.userId !== callerUid) {
+      log.warn("Caller does not own this purchase", {
+        callerUid,
+        purchaseOwner: purchase.userId,
+        orgId,
+        purchaseId,
+      });
+      throw new functions.https.HttpsError(
+          "permission-denied",
+          "אין הרשאה לרכישה זו",
+      );
+    }
+
+    // Idempotency: if this purchase was already credited, return success
+    // immediately instead of charging again. Protects against double-click,
+    // client retry after a dropped response, etc.
+    if (purchase.status === "completed" && purchase.creditedAt) {
+      log.warn("Purchase already credited, skipping duplicate charge", {
+        orgId,
+        purchaseId,
+        existingTransactionId: purchase.transactionId,
+      });
+      return {
+        success: true,
+        message: "כבר עובד (idempotent)",
+        correlationId,
+      };
+    }
+
+    // Verify the saved card belongs to the SAME user making the request -
+    // never trust a kevaId passed from the client without cross-checking it
+    // against what's actually stored for this user.
+    const userRef = admin.database().ref(`organizations/${orgId}/users/${callerUid}`);
+    const userSnapshot = await userRef.once("value");
+    const user = userSnapshot.val();
+
+    if (!user) {
+      log.error("User not found", null, {callerUid, orgId});
+      throw new functions.https.HttpsError("not-found", "המשתמש לא נמצא");
+    }
+
+    const storedKevaId = user.savedCard && user.savedCard.kevaId;
+    if (!storedKevaId || storedKevaId !== kevaId) {
+      log.warn("KevaId mismatch or missing - possible tampering", {
+        callerUid,
+        orgId,
+        providedKevaId: kevaId,
+        storedKevaId: storedKevaId || null,
+      });
+      throw new functions.https.HttpsError(
+          "permission-denied",
+          "כרטיס שמור לא תקין",
+      );
+    }
+
+    // Read organization Nedarim credentials (server-side only - never sent
+    // to the client).
+    const metaRef = admin.database()
+        .ref(`organizations/${orgId}/metadata/settings`);
+    const metaSnapshot = await metaRef.once("value");
+    const meta = metaSnapshot.val() || {};
+    const mosadId = meta.nedarim_mosad_id || "";
+    const apiPassword = meta.nedarim_api_valid || "";
+
+    if (!mosadId || !apiPassword) {
+      log.error("Missing Nedarim credentials for organization", null, {
+        orgId,
+        hasMosadId: !!mosadId,
+        hasApiPassword: !!apiPassword,
+      });
+      throw new functions.https.HttpsError(
+          "failed-precondition",
+          "חסרים פרטי התחברות לנדרים",
+      );
+    }
+
+    const amount = Number(purchase.amount) || 0;
+
+    log.info("Calling Nedarim TashlumBodedNew", {
+      orgId,
+      purchaseId,
+      kevaId,
+      amount,
+    });
+
+    const chargeTimer = createTimer("nedarim-tashlum-boded-new");
+    const params = new URLSearchParams({
+      Action: "TashlumBodedNew",
+      MosadNumber: mosadId,
+      ApiPassword: apiPassword,
+      Currency: "1",
+      KevaId: kevaId,
+      Amount: amount.toFixed(0),
+      Tashloumim: "1",
+      JoinToKevaId: "NoJoin",
+      Comments: `Purchase:${purchaseId}`,
+    });
+
+    const nedarimResponse = await fetch(
+        "https://matara.pro/nedarimplus/Reports/Manage3.aspx",
+        {method: "POST", body: params},
+    );
+    const responseText = await nedarimResponse.text();
+    chargeTimer.end(log.info);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch (parseErr) {
+      log.error("Failed to parse Nedarim response", parseErr, {
+        orgId,
+        purchaseId,
+        rawResponseLength: responseText.length,
+      });
+      throw new functions.https.HttpsError(
+          "internal",
+          "תגובה לא תקינה מנדרים",
+      );
+    }
+
+    const status = parsed.Status;
+    const transactionId = parsed.Id || parsed.TransactionId || correlationId;
+
+    if (status !== "OK") {
+      log.warn("Nedarim charge failed", {
+        orgId,
+        purchaseId,
+        status,
+        message: parsed.Message,
+      });
+      await purchaseRef.update({
+        status: "failed",
+        message: parsed.Message || "",
+        callbackReceivedAt: admin.database.ServerValue.TIMESTAMP,
+        correlationId,
+      });
+      return {
+        success: false,
+        error: parsed.Message || "התשלום נכשל",
+        correlationId,
+      };
+    }
+
+    log.info("Nedarim charge succeeded, crediting user", {
+      orgId,
+      purchaseId,
+      callerUid,
+      transactionId,
+    });
+
+    // Credit the user - same calculation shape as nedarimCallback, so the
+    // two paths stay consistent.
+    const currentTime = user.remainingTime || 0;
+    const currentPrintBudget = user.printBalance || 0;
+    const addingMinutes = purchase.minutes || 0;
+    const addingPrintBudget = purchase.printBudget || 0;
+    const validityDays = purchase.validityDays || 0;
+    const newTime = currentTime + (addingMinutes * 60);
+    const newPrintBudget = currentPrintBudget + addingPrintBudget;
+
+    const updatePayload = {
+      remainingTime: newTime,
+      printBalance: newPrintBudget,
+      updatedAt: new Date().toISOString(),
+      lastCreditedAt: new Date().toISOString(),
+      lastCreditedBy: "charge-with-saved-card",
+      correlationId,
+    };
+
+    if (validityDays > 0) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + validityDays);
+      updatePayload.timeExpiresAt = expiresAt.toISOString();
+    }
+
+    // Atomic multi-path update: credit user + mark purchase as credited,
+    // same pattern as nedarimCallback to avoid inconsistency on crash.
+    const atomicUpdate = {};
+    const userPath = `organizations/${orgId}/users/${callerUid}`;
+    for (const [key, val] of Object.entries(updatePayload)) {
+      atomicUpdate[`${userPath}/${key}`] = val;
+    }
+    const purchasePath = `organizations/${orgId}/purchases/${purchaseId}`;
+    atomicUpdate[`${purchasePath}/status`] = "completed";
+    atomicUpdate[`${purchasePath}/transactionId`] = transactionId;
+    atomicUpdate[`${purchasePath}/amount`] = amount;
+    atomicUpdate[`${purchasePath}/creditedAt`] = new Date().toISOString();
+    atomicUpdate[`${purchasePath}/creditedUserId`] = callerUid;
+    atomicUpdate[`${purchasePath}/creditedBy`] = "charge-with-saved-card";
+    atomicUpdate[`${purchasePath}/correlationId`] = correlationId;
+
+    await admin.database().ref().update(atomicUpdate);
+
+    log.info("User credited successfully via saved card", {
+      orgId,
+      callerUid,
+      purchaseId,
+      timeAdded: addingMinutes,
+      printBudgetAdded: addingPrintBudget,
+      newTime,
+      newPrintBudget,
+    });
+
+    return {
+      success: true,
+      message: "התשלום הצליח",
+      correlationId,
+    };
+  } catch (error) {
+    log.error("Error charging saved card", error, {correlationId});
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError(
+        "internal",
+        "שגיאה בעיבוד התשלום: " + error.message,
+    );
   }
 });
 

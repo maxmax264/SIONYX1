@@ -431,3 +431,7 @@ sionyx-kiosk-wpf/set-env.ps1
 # Plain 'env' file (no dot) - contains real Firebase config, never commit
 env
 
+
+# Build temp files / patch rejects (should never be committed)
+*_wpftmp.csproj
+*.rej

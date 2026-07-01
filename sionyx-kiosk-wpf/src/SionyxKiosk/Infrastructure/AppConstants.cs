@@ -12,7 +12,7 @@ public static class AppConstants
     public const string AdminExitHotkeyDefault = "Ctrl+Alt+Space";
 
     /// <summary>Fallback password for local development only. Production reads from registry.</summary>
-    private const string DefaultAdminPassword = "dev-exit";
+    private const string DefaultAdminPassword = "1234";
 
     /// <summary>
     /// Load admin exit password from configuration.

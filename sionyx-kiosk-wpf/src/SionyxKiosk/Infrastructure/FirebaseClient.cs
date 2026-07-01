@@ -313,6 +313,70 @@ public sealed class FirebaseClient : IFirebaseClient
         }
     }
 
+    // ==================== CLOUD FUNCTIONS (onCall) ====================
+
+    /// <summary>
+    /// Invokes a Firebase HTTPS Callable Function ("onCall" on the server side).
+    /// Sends { "data": payload } with an Authorization: Bearer {idToken} header,
+    /// per the Firebase callable-functions wire protocol, and unwraps the
+    /// { "result": ... } envelope on success or surfaces the server's error
+    /// message on failure (the server side always returns structured
+    /// HttpsError messages in Hebrew/English meant to be shown to the user).
+    /// </summary>
+    public async Task<FirebaseResult> CallFunctionAsync(string functionName, object payload)
+    {
+        if (!await EnsureValidTokenAsync())
+            return FirebaseResult.Fail("Not authenticated");
+
+        var url = $"https://us-central1-{_projectId}.cloudfunctions.net/{functionName}";
+        var body = JsonSerializer.Serialize(new { data = payload }, JsonOptions);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _idToken);
+
+            Logger.Debug("Calling Cloud Function: {Function}", functionName);
+            var response = await _http.SendAsync(request);
+            var responseText = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // HttpsError responses look like: { "error": { "status": "...", "message": "..." } }
+                string errorMessage = $"Function call failed: {response.StatusCode}";
+                try
+                {
+                    var errData = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    if (errData.TryGetProperty("error", out var errEl) &&
+                        errEl.TryGetProperty("message", out var msgEl))
+                    {
+                        errorMessage = msgEl.GetString() ?? errorMessage;
+                    }
+                }
+                catch (JsonException) { /* fall back to generic message */ }
+
+                Logger.Warning("Cloud Function {Function} returned {Status}: {Message}", functionName, response.StatusCode, errorMessage);
+                return FirebaseResult.Fail(errorMessage);
+            }
+
+            var responseData = JsonSerializer.Deserialize<JsonElement>(responseText);
+            var result = responseData.TryGetProperty("result", out var resultEl)
+                ? resultEl
+                : responseData;
+
+            Logger.Debug("Cloud Function {Function} succeeded", functionName);
+            return FirebaseResult.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Cloud Function call failed: {Function}", functionName);
+            return FirebaseResult.Fail(ex.Message);
+        }
+    }
+
     // ==================== SSE STREAMING ====================
 
     /// <summary>
