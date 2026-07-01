@@ -24,11 +24,20 @@ public class AppConstantsCoverageTests
         password.Should().NotBeNullOrEmpty();
     }
 
-    [Fact]
+[Fact]
     public void GetAdminExitPassword_DefaultFallback()
     {
-        var password = AppConstants.GetAdminExitPassword();
-        password.Should().Be("1234");
+        var originalValue = Environment.GetEnvironmentVariable("ADMIN_EXIT_PASSWORD");
+        try
+        {
+            Environment.SetEnvironmentVariable("ADMIN_EXIT_PASSWORD", null);
+            var password = AppConstants.GetAdminExitPassword();
+            password.Should().Be("1234");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ADMIN_EXIT_PASSWORD", originalValue);
+        }
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
@@ -219,7 +220,10 @@ public partial class PaymentDialog : Window
             }
 
             if (string.IsNullOrEmpty(mosadId) || string.IsNullOrEmpty(apiValid))
-                Logger.Warning("Nedarim credentials missing — payment will fail");
+                Logger.Warning(
+                    "Nedarim credentials missing for OrgId={OrgId} — payment will fail. " +
+                    "MetaResult.Success={Success} MetaResult.Error={Error} mosadId.IsEmpty={MosadEmpty} apiValid.IsEmpty={ApiEmpty}",
+                    _firebase.OrgId, metaResult.IsSuccess, metaResult.Error, string.IsNullOrEmpty(mosadId), string.IsNullOrEmpty(apiValid));
 
             // Read payment settings (save card feature)
             var saveCardEnabled = false;
@@ -344,9 +348,12 @@ public partial class PaymentDialog : Window
         }
     }
 
-    // Note: Nedarim's TashlumBodedNew API (charging an existing saved card/Keva) does not accept
-    // a CVV parameter at all - per their docs, CVV is never stored and cannot be verified for
-    // an existing token charge. The CVV field in the UI is a client-side UX prompt only.
+    // Note: the actual Nedarim TashlumBodedNew call and crediting now happen entirely
+    // server-side in the chargeWithSavedCard Cloud Function. This keeps ApiPassword
+    // (a real Nedarim business secret) out of the kiosk client, and ensures saved-card
+    // charges go through the same idempotency/amount-verification path as the regular
+    // iframe + nedarimCallback flow, instead of crediting blindly right after a
+    // synchronous "OK" response with no server-side check at all.
     private async Task HandleChargeWithSavedCardAsync()
     {
         try
@@ -355,6 +362,7 @@ public partial class PaymentDialog : Window
             var result = await _purchaseService.CreatePendingPurchaseAsync(_userId, _package);
             if (!result.IsSuccess || result.Data is not { } data)
             {
+                Logger.Warning("Saved-card charge aborted: failed to create pending purchase. Error={Error}", result.Error);
                 var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = result.Error ?? "שגיאה" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
                 return;
@@ -363,20 +371,9 @@ public partial class PaymentDialog : Window
             _purchaseId = type.GetProperty("purchaseId")?.GetValue(data)?.ToString() ?? "";
             Logger.Information("Pending purchase created for saved card: {PurchaseId}", _purchaseId);
 
-            // Read config values
-            var metaResult = await _metadataService.GetOrganizationMetadataAsync(_firebase.OrgId);
-            var mosadId = "";
-            var apiPassword = "";
-            if (metaResult.IsSuccess && metaResult.Data != null)
-            {
-                var dt = metaResult.Data.GetType();
-                if (dt.GetProperty("nedarim_mosad_id")?.GetValue(metaResult.Data) is JsonElement mosadEl)
-                    mosadId = mosadEl.ValueKind == System.Text.Json.JsonValueKind.String ? mosadEl.GetString() ?? "" : mosadEl.ToString();
-                if (dt.GetProperty("nedarim_api_valid")?.GetValue(metaResult.Data) is JsonElement apiEl)
-                    apiPassword = apiEl.ValueKind == System.Text.Json.JsonValueKind.String ? apiEl.GetString() ?? "" : apiEl.ToString();
-            }
-
-            // Read savedKevaId from Firebase
+            // Read savedKevaId from Firebase (only used to send to the server for
+            // cross-checking - the server re-reads it from the user's own record
+            // anyway and never trusts this value blindly).
             var savedKevaId = "";
             var userResult = await _firebase.DbGetAsync($"users/{_userId}");
             if (userResult.Success && userResult.Data is JsonElement userData)
@@ -387,50 +384,55 @@ public partial class PaymentDialog : Window
             }
             if (string.IsNullOrEmpty(savedKevaId))
             {
+                Logger.Warning("Saved-card charge aborted: no savedKevaId found for user {UserId}", _userId);
                 var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "לא נמצא כרטיס שמור" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
                 return;
             }
 
-            // Call Nedarim TashlumBodedNew
-            Logger.Information("Charging with saved card KevaId={KevaId} PurchaseId={PurchaseId}", savedKevaId, _purchaseId);
-            using var http = new HttpClient();
-            http.Timeout = TimeSpan.FromSeconds(30);
-            var formData = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["Action"] = "TashlumBodedNew",
-                ["MosadNumber"] = mosadId,
-                ["ApiPassword"] = apiPassword,
-                ["Currency"] = "1",
-                ["KevaId"] = savedKevaId,
-                ["Amount"] = _package.DisplayPrice.ToString("F0"),
-                ["Tashloumim"] = "1",
-                ["JoinToKevaId"] = "NoJoin",
-                ["Comments"] = $"Purchase:{_purchaseId}"
-            });
-            var response = await http.PostAsync("https://matara.pro/nedarimplus/Reports/Manage3.aspx", formData);
-            var responseText = await response.Content.ReadAsStringAsync();
-            Logger.Information("Nedarim TashlumBodedNew response: {Response}", responseText);
+            Logger.Information("Calling chargeWithSavedCard function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix}",
+                _firebase.OrgId, _purchaseId, savedKevaId.Length > 4 ? savedKevaId[^4..] : savedKevaId);
 
-            using var doc = JsonDocument.Parse(responseText);
-            var respRoot = doc.RootElement;
-            var status = respRoot.TryGetProperty("Status", out var st) ? st.GetString() : "";
-            if (status == "OK")
+            var callResult = await _firebase.CallFunctionAsync("chargeWithSavedCard", new
             {
-                // Charge succeeded immediately - credit the user directly (no callback exists for this flow)
-                await CreditUserForPurchaseAsync(_purchaseId, savedKevaId);
+                orgId = _firebase.OrgId,
+                purchaseId = _purchaseId,
+                kevaId = savedKevaId,
+            });
+
+            if (!callResult.Success)
+            {
+                Logger.Error("chargeWithSavedCard function call failed: {Error}", callResult.Error);
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = callResult.Error ?? "שגיאה בעיבוד תשלום" });
+                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
+                return;
+            }
+
+            // The function returns { success, message/error, correlationId }
+            var resultData = (JsonElement)callResult.Data!;
+            var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
+            var correlationId = resultData.TryGetProperty("correlationId", out var cEl) ? cEl.GetString() : null;
+
+            if (success)
+            {
+                Logger.Information("Saved-card charge succeeded server-side. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
+                    _purchaseId, correlationId);
+                PaymentSucceeded = true;
+                var successMsg = JsonSerializer.Serialize(new { action = "showSuccess" });
+                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(successMsg));
             }
             else
             {
-                var errorText = respRoot.TryGetProperty("Message", out var m) ? m.GetString() ?? "שגיאה" : "שגיאה";
-                Logger.Error("Nedarim charge failed: {Error}", errorText);
+                var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "שגיאה" : "שגיאה";
+                Logger.Warning("Saved-card charge declined by server. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
+                    _purchaseId, errorText, correlationId);
                 var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = errorText });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
             }
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to charge with saved card");
+            Logger.Error(ex, "Failed to charge with saved card. PurchaseId={PurchaseId}", _purchaseId);
             var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בעיבוד תשלום" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
         }
@@ -458,107 +460,37 @@ public partial class PaymentDialog : Window
         }
     }
 
-    private async Task HandlePaymentSuccessAsync(JsonElement root)
-    {
-        Logger.Information("Payment success received from JS - raw: {Raw}", root.ToString());
-
-        if (string.IsNullOrEmpty(_purchaseId)) return;
-
-        // Extract KevaId from JS response (present only when a token/Keva was created via the iframe)
-        var kevaId = "";
-        if (root.TryGetProperty("response", out var resp) && resp.ValueKind == System.Text.Json.JsonValueKind.Object)
-        {
-            kevaId = resp.TryGetProperty("KevaId", out var keva) ? keva.GetString() ?? "" : "";
-        }
-
-        await CreditUserForPurchaseAsync(_purchaseId, kevaId);
-    }
-
     /// <summary>
-    /// Credits a user for a completed purchase: reads purchase + user data, updates remainingTime/printBalance,
-    /// marks the purchase as completed, optionally saves a KevaId for future saved-card charges, and notifies JS.
-    /// Used both for the iframe payment flow and the saved-card (TashlumBodedNew) flow, since the latter has
-    /// no callback mechanism and must credit synchronously right after a successful charge.
+    /// Called when the Nedarim iframe reports the transaction itself succeeded
+    /// (card was charged / token created). This does NOT credit the user -
+    /// crediting is the Cloud Function nedarimCallback's job, triggered by
+    /// Nedarim's server-to-server callback, which is the only place that can
+    /// safely guarantee idempotency and amount verification. The kiosk just
+    /// shows a "processing" state and waits for purchases/{id}/status to flip
+    /// to "completed" via the SSE listener (started in HandleCreatePurchaseAsync)
+    /// or the polling fallback if SSE drops.
     /// </summary>
-    private async Task CreditUserForPurchaseAsync(string purchaseId, string kevaId)
+    private Task HandlePaymentSuccessAsync(JsonElement root)
     {
-        try
+        Logger.Information("Payment success received from JS (transaction OK, awaiting server credit) - raw: {Raw}", root.ToString());
+
+        if (string.IsNullOrEmpty(_purchaseId))
         {
-            // Read purchase data to get package details
-            var purchaseResult = await _firebase.DbGetAsync($"purchases/{purchaseId}");
-            if (!purchaseResult.Success || purchaseResult.Data is not JsonElement purchaseData)
-            {
-                Logger.Error("Failed to read purchase data for {Id}", purchaseId);
-                await ShowTimeoutAsync();
-                return;
-            }
-
-            var userId = purchaseData.TryGetProperty("userId", out var u) ? u.GetString() : null;
-            if (string.IsNullOrEmpty(userId))
-            {
-                Logger.Error("Purchase {Id} missing userId", purchaseId);
-                await ShowTimeoutAsync();
-                return;
-            }
-
-            // Read current user data
-            var userResult = await _firebase.DbGetAsync($"users/{userId}");
-            if (!userResult.Success || userResult.Data is not JsonElement userData)
-            {
-                Logger.Error("Failed to read user data for {UserId}", userId);
-                await ShowTimeoutAsync();
-                return;
-            }
-
-            var currentTime = userData.TryGetProperty("remainingTime", out var rt) ? rt.GetInt32() : 0;
-            var currentPrints = userData.TryGetProperty("printBalance", out var pb) ? pb.GetDouble() : 0.0;
-            var addMinutes = purchaseData.TryGetProperty("minutes", out var m) ? m.GetInt32() : 0;
-            var addPrints = purchaseData.TryGetProperty("printBudget", out var pp) ? pp.GetDouble() : 0.0;
-
-            var newTime = currentTime + (addMinutes * 60);
-            var newPrints = currentPrints + addPrints;
-
-            if (!string.IsNullOrEmpty(kevaId))
-                Logger.Information("KevaId received: {KevaId}", kevaId);
-            Logger.Information("Crediting user {UserId}: +{Min}min +{Prints} prints", userId, addMinutes, addPrints);
-
-            // Update purchase status
-            await _firebase.DbUpdateAsync($"purchases/{purchaseId}", new Dictionary<string, object>
-            {
-                ["status"] = "completed",
-                ["creditedAt"] = DateTime.UtcNow.ToString("o"),
-                ["creditedBy"] = "kiosk-direct"
-            });
-
-            // Credit user
-            var userUpdate = new Dictionary<string, object>
-            {
-                ["remainingTime"] = newTime,
-                ["printBalance"] = newPrints,
-                ["lastCreditedAt"] = DateTime.UtcNow.ToString("o"),
-                ["lastCreditedBy"] = "kiosk-direct"
-            };
-            if (!string.IsNullOrEmpty(kevaId))
-            {
-                userUpdate["savedCard"] = new Dictionary<string, object> { ["kevaId"] = kevaId, ["savedAt"] = DateTime.UtcNow.ToString("o") };
-                Logger.Information("Saving KevaId for user {UserId}", userId);
-            }
-            await _firebase.DbUpdateAsync($"users/{userId}", userUpdate);
-
-            Logger.Information("User {UserId} credited successfully. newTime={T} newPrints={P}", userId, newTime, newPrints);
-
-            _ = Dispatcher.InvokeAsync(() =>
-            {
-                PaymentSucceeded = true;
-                var msg = System.Text.Json.JsonSerializer.Serialize(new { action = "showSuccess" });
-                PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
-            });
+            Logger.Warning("HandlePaymentSuccessAsync called with no active purchaseId");
+            return Task.CompletedTask;
         }
-        catch (Exception ex)
+
+        // Show "processing" UI and kick off the polling fallback in case the
+        // SSE listener (already running since purchase creation) misses the
+        // update for any reason (dropped connection, etc).
+        _ = Dispatcher.InvokeAsync(() =>
         {
-            Logger.Error(ex, "Failed to credit user after payment");
-            await ShowTimeoutAsync();
-        }
+            var msg = JsonSerializer.Serialize(new { action = "savedCardCharging" });
+            PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
+        });
+        _ = PollPurchaseStatusAsync();
+
+        return Task.CompletedTask;
     }
 
     private Task ShowTimeoutAsync()
@@ -581,11 +513,20 @@ public partial class PaymentDialog : Window
 
             if (status is "completed" or "approved")
             {
-                Logger.Information("Purchase {Id} completed via SSE", purchaseId);
+                Logger.Information("Purchase {Id} completed via SSE (server-side credit confirmed)", purchaseId);
                 _ = Dispatcher.InvokeAsync(() =>
                 {
                     PaymentSucceeded = true;
                     var msg = JsonSerializer.Serialize(new { action = "showSuccess" });
+                    PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
+                });
+            }
+            else if (status == "failed")
+            {
+                Logger.Warning("Purchase {Id} marked failed via SSE", purchaseId);
+                _ = Dispatcher.InvokeAsync(() =>
+                {
+                    var msg = JsonSerializer.Serialize(new { action = "purchaseError", error = "התשלום נכשל. אם חויבת, נא לפנות לתמיכה." });
                     PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
                 });
             }
@@ -612,6 +553,16 @@ public partial class PaymentDialog : Window
                     {
                         PaymentSucceeded = true;
                         var msg = JsonSerializer.Serialize(new { action = "showSuccess" });
+                        PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
+                    });
+                    return;
+                }
+                if (status == "failed")
+                {
+                    Logger.Warning("Purchase {Id} marked failed via polling", _purchaseId);
+                    _ = Dispatcher.InvokeAsync(() =>
+                    {
+                        var msg = JsonSerializer.Serialize(new { action = "purchaseError", error = "התשלום נכשל. אם חויבת, נא לפנות לתמיכה." });
                         PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
                     });
                     return;

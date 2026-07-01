@@ -490,6 +490,8 @@
             else if (msg.action === 'purchaseError') {
                 document.getElementById('formSection').style.display = 'flex';
                 document.getElementById('loadingPayment').classList.remove('active');
+                var pmErr = document.getElementById('processingMessage');
+                if (pmErr) pmErr.classList.remove('active');
                 showError(msg.error || 'שגיאה ביצירת רכישה');
             }
             else if (msg.action === 'showSuccess') {
