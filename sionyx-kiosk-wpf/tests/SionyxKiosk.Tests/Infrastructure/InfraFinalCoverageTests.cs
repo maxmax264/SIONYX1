@@ -307,7 +307,7 @@ public class FirebaseConfigFinalCoverageTests
 
         var config = (FirebaseConfig)method.Invoke(null, new object?[]
         {
-            "api-key", null, "https://db.firebaseio.com", "project-id", "org-id", "test"
+            "api-key", null, "https://db.firebaseio.com", "project-id", "org-id", "test", null
         })!;
 
         config.ApiKey.Should().Be("api-key");
@@ -323,7 +323,7 @@ public class FirebaseConfigFinalCoverageTests
 
         var config = (FirebaseConfig)method.Invoke(null, new object?[]
         {
-            "api-key", "auth.domain.com", "https://db.firebaseio.com", "project-id", "my-org", "test"
+            "api-key", "auth.domain.com", "https://db.firebaseio.com", "project-id", "my-org", "test", null
         })!;
 
         config.ApiKey.Should().Be("api-key");

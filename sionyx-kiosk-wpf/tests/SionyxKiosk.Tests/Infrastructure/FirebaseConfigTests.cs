@@ -75,7 +75,7 @@ public class FirebaseConfigTests
 
         try
         {
-            method!.Invoke(null, new object?[] { apiKey, authDomain, databaseUrl, projectId, orgId, "test" });
+            method!.Invoke(null, new object?[] { apiKey, authDomain, databaseUrl, projectId, orgId, "test", null });
         }
         catch (TargetInvocationException ex) when (ex.InnerException != null)
         {

@@ -147,15 +147,16 @@ public static class TestFirebaseFactory
         string? authDomain = "test.firebaseapp.com",
         string databaseUrl = "https://test-db.firebaseio.com",
         string projectId = "test-project",
-        string orgId = "test-org")
+        string orgId = "test-org",
+        string? functionsBaseUrl = null)
     {
         var ctor = typeof(FirebaseConfig).GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
             null,
-            new[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string) },
+            new[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string) },
             null);
 
-        return (FirebaseConfig)ctor!.Invoke(new object?[] { apiKey, authDomain, databaseUrl, projectId, orgId });
+        return (FirebaseConfig)ctor!.Invoke(new object?[] { apiKey, authDomain, databaseUrl, projectId, orgId, functionsBaseUrl });
     }
 
     /// <summary>Create a JsonElement from an anonymous object.</summary>

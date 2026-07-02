@@ -17,7 +17,7 @@ public class FirebaseConfigDeepTests
         string? projectId, string? orgId, string source = "test")
     {
         return (FirebaseConfig)CreateAndValidateMethod.Invoke(null,
-            new object?[] { apiKey, authDomain, databaseUrl, projectId, orgId, source })!;
+            new object?[] { apiKey, authDomain, databaseUrl, projectId, orgId, source, null })!;
     }
 
     [Fact]
