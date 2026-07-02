@@ -102,6 +102,7 @@
         <RegistryKey Root="HKLM" Key="SOFTWARE\SIONYX">
           <RegistryValue Name="NedarimCallbackUrl" Type="string" Value="$(var.NedarimCallbackUrl)" />
           <RegistryValue Name="AdminExitPassword"  Type="string" Value="$(var.AdminExitPassword)" />
+          <RegistryValue Name="FunctionsBaseUrl"   Type="string" Value="$(var.FunctionsBaseUrl)" />
         </RegistryKey>
         <RegistryValue Root="HKLM" Key="SOFTWARE\SIONYX" Name="paymentConfigured" Type="integer" Value="1" KeyPath="yes" />
       </Component>

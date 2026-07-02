@@ -359,6 +359,7 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
           NEDARIM_CALLBACK_URL: ${{ secrets.NEDARIM_CALLBACK_URL }}
           ADMIN_EXIT_PASSWORD: ${{ secrets.ADMIN_EXIT_PASSWORD }}
+          FUNCTIONS_BASE_URL: ${{ secrets.FUNCTIONS_BASE_URL }}
         run: |
           $publishDir = (Resolve-Path dist).Path
           $sourceDir  = (Resolve-Path .).Path
@@ -412,6 +413,7 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
           NEDARIM_CALLBACK_URL: ${{ secrets.NEDARIM_CALLBACK_URL }}
           ADMIN_EXIT_PASSWORD: ${{ secrets.ADMIN_EXIT_PASSWORD }}
+          FUNCTIONS_BASE_URL: ${{ secrets.FUNCTIONS_BASE_URL }}
         run: |
           $pass = 0; $fail = 0; $warn = 0
           function Assert-Pass($msg)  { $script:pass++; Write-Host "[PASS] $msg" }
@@ -461,6 +463,7 @@ jobs:
           Write-Host "`n=== REGISTRY: PAYMENT & SECURITY ==="
           Assert-Equal "NedarimCallbackUrl" $reg.NedarimCallbackUrl $env:NEDARIM_CALLBACK_URL
           Assert-Equal "AdminExitPassword" $reg.AdminExitPassword $env:ADMIN_EXIT_PASSWORD
+          Assert-Equal "FunctionsBaseUrl" $reg.FunctionsBaseUrl $env:FUNCTIONS_BASE_URL
           Assert-Equal "paymentConfigured" $reg.paymentConfigured 1
 
           Write-Host "`n=== REGISTRY: SHORTCUT MARKERS (HKCU) ==="

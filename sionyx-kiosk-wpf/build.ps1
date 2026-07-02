@@ -205,6 +205,14 @@ function Test-InstallerSecrets {
         Write-Host "  Example:  `$env:FIREBASE_API_KEY = 'AIza...'" -ForegroundColor Yellow
         return $false
     }
+
+    # Optional: base URL for the Render payment bridge. Not required (falls
+    # back to cloudfunctions.net if unset) but worth flagging so it's not
+    # silently missed on a build where you meant to set it.
+    if (-not [Environment]::GetEnvironmentVariable("FUNCTIONS_BASE_URL")) {
+        Write-Warn "FUNCTIONS_BASE_URL not set - this build will point saved-card payments at cloudfunctions.net (requires Blaze). Set `$env:FUNCTIONS_BASE_URL if you're using the Render bridge."
+    }
+
     Write-Ok "All installer secrets present in environment"
     return $true
 }
@@ -285,7 +293,7 @@ function Invoke-Upload([string]$installerPath, $versionData) {
     $ver = $versionData.version
     $buildNum = $versionData.buildNumber
 
-    python $uploadScript $installerPath $ver $buildNum | Out-Host
+    python $uploadScript $installerPath $ver $buildNum
     if ($LASTEXITCODE -ne 0) {
         Write-Err "Upload failed"
         return $false

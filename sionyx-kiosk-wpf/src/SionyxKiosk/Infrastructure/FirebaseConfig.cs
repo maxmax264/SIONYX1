@@ -14,16 +14,26 @@ public sealed class FirebaseConfig
     public string ProjectId { get; }
     public string OrgId { get; }
 
+    /// <summary>
+    /// Optional base URL for HTTP function-equivalents (e.g. a Render
+    /// service standing in for Cloud Functions that require Blaze).
+    /// When null/empty, callers fall back to the default
+    /// https://us-central1-{ProjectId}.cloudfunctions.net pattern.
+    /// Example: https://sionyx-payment-bridge.onrender.com
+    /// </summary>
+    public string? FunctionsBaseUrl { get; }
+
     /// <summary>Firebase Auth REST API base URL.</summary>
     public string AuthUrl => "https://identitytoolkit.googleapis.com/v1/accounts";
 
-    private FirebaseConfig(string apiKey, string? authDomain, string databaseUrl, string projectId, string orgId)
+    private FirebaseConfig(string apiKey, string? authDomain, string databaseUrl, string projectId, string orgId, string? functionsBaseUrl = null)
     {
         ApiKey = apiKey;
         AuthDomain = authDomain;
         DatabaseUrl = databaseUrl;
         ProjectId = projectId;
         OrgId = orgId;
+        FunctionsBaseUrl = string.IsNullOrWhiteSpace(functionsBaseUrl) ? null : functionsBaseUrl.TrimEnd('/');
     }
 
     /// <summary>
@@ -46,8 +56,9 @@ public sealed class FirebaseConfig
         var databaseUrl = config["DatabaseUrl"];
         var projectId = config["ProjectId"];
         var orgId = config["OrgId"];
+        var functionsBaseUrl = config.ContainsKey("FunctionsBaseUrl") ? config["FunctionsBaseUrl"] : null;
 
-        return CreateAndValidate(apiKey, authDomain, databaseUrl, projectId, orgId, "registry");
+        return CreateAndValidate(apiKey, authDomain, databaseUrl, projectId, orgId, "registry", functionsBaseUrl);
     }
 
     private static FirebaseConfig LoadFromEnvironment()
@@ -62,13 +73,14 @@ public sealed class FirebaseConfig
         var databaseUrl = Environment.GetEnvironmentVariable("FIREBASE_DATABASE_URL");
         var projectId = Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID");
         var orgId = Environment.GetEnvironmentVariable("ORG_ID");
+        var functionsBaseUrl = Environment.GetEnvironmentVariable("FUNCTIONS_BASE_URL");
 
-        return CreateAndValidate(apiKey, authDomain, databaseUrl, projectId, orgId, ".env");
+        return CreateAndValidate(apiKey, authDomain, databaseUrl, projectId, orgId, ".env", functionsBaseUrl);
     }
 
     private static FirebaseConfig CreateAndValidate(
         string? apiKey, string? authDomain, string? databaseUrl,
-        string? projectId, string? orgId, string source)
+        string? projectId, string? orgId, string source, string? functionsBaseUrl = null)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException($"FIREBASE_API_KEY missing in {source}");
@@ -88,7 +100,7 @@ public sealed class FirebaseConfig
                 "Must contain only lowercase letters, numbers, and hyphens.\n" +
                 "Example: myorg, tech-lab, university-cs");
 
-        return new FirebaseConfig(apiKey, authDomain, databaseUrl, projectId, orgId);
+        return new FirebaseConfig(apiKey, authDomain, databaseUrl, projectId, orgId, functionsBaseUrl);
     }
 
     private static string? FindEnvFile()

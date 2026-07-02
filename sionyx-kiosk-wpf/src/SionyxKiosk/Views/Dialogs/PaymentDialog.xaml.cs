@@ -238,7 +238,12 @@ public partial class PaymentDialog : Window
             }
             Logger.Information("Payment settings: saveCard={SaveCard}", saveCardEnabled);
 
-            var callbackUrl = $"https://us-central1-{_firebase.ProjectId}.cloudfunctions.net/nedarimCallback";
+            // Uses the same base-URL override as CallFunctionAsync so both
+            // point at the Render bridge when configured (see FirebaseConfig.
+            // FunctionsBaseUrl), falling back to Cloud Functions otherwise.
+            var callbackUrl = string.IsNullOrEmpty(_firebase.FunctionsBaseUrl)
+                ? $"https://us-central1-{_firebase.ProjectId}.cloudfunctions.net/nedarimCallback"
+                : $"{_firebase.FunctionsBaseUrl}/nedarimCallback";
             // Check if user has a saved card
             var savedKevaId = "";
             var userResult = await _firebase.DbGetAsync($"users/{_userId}");

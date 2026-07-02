@@ -59,6 +59,9 @@ public static class RegistryConfig
             ["MessagingSenderId"] = ReadValue("FirebaseMessagingSenderId"),
             ["AppId"] = ReadValue("FirebaseAppId"),
             ["MeasurementId"] = ReadValue("FirebaseMeasurementId"),
+            // Optional: base URL for HTTP function-equivalents (e.g. a Render
+            // service standing in for Cloud Functions that require Blaze).
+            ["FunctionsBaseUrl"] = ReadValue("FunctionsBaseUrl"),
         };
     }
 

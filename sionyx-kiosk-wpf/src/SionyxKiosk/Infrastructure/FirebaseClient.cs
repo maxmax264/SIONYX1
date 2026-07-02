@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using Serilog;
 
 namespace SionyxKiosk.Infrastructure;
@@ -26,6 +27,7 @@ public sealed class FirebaseClient : IFirebaseClient
     private readonly string _authUrl;
     private readonly string _orgId;
     private readonly string _projectId;
+    private readonly string? _functionsBaseUrl;
 
     // Auth state
     private string? _idToken;
@@ -38,6 +40,13 @@ public sealed class FirebaseClient : IFirebaseClient
     public string? RefreshToken => _refreshToken;
     public string OrgId => _orgId;
     public string ProjectId => _projectId;
+    /// <summary>
+    /// Base URL used for HTTP function-equivalents, e.g. a Render service
+    /// standing in for Cloud Functions (which require Blaze). Null when
+    /// not configured, in which case callers fall back to the default
+    /// cloudfunctions.net pattern.
+    /// </summary>
+    public string? FunctionsBaseUrl => _functionsBaseUrl;
     public bool IsAuthenticated => _idToken != null && _userId != null;
 
     public FirebaseClient(FirebaseConfig config, HttpClient? httpClient = null)
@@ -47,6 +56,7 @@ public sealed class FirebaseClient : IFirebaseClient
         _authUrl = config.AuthUrl;
         _orgId = config.OrgId;
         _projectId = config.ProjectId;
+        _functionsBaseUrl = config.FunctionsBaseUrl;
         _http = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
         Logger.Information("Firebase client initialized (org: {OrgId})", _orgId);
@@ -328,7 +338,9 @@ public sealed class FirebaseClient : IFirebaseClient
         if (!await EnsureValidTokenAsync())
             return FirebaseResult.Fail("Not authenticated");
 
-        var url = $"https://us-central1-{_projectId}.cloudfunctions.net/{functionName}";
+        var url = string.IsNullOrEmpty(_functionsBaseUrl)
+            ? $"https://us-central1-{_projectId}.cloudfunctions.net/{functionName}"
+            : $"{_functionsBaseUrl}/{functionName}";
         var body = JsonSerializer.Serialize(new { data = payload }, JsonOptions);
 
         try
@@ -339,8 +351,12 @@ public sealed class FirebaseClient : IFirebaseClient
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _idToken);
 
-            Logger.Debug("Calling Cloud Function: {Function}", functionName);
-            var response = await _http.SendAsync(request);
+            Logger.Debug("Calling function: {Function} at {Url}", functionName, url);
+            // Render's free tier can take 30-50s to wake up from an idle
+            // spin-down, so this call needs a generous timeout - the default
+            // HttpClient timeout (30s) can be too short for a cold start.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            var response = await _http.SendAsync(request, cts.Token);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)

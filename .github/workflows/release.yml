@@ -68,6 +68,7 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
           NEDARIM_CALLBACK_URL: ${{ secrets.NEDARIM_CALLBACK_URL }}
           ADMIN_EXIT_PASSWORD: ${{ secrets.ADMIN_EXIT_PASSWORD }}
+          FUNCTIONS_BASE_URL: ${{ secrets.FUNCTIONS_BASE_URL }}
         run: |
           $ver = "${{ steps.version.outputs.version }}"
           powershell -ExecutionPolicy Bypass -File build.ps1 -Version $ver -NoUpload

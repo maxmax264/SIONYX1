@@ -22,8 +22,13 @@
     <FirebaseMeasurementId Condition="'$(FirebaseMeasurementId)' == ''">$(FIREBASE_MEASUREMENT_ID)</FirebaseMeasurementId>
     <NedarimCallbackUrl Condition="'$(NedarimCallbackUrl)' == ''">$(NEDARIM_CALLBACK_URL)</NedarimCallbackUrl>
     <AdminExitPassword Condition="'$(AdminExitPassword)' == ''">$(ADMIN_EXIT_PASSWORD)</AdminExitPassword>
+    <!-- Base URL for the Render payment bridge (chargeWithSavedCard +
+         nedarimCallback), replacing Cloud Functions since those require
+         Firebase Blaze. Optional: leave empty to fall back to the old
+         cloudfunctions.net URLs (see FirebaseConfig.cs / FirebaseClient.cs). -->
+    <FunctionsBaseUrl Condition="'$(FunctionsBaseUrl)' == ''">$(FUNCTIONS_BASE_URL)</FunctionsBaseUrl>
 
-    <DefineConstants>ProductVersion=$(ProductVersion);PublishDir=$(PublishDir);SourceDir=$(SourceDir);FirebaseApiKey=$(FirebaseApiKey);FirebaseAuthDomain=$(FirebaseAuthDomain);FirebaseProjectId=$(FirebaseProjectId);FirebaseDatabaseUrl=$(FirebaseDatabaseUrl);FirebaseStorageBucket=$(FirebaseStorageBucket);FirebaseMessagingSenderId=$(FirebaseMessagingSenderId);FirebaseAppId=$(FirebaseAppId);FirebaseMeasurementId=$(FirebaseMeasurementId);NedarimCallbackUrl=$(NedarimCallbackUrl);AdminExitPassword=$(AdminExitPassword)</DefineConstants>
+    <DefineConstants>ProductVersion=$(ProductVersion);PublishDir=$(PublishDir);SourceDir=$(SourceDir);FirebaseApiKey=$(FirebaseApiKey);FirebaseAuthDomain=$(FirebaseAuthDomain);FirebaseProjectId=$(FirebaseProjectId);FirebaseDatabaseUrl=$(FirebaseDatabaseUrl);FirebaseStorageBucket=$(FirebaseStorageBucket);FirebaseMessagingSenderId=$(FirebaseMessagingSenderId);FirebaseAppId=$(FirebaseAppId);FirebaseMeasurementId=$(FirebaseMeasurementId);NedarimCallbackUrl=$(NedarimCallbackUrl);AdminExitPassword=$(AdminExitPassword);FunctionsBaseUrl=$(FunctionsBaseUrl)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

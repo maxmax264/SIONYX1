@@ -8,6 +8,7 @@ public interface IFirebaseClient : IDisposable
     string? RefreshToken { get; }
     string OrgId { get; }
     string ProjectId { get; }
+    string? FunctionsBaseUrl { get; }
     bool IsAuthenticated { get; }
 
     Task<FirebaseResult> SignUpAsync(string email, string password);
