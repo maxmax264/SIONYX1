@@ -200,6 +200,20 @@ public partial class PaymentDialog : Window
         }
     }
 
+    /// <summary>
+    /// Extracts a string from a value that might be a JsonElement (if it
+    /// came through JSON deserialization) or a plain object like string/
+    /// number (if it came from an in-process C# object, as
+    /// GetOrganizationMetadataAsync's anonymous-type result does).
+    /// </summary>
+    private static string ExtractStringValue(object? value)
+    {
+        if (value is null) return "";
+        if (value is JsonElement el)
+            return el.ValueKind == JsonValueKind.String ? el.GetString() ?? "" : el.ToString();
+        return value.ToString() ?? "";
+    }
+
     private async Task InjectConfigAsync()
     {
         try
@@ -212,11 +226,8 @@ public partial class PaymentDialog : Window
             {
                 var dataType = metaResult.Data.GetType();
 
-                if (dataType.GetProperty("nedarim_mosad_id")?.GetValue(metaResult.Data) is JsonElement mosadEl)
-                    mosadId = mosadEl.ValueKind == JsonValueKind.String ? mosadEl.GetString() ?? "" : mosadEl.ToString();
-
-                if (dataType.GetProperty("nedarim_api_valid")?.GetValue(metaResult.Data) is JsonElement apiEl)
-                    apiValid = apiEl.ValueKind == JsonValueKind.String ? apiEl.GetString() ?? "" : apiEl.ToString();
+                mosadId = ExtractStringValue(dataType.GetProperty("nedarim_mosad_id")?.GetValue(metaResult.Data));
+                apiValid = ExtractStringValue(dataType.GetProperty("nedarim_api_valid")?.GetValue(metaResult.Data));
             }
 
             if (string.IsNullOrEmpty(mosadId) || string.IsNullOrEmpty(apiValid))

@@ -1,8 +1,8 @@
 {
-  "version": "3.5.0",
-  "major": 3,
-  "minor": 5,
-  "patch": 0,
-  "buildNumber": 399,
-  "lastBuildDate": "2026-07-03T06:37:15.5396394+00:00"
+    "version":  "3.5.1",
+    "major":  3,
+    "minor":  5,
+    "patch":  1,
+    "buildNumber":  400,
+    "lastBuildDate":  "2026-07-03T09:58:43.5885758+03:00"
 }
