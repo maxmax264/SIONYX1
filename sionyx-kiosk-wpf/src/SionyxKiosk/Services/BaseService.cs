@@ -48,7 +48,13 @@ public abstract class BaseService
         if (element.ValueKind == JsonValueKind.Object &&
             element.TryGetProperty(property, out var prop))
         {
-            return prop.GetString() ?? defaultValue;
+            return prop.ValueKind switch
+            {
+                JsonValueKind.String => prop.GetString() ?? defaultValue,
+                JsonValueKind.Number => prop.GetRawText(),
+                JsonValueKind.True or JsonValueKind.False => prop.GetRawText(),
+                _ => defaultValue,
+            };
         }
         return defaultValue;
     }

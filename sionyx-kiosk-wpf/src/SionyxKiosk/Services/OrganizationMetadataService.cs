@@ -13,9 +13,15 @@ public class OrganizationMetadataService : BaseService
 
     public OrganizationMetadataService(FirebaseClient firebase) : base(firebase) { }
 
-    /// <summary>Decode base64-encoded JSON data.</summary>
+    /// <summary>
+    /// Decode base64-encoded JSON data. Falls back to returning the raw
+    /// input unchanged if it isn't valid base64/JSON - org metadata that
+    /// was never actually encoded (e.g. entered directly, or created
+    /// before encoding was added) still needs to work.
+    /// </summary>
     public static object? DecodeData(string encoded)
     {
+        if (string.IsNullOrEmpty(encoded)) return null;
         try
         {
             var bytes = Convert.FromBase64String(encoded);
@@ -24,7 +30,8 @@ public class OrganizationMetadataService : BaseService
         }
         catch (Exception)
         {
-            return null;
+            // Not base64/JSON - treat as the plain value itself.
+            return encoded;
         }
     }
 

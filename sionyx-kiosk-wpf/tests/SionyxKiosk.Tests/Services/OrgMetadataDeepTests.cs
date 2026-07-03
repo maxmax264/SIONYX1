@@ -248,10 +248,10 @@ public class OrgMetadataDeepTests : IDisposable
     }
 
     [Fact]
-    public void DecodeData_WithInvalidBase64_ShouldReturnNull()
+    public void DecodeData_WithInvalidBase64_ShouldReturnRawValue()
     {
         var result = OrganizationMetadataService.DecodeData("not-valid-base64!!!");
-        result.Should().BeNull();
+        result.Should().Be("not-valid-base64!!!");
     }
 
     [Fact]

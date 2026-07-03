@@ -114,9 +114,12 @@ public class OrgMetadataFinalCoverageTests : IDisposable
     }
 
     [Fact]
-    public async Task GetOrganizationMetadataAsync_WithInvalidNedarimData_ShouldReturnError()
+    public async Task GetOrganizationMetadataAsync_WithBase64ButNonJsonData_ShouldSucceedWithRawFallback()
     {
-        // base64 but invalid JSON
+        // base64 but invalid JSON - DecodeData now falls back to treating
+        // this as a plain (unencoded) credential value rather than failing,
+        // since real org data is often stored unencoded (see BaseService/
+        // OrganizationMetadataService fixes for the numeric-mosad-id bug).
         var badEncoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("not json"));
 
         _handler.When("metadata.json", new
@@ -127,8 +130,7 @@ public class OrgMetadataFinalCoverageTests : IDisposable
         });
 
         var result = await _service.GetOrganizationMetadataAsync("test-org");
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("NEDARIM");
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]

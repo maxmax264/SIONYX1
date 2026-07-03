@@ -35,10 +35,10 @@ public class OrganizationMetadataServiceDeepTests : IDisposable
     }
 
     [Fact]
-    public void DecodeData_WithInvalidBase64_ShouldReturnNull()
+    public void DecodeData_WithInvalidBase64_ShouldReturnRawValue()
     {
         var result = OrganizationMetadataService.DecodeData("not-valid-base64!!!");
-        result.Should().BeNull();
+        result.Should().Be("not-valid-base64!!!");
     }
 
     [Fact]
@@ -49,11 +49,11 @@ public class OrganizationMetadataServiceDeepTests : IDisposable
     }
 
     [Fact]
-    public void DecodeData_WithValidBase64ButInvalidJson_ShouldReturnNull()
+    public void DecodeData_WithValidBase64ButInvalidJson_ShouldReturnRawEncodedValue()
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes("not json {{{"));
         var result = OrganizationMetadataService.DecodeData(encoded);
-        result.Should().BeNull();
+        result.Should().Be(encoded);
     }
 
     // ==================== GetOrganizationMetadataAsync ====================
