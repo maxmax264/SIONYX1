@@ -521,8 +521,17 @@
         function initNedarimIframe() {
             // CVV is never required: Nedarim does not store it and it cannot be verified
             // for saved-card charges anyway, so we never ask for it - regardless of whether
-            // the card is being saved or not. Card number + expiry only.
+            // the card is being saved or not.
+            //
+            // Tokef (expiry) IS collected normally for a regular one-time charge, but must
+            // be HIDDEN when creating a token (save-card checked): Nedarim does not accept
+            // an expiry for CreateToken, and re-shows/re-collects it internally when the
+            // saved token is later charged via TashlumBodedNew - it isn't something we
+            // ever need to store or send ourselves.
+            var creatingToken = document.getElementById('saveCardCheck') &&
+                                 document.getElementById('saveCardCheck').checked;
             var url = "https://matara.pro/nedarimplus/iframe?language=he&CVV=Hide";
+            if (creatingToken) url += "&Tokef=Hide";
             document.getElementById('loadingIframe').style.display = 'flex';
             document.getElementById('NedarimFrame').src = url;
         }
