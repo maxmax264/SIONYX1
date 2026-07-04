@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [3.5.4] - 2026-07-04
+
+### Bug Fixes
+- hide Tokef field in iframe when creating a token (save card checked) (c97889f4)
+- re-ignore understood-payment-bridge (was accidentally re-tracked) (47e40b1e)
+
+
 ## [3.5.2] - 2026-07-03
 
 ### Bug Fixes
