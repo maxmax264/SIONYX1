@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.5.2] - 2026-07-03
+
+### Bug Fixes
+- PaymentDialog InjectConfigAsync expected JsonElement but got plain object from in-process metadata result (c1bc7537)
+
+
 ## [3.5.0] - 2026-07-03
 
 ### Features
