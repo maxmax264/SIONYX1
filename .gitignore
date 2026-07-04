@@ -436,3 +436,4 @@ env
 # Build temp files / patch rejects (should never be committed)
 *_wpftmp.csproj
 *.rej
+understood-payment-bridge/
