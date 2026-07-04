@@ -488,13 +488,17 @@ public partial class PaymentDialog : Window
 
     /// <summary>
     /// Called when the Nedarim iframe reports the transaction itself succeeded
-    /// (card was charged / token created). This does NOT credit the user -
-    /// crediting is the Cloud Function nedarimCallback's job, triggered by
-    /// Nedarim's server-to-server callback, which is the only place that can
-    /// safely guarantee idempotency and amount verification. The kiosk just
-    /// shows a "processing" state and waits for purchases/{id}/status to flip
-    /// to "completed" via the SSE listener (started in HandleCreatePurchaseAsync)
-    /// or the polling fallback if SSE drops.
+    /// (card was charged / token created). The normal/intended path is that
+    /// Nedarim's own server-to-server callback (nedarimCallback) credits the
+    /// user - that's the only place that can independently verify the charge
+    /// against Nedarim's own records. But if that callback URL isn't
+    /// enabled/whitelisted yet on this Mosad's account, it may never arrive,
+    /// leaving the purchase stuck "pending" forever despite the card having
+    /// been charged. So in addition to waiting for the webhook (SSE listener
+    /// + polling fallback, both already running), we also proactively tell
+    /// the server ourselves via /confirmPayment. Whichever one lands first
+    /// wins (confirmPayment is idempotent against the same "completed" check
+    /// nedarimCallback uses) - the other becomes a harmless no-op.
     /// </summary>
     private Task HandlePaymentSuccessAsync(JsonElement root)
     {
@@ -515,8 +519,52 @@ public partial class PaymentDialog : Window
             PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
         });
         _ = PollPurchaseStatusAsync();
+        _ = ConfirmPaymentDirectlyAsync(root);
 
         return Task.CompletedTask;
+    }
+
+    private async Task ConfirmPaymentDirectlyAsync(JsonElement root)
+    {
+        try
+        {
+            string? transactionId = null;
+            string? lastFourDigits = null;
+            if (root.TryGetProperty("response", out var responseEl))
+            {
+                if (responseEl.TryGetProperty("Token", out var tokenEl))
+                    transactionId = tokenEl.ValueKind == JsonValueKind.String ? tokenEl.GetString() : tokenEl.ToString();
+                if (responseEl.TryGetProperty("LastNum", out var lastNumEl))
+                    lastFourDigits = lastNumEl.ValueKind == JsonValueKind.String ? lastNumEl.GetString() : lastNumEl.ToString();
+            }
+
+            var payload = new
+            {
+                orgId = _firebase.OrgId,
+                purchaseId = _purchaseId,
+                transactionId,
+                lastFourDigits,
+            };
+
+            var result = await _firebase.CallFunctionAsync("confirmPayment", payload);
+            if (result.Success && result.Data is JsonElement resultData)
+            {
+                var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
+                Logger.Information("confirmPayment call completed: success={Success} purchaseId={PurchaseId}",
+                    success, _purchaseId);
+            }
+            else
+            {
+                // Not fatal - the SSE listener/polling fallback for the real
+                // nedarimCallback webhook is still running independently.
+                Logger.Warning("confirmPayment call failed (non-fatal, still waiting on webhook/polling): {Error}",
+                    result.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Error calling confirmPayment (non-fatal, still waiting on webhook/polling)");
+        }
     }
 
     private Task ShowTimeoutAsync()
