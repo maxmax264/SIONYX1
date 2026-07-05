@@ -611,7 +611,12 @@ public partial class PaymentDialog : Window
     {
         if (string.IsNullOrEmpty(_purchaseId)) return;
 
-        for (int i = 0; i < 10; i++)
+        // 40 x 2s = 80s total - comfortably longer than the 60s timeout we
+        // give the confirmPayment call itself (which can be slow on a cold
+        // Render free-tier start). Previously this was only 10 x 2s = 20s,
+        // which could time out and show an error to the customer moments
+        // before the payment was actually confirmed.
+        for (int i = 0; i < 40; i++)
         {
             if (PaymentSucceeded) return;
 
