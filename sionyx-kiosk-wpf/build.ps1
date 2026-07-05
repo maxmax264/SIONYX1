@@ -183,6 +183,15 @@ function Invoke-Publish {
 }
 
 function Test-InstallerSecrets {
+    # Local/manual builds forget to set this every new PowerShell session,
+    # so default it here. GitHub Actions still wins - it sets
+    # $env:FUNCTIONS_BASE_URL explicitly from the repo secret before this
+    # script runs, and that assignment is untouched by this default.
+    if (-not $env:FUNCTIONS_BASE_URL) {
+        $env:FUNCTIONS_BASE_URL = "https://understood-n5ok.onrender.com"
+        Write-Warn "FUNCTIONS_BASE_URL not set - defaulting to $($env:FUNCTIONS_BASE_URL). Override with `$env:FUNCTIONS_BASE_URL if this ever changes."
+    }
+
     $required = @(
         "FIREBASE_API_KEY",
         "FIREBASE_AUTH_DOMAIN",
@@ -206,12 +215,8 @@ function Test-InstallerSecrets {
         return $false
     }
 
-    # Optional: base URL for the Render payment bridge. Not required (falls
-    # back to cloudfunctions.net if unset) but worth flagging so it's not
-    # silently missed on a build where you meant to set it.
-    if (-not [Environment]::GetEnvironmentVariable("FUNCTIONS_BASE_URL")) {
-        Write-Warn "FUNCTIONS_BASE_URL not set - this build will point saved-card payments at cloudfunctions.net (requires Blaze). Set `$env:FUNCTIONS_BASE_URL if you're using the Render bridge."
-    }
+    # (FUNCTIONS_BASE_URL is defaulted at the top of this function, so it's
+    # always set by this point - no separate warning needed here anymore.)
 
     Write-Ok "All installer secrets present in environment"
     return $true
@@ -293,7 +298,7 @@ function Invoke-Upload([string]$installerPath, $versionData) {
     $ver = $versionData.version
     $buildNum = $versionData.buildNumber
 
-    python $uploadScript $installerPath $ver $buildNum
+    python $uploadScript $installerPath $ver $buildNum | Out-Host
     if ($LASTEXITCODE -ne 0) {
         Write-Err "Upload failed"
         return $false
