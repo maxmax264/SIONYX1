@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [3.5.5] - 2026-07-05
+
+### Bug Fixes
+- extend purchase-status polling timeout to 80s to avoid racing confirmPayment on Render cold start (cd9841b0)
+
+### Other
+- bump version to 3.5.7 (bc6bb006)
+- validate event.origin before trusting TransactionResponse; send real phone/name to Nedarim (b6859210)
+
+
 ## [3.5.4] - 2026-07-04
 
 ### Bug Fixes
