@@ -547,6 +547,15 @@
 
         function handlePostMessage(event) {
             if (!event.data || !event.data.Name) return;
+            // SECURITY: only trust TransactionResponse (the "charge succeeded"
+            // signal that ultimately credits the user) if it genuinely comes
+            // from Nedarim's own iframe origin - otherwise any script running
+            // in this page could spoof a fake success message with no real
+            // charge having happened at all.
+            if (event.data.Name === 'TransactionResponse' && event.origin !== 'https://matara.pro') {
+                console.warn('Ignoring TransactionResponse from unexpected origin:', event.origin);
+                return;
+            }
             switch (event.data.Name) {
                 case 'Height':
                     document.getElementById('NedarimFrame').style.height =
@@ -607,11 +616,11 @@
                     'PaymentType': paymentType,
                     'Currency': '1',
                     'Zeout': '',
-                    'FirstName': name,
-                    'LastName': '',
+                    'FirstName': name || CONFIG.userFirstName || '',
+                    'LastName': CONFIG.userLastName || '',
                     'Street': '',
                     'City': '',
-                    'Phone': '',
+                    'Phone': CONFIG.userPhone || '',
                     'Mail': '',
                     'Amount': CONFIG.amount,
                     'Tashlumim': '1',
