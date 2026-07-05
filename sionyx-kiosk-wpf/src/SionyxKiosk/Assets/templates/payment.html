@@ -606,7 +606,13 @@
             var name = document.getElementById('clientName').value.trim();
             var saveCard = CONFIG.saveCardEnabled && document.getElementById('saveCardCheck') &&
                            document.getElementById('saveCardCheck').checked;
-            var apiValidToUse = saveCard && CONFIG.saveCardApiValid ? CONFIG.saveCardApiValid : CONFIG.apiValid;
+            // Nedarim confirmed CONFIG.saveCardApiValid is the official
+            // iframe/WooCommerce auth code for this Mosad - always use it for
+            // the iframe (both regular and CreateToken), not just when
+            // save-card is checked. CONFIG.apiValid (nedarim_api_valid) is a
+            // separate credential apparently meant for server-to-server API
+            // calls (TashlumBodedNew), not the iframe.
+            var apiValidToUse = CONFIG.saveCardApiValid || CONFIG.apiValid;
             var paymentType = saveCard ? 'CreateToken' : 'Ragil';
             postToNedarim({
                 'Name': 'FinishTransaction2',
