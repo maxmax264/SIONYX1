@@ -643,15 +643,22 @@
 
         function handleTransactionResponse(response) {
             document.getElementById('loadingPayment').classList.remove('active');
-            if (response.Status === 'Error') {
-                document.getElementById('formSection').style.display = 'flex';
-                showError(response.Message || 'התשלום נכשל. נסה שוב.');
-            } else {
+            // SECURITY-CRITICAL: only credit the user for an exact, explicit
+            // 'OK' status from Nedarim. Previously this checked the opposite
+            // (only 'Error' failed, everything else - including undefined,
+            // empty, or any other non-'OK' status Nedarim might return -
+            // silently fell through to success). That's backwards: a missing
+            // or unrecognized status must never be treated as a successful
+            // charge.
+            if (response && response.Status === 'OK') {
                 document.getElementById('processingMessage').classList.add('active');
                 window.chrome.webview.postMessage({
                     action: 'paymentSuccess',
                     response: response
                 });
+            } else {
+                document.getElementById('formSection').style.display = 'flex';
+                showError((response && response.Message) || 'התשלום נכשל. נסה שוב.');
             }
         }
 
