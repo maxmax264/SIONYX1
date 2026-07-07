@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.5.6] - 2026-07-05
+
+### Bug Fixes
+- always use the Nedarim-confirmed iframe ApiValid (QWtE4M6uVn), not just when save-card is checked (c4cc8ae7)
+
+
 ## [3.5.5] - 2026-07-05
 
 ### Bug Fixes
