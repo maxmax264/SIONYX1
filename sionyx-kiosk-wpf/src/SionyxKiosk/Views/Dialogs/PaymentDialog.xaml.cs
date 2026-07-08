@@ -255,14 +255,26 @@ public partial class PaymentDialog : Window
             var callbackUrl = string.IsNullOrEmpty(_firebase.FunctionsBaseUrl)
                 ? $"https://us-central1-{_firebase.ProjectId}.cloudfunctions.net/nedarimCallback"
                 : $"{_firebase.FunctionsBaseUrl}/nedarimCallback";
-            // Check if user has a saved card
+            // Check if user has a saved card, and grab contact details we
+            // already have (phone) to actually send Nedarim - previously
+            // these were always sent as empty strings, which is likely why
+            // Nedarim never sends a receipt (they have nowhere to send it).
             var savedKevaId = "";
+            var userPhone = "";
+            var userFirstName = "";
+            var userLastName = "";
             var userResult = await _firebase.DbGetAsync($"users/{_userId}");
             if (userResult.Success && userResult.Data is JsonElement userData)
             {
                 if (userData.TryGetProperty("savedCard", out var sc) &&
                     sc.TryGetProperty("kevaId", out var keva))
                     savedKevaId = keva.GetString() ?? "";
+                if (userData.TryGetProperty("phoneNumber", out var phoneEl))
+                    userPhone = phoneEl.GetString() ?? "";
+                if (userData.TryGetProperty("firstName", out var fnEl))
+                    userFirstName = fnEl.GetString() ?? "";
+                if (userData.TryGetProperty("lastName", out var lnEl))
+                    userLastName = lnEl.GetString() ?? "";
             }
 
             var config = new
@@ -274,6 +286,9 @@ public partial class PaymentDialog : Window
                 packageMinutes = _package.Minutes.ToString(),
                 packagePrints = _package.Prints.ToString(),
                 userName = "",
+                userPhone,
+                userFirstName,
+                userLastName,
                 orgId = _firebase.OrgId,
                 callbackUrl,
                 saveCardEnabled,
@@ -532,8 +547,21 @@ public partial class PaymentDialog : Window
             string? lastFourDigits = null;
             if (root.TryGetProperty("response", out var responseEl))
             {
-                if (responseEl.TryGetProperty("Token", out var tokenEl))
-                    transactionId = tokenEl.ValueKind == JsonValueKind.String ? tokenEl.GetString() : tokenEl.ToString();
+                // Nedarim's field name for the reusable card token isn't
+                // consistently documented - check all known variants
+                // (matches the server-side nedarimCallback check).
+                foreach (var fieldName in new[] { "KevaId", "Tokef", "Token", "TransactionToken" })
+                {
+                    if (responseEl.TryGetProperty(fieldName, out var tokenEl))
+                    {
+                        var val = tokenEl.ValueKind == JsonValueKind.String ? tokenEl.GetString() : tokenEl.ToString();
+                        if (!string.IsNullOrEmpty(val))
+                        {
+                            transactionId = val;
+                            break;
+                        }
+                    }
+                }
                 if (responseEl.TryGetProperty("LastNum", out var lastNumEl))
                     lastFourDigits = lastNumEl.ValueKind == JsonValueKind.String ? lastNumEl.GetString() : lastNumEl.ToString();
             }
