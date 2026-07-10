@@ -693,6 +693,24 @@ public partial class PaymentDialog : Window
         _statusListener?.Stop();
         _server?.Stop();
         _server?.Dispose();
+
+        // CRITICAL: without this, the WebView2 control's CoreWebView2Environment
+        // (which is created fresh on every dialog open, pointed at the same
+        // fixed user-data folder) never releases its lock on that folder.
+        // The next PaymentDialog instance then fails to create its own
+        // environment with RPC_E_DISCONNECTED ("The object invoked has
+        // disconnected from its clients"), making every payment after the
+        // first one in a session fail until the app is restarted.
+        try
+        {
+            PaymentWebView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+        }
+        catch
+        {
+            // CoreWebView2 may not have been initialized (e.g. dialog closed
+            // before EnsureCoreWebView2Async completed) - safe to ignore.
+        }
+        PaymentWebView.Dispose();
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)
