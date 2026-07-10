@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [3.5.7] - 2026-07-10
+
+### Bug Fixes
+- add CallBack param to TashlumBodedNew requests; check 4 possible token field names (ccdb6940)
+- restore Out-Host on upload_release.py call (regression) (8ef8138f)
+- restore Out-Host on upload_release.py call (regression) (40aba604)
+
+
 ## [3.5.6] - 2026-07-05
 
 ### Bug Fixes
