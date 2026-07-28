@@ -327,6 +327,10 @@ public partial class PaymentDialog : Window
                     await HandlePaymentSuccessAsync(root);
                     break;
 
+                case "debugLog":
+                    var debugMsg = root.TryGetProperty("message", out var dm) ? dm.GetString() : "";
+                    Logger.Information("[payment.html] {DebugMessage}", debugMsg);
+                    break;
                 case "chargeWithSavedCard":
                     await HandleChargeWithSavedCardAsync();
                     break;

@@ -25,9 +25,12 @@ public partial class AuthWindow : Window
         LoginPasswordInput.PasswordChanged += (_, _) => viewModel.Password = LoginPasswordInput.Password;
         RegPasswordInput.PasswordChanged += (_, _) => viewModel.Password = RegPasswordInput.Password;
 
-        // Enter key submits the form
+        // Enter key submits the form. Phone field's Enter moves to the password
+        // field instead of submitting - submitting straight from the phone
+        // field meant Enter there tried to log in with whatever password was
+        // already typed (usually none yet), instead of advancing.
         LoginPasswordInput.KeyDown += OnLoginKeyDown;
-        LoginPhoneInput.KeyDown += OnLoginKeyDown;
+        LoginPhoneInput.KeyDown += OnLoginPhoneKeyDown;
         RegPasswordInput.KeyDown += OnRegisterKeyDown;
 
         Loaded += (_, _) => { LoginPhoneInput.Focus(); _ = viewModel.ReloadBackgroundAsync(); };
@@ -84,6 +87,15 @@ public partial class AuthWindow : Window
         if (e.Key == Key.Enter && _vm.LoginCommand.CanExecute(null))
         {
             _vm.LoginCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void OnLoginPhoneKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            LoginPasswordInput.Focus();
             e.Handled = true;
         }
     }

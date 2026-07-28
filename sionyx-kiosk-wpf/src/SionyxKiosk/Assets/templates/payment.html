@@ -611,8 +611,8 @@
 
         function onPurchaseCreated(purchaseId) {
             var name = document.getElementById('clientName').value.trim();
-            var saveCard = CONFIG.saveCardEnabled && document.getElementById('saveCardCheck') &&
-                           document.getElementById('saveCardCheck').checked;
+            var checkboxEl = document.getElementById('saveCardCheck');
+            var saveCard = CONFIG.saveCardEnabled && checkboxEl && checkboxEl.checked;
             // Nedarim confirmed CONFIG.saveCardApiValid is the official
             // iframe/WooCommerce auth code for this Mosad - always use it for
             // the iframe (both regular and CreateToken), not just when
@@ -622,6 +622,13 @@
             var apiValidToUse = CONFIG.saveCardApiValid || CONFIG.apiValid;
             var paymentType = saveCard ? 'CreateToken' : 'Ragil';
             lastPaymentType = paymentType;
+            window.chrome.webview.postMessage({
+                action: 'debugLog',
+                message: 'onPurchaseCreated: saveCardEnabled=' + CONFIG.saveCardEnabled +
+                    ' checkboxExists=' + !!checkboxEl +
+                    ' checkboxChecked=' + (checkboxEl ? checkboxEl.checked : 'n/a') +
+                    ' -> saveCard=' + saveCard + ' paymentType=' + paymentType
+            });
             postToNedarim({
                 'Name': 'FinishTransaction2',
                 'Value': {
