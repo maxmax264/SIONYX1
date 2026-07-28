@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [3.5.8] - 2026-07-28
+
+### Bug Fixes
+- remove Timeout attribute unsupported by WiX v6 CustomAction schema (e70e7253)
+- embed VC++ x64 redist in installer, auto-install if missing (6b007309)
+
+
 ## [3.5.7] - 2026-07-10
 
 ### Bug Fixes
