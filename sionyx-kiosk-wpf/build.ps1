@@ -222,6 +222,48 @@ function Test-InstallerSecrets {
     return $true
 }
 
+function Get-VCRedist {
+    # WebView2Loader.dll (self-extracted from the single-file exe) depends on
+    # the VC++ x64 runtime. Machines without it get:
+    #   System.DllNotFoundException at CoreWebView2Environment.CreateAsync
+    # We embed the redist in the MSI and install it silently if missing, so
+    # kiosks don't need it pre-installed. Cached locally - not re-downloaded
+    # every build, and gitignored (*.exe) like the rest of the build output.
+    $redistDir = Join-Path $ScriptDir "redist"
+    $redistPath = Join-Path $redistDir "vc_redist.x64.exe"
+
+    if (Test-Path $redistPath) {
+        $sizeOk = (Get-Item $redistPath).Length -gt 10MB
+        if ($sizeOk) {
+            Write-Ok "VC++ redist already cached: redist\vc_redist.x64.exe"
+            return $redistPath
+        }
+        Write-Warn "Cached vc_redist.x64.exe looks truncated - re-downloading"
+        Remove-Item $redistPath -Force
+    }
+
+    if (-not (Test-Path $redistDir)) {
+        New-Item -ItemType Directory -Path $redistDir | Out-Null
+    }
+
+    Write-Host "  Downloading VC++ x64 redist (one-time, ~25MB)..." -ForegroundColor Cyan
+    try {
+        Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $redistPath
+    }
+    catch {
+        Write-Err "Failed to download vc_redist.x64.exe: $($_.Exception.Message)"
+        return $null
+    }
+
+    if (-not (Test-Path $redistPath) -or (Get-Item $redistPath).Length -lt 10MB) {
+        Write-Err "Downloaded vc_redist.x64.exe looks invalid"
+        return $null
+    }
+
+    Write-Ok "VC++ redist downloaded: redist\vc_redist.x64.exe"
+    return $redistPath
+}
+
 function New-Installer([string]$ver) {
     Write-Header "Creating Installer v$ver (WiX MSI)"
 
@@ -234,6 +276,11 @@ function New-Installer([string]$ver) {
     }
 
     if (-not (Test-InstallerSecrets)) {
+        return $null
+    }
+
+    if (-not (Get-VCRedist)) {
+        Write-Err "Cannot build installer without vc_redist.x64.exe"
         return $null
     }
 
