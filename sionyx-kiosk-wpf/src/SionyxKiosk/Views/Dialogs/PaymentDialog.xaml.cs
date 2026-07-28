@@ -421,60 +421,72 @@ public partial class PaymentDialog : Window
                 return;
             }
 
-            Logger.Information("Calling chargeWithSavedCard function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix}",
-                _firebase.OrgId, _purchaseId, savedKevaId.Length > 4 ? savedKevaId[^4..] : savedKevaId);
-
-            var callResult = await _firebase.CallFunctionAsync("chargeWithSavedCard", new
-            {
-                orgId = _firebase.OrgId,
-                purchaseId = _purchaseId,
-                kevaId = savedKevaId,
-            });
-
-            if (!callResult.Success)
-            {
-                Logger.Error("chargeWithSavedCard function call failed: {Error}", callResult.Error);
-                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = callResult.Error ?? "שגיאה בעיבוד תשלום" });
-                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
-                return;
-            }
-
-            // The function returns { success, message/error, correlationId, optionUsed }
-            // optionUsed tells us which of the numbered TashlumBodedNew parameter
-            // strategies (see chargeWithSavedCard in functions/index.js) actually
-            // got a response from Nedarim. Logged here too so it shows up in the
-            // kiosk's own public logs (C:\Users\Public\Documents\SIONYX\logs\)
-            // alongside everything else - once one option is confirmed working
-            // consistently in production, the others should be deleted from the
-            // Cloud Function.
-            var resultData = (JsonElement)callResult.Data!;
-            var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
-            var correlationId = resultData.TryGetProperty("correlationId", out var cEl) ? cEl.GetString() : null;
-            var optionUsed = resultData.TryGetProperty("optionUsed", out var oEl) && oEl.ValueKind == JsonValueKind.Number
-                ? oEl.GetInt32().ToString()
-                : "none-succeeded";
-
-            if (success)
-            {
-                Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
-                    optionUsed, _purchaseId, correlationId);
-                PaymentSucceeded = true;
-                var successMsg = JsonSerializer.Serialize(new { action = "showSuccess" });
-                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(successMsg));
-            }
-            else
-            {
-                var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "שגיאה" : "שגיאה";
-                Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
-                    optionUsed, _purchaseId, errorText, correlationId);
-                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = errorText });
-                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
-            }
+            await ChargeTokenAndCreditAsync(savedKevaId);
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to charge with saved card. PurchaseId={PurchaseId}", _purchaseId);
             var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בעיבוד תשלום" });
+            _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
+        }
+    }
+
+    /// <summary>
+    /// Calls the chargeWithSavedCard Cloud Function for the current _purchaseId
+    /// with the given token, and reports success/failure to the JS side. Shared
+    /// between "charge an existing saved card" and "charge the card we just
+    /// tokenized" (see HandleTokenCreatedAsync) - both need the exact same
+    /// server call and result handling.
+    /// </summary>
+    private async Task ChargeTokenAndCreditAsync(string kevaId)
+    {
+        Logger.Information("Calling chargeWithSavedCard function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix}",
+            _firebase.OrgId, _purchaseId, kevaId.Length > 4 ? kevaId[^4..] : kevaId);
+
+        var callResult = await _firebase.CallFunctionAsync("chargeWithSavedCard", new
+        {
+            orgId = _firebase.OrgId,
+            purchaseId = _purchaseId,
+            kevaId,
+        });
+
+        if (!callResult.Success)
+        {
+            Logger.Error("chargeWithSavedCard function call failed: {Error}", callResult.Error);
+            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = callResult.Error ?? "שגיאה בעיבוד תשלום" });
+            _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
+            return;
+        }
+
+        // The function returns { success, message/error, correlationId, optionUsed }
+        // optionUsed tells us which of the numbered TashlumBodedNew parameter
+        // strategies (see chargeWithSavedCard in functions/index.js) actually
+        // got a response from Nedarim. Logged here too so it shows up in the
+        // kiosk's own public logs (C:\Users\Public\Documents\SIONYX\logs\)
+        // alongside everything else - once one option is confirmed working
+        // consistently in production, the others should be deleted from the
+        // Cloud Function.
+        var resultData = (JsonElement)callResult.Data!;
+        var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
+        var correlationId = resultData.TryGetProperty("correlationId", out var cEl) ? cEl.GetString() : null;
+        var optionUsed = resultData.TryGetProperty("optionUsed", out var oEl) && oEl.ValueKind == JsonValueKind.Number
+            ? oEl.GetInt32().ToString()
+            : "none-succeeded";
+
+        if (success)
+        {
+            Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
+                optionUsed, _purchaseId, correlationId);
+            PaymentSucceeded = true;
+            var successMsg = JsonSerializer.Serialize(new { action = "showSuccess" });
+            _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(successMsg));
+        }
+        else
+        {
+            var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "שגיאה" : "שגיאה";
+            Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
+                optionUsed, _purchaseId, errorText, correlationId);
+            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = errorText });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
         }
     }
@@ -502,22 +514,31 @@ public partial class PaymentDialog : Window
     }
 
     /// <summary>
-    /// Called when the Nedarim iframe reports the transaction itself succeeded
-    /// (card was charged / token created). The normal/intended path is that
-    /// Nedarim's own server-to-server callback (nedarimCallback) credits the
-    /// user - that's the only place that can independently verify the charge
-    /// against Nedarim's own records. But if that callback URL isn't
-    /// enabled/whitelisted yet on this Mosad's account, it may never arrive,
-    /// leaving the purchase stuck "pending" forever despite the card having
-    /// been charged. So in addition to waiting for the webhook (SSE listener
-    /// + polling fallback, both already running), we also proactively tell
-    /// the server ourselves via /confirmPayment. Whichever one lands first
-    /// wins (confirmPayment is idempotent against the same "completed" check
-    /// nedarimCallback uses) - the other becomes a harmless no-op.
+    /// Called when the Nedarim iframe reports the transaction itself succeeded.
+    /// Two very different cases share this entry point, distinguished by
+    /// paymentType (set client-side in payment.html, based on which Nedarim
+    /// Action was actually submitted):
+    ///
+    /// - "Ragil" (real one-time charge, no save): the normal/intended path is
+    ///   that Nedarim's own server-to-server callback (nedarimCallback) credits
+    ///   the user - that's the only place that can independently verify the
+    ///   charge against Nedarim's own records. But if that callback URL isn't
+    ///   enabled/whitelisted yet on this Mosad's account, it may never arrive,
+    ///   leaving the purchase stuck "pending" forever despite the card having
+    ///   been charged. So in addition to waiting for the webhook (SSE listener
+    ///   + polling fallback, both already running), we also proactively tell
+    ///   the server ourselves via /confirmPayment. Whichever lands first wins.
+    ///
+    /// - "CreateToken" (first-time payment with "save card" checked): we've
+    ///   confirmed in production that Nedarim can return Status:OK with a
+    ///   real Token here while no charge actually lands on the card statement
+    ///   and no confirmation email goes out. So this case is NEVER credited
+    ///   directly from the iframe's OK - see HandleTokenCreatedAsync.
     /// </summary>
     private Task HandlePaymentSuccessAsync(JsonElement root)
     {
-        Logger.Information("Payment success received from JS (transaction OK, awaiting server credit) - raw: {Raw}", root.ToString());
+        var paymentType = root.TryGetProperty("paymentType", out var ptEl) ? ptEl.GetString() : null;
+        Logger.Information("Payment success received from JS - PaymentType={PaymentType} raw: {Raw}", paymentType, root.ToString());
 
         if (string.IsNullOrEmpty(_purchaseId))
         {
@@ -525,18 +546,109 @@ public partial class PaymentDialog : Window
             return Task.CompletedTask;
         }
 
-        // Show "processing" UI and kick off the polling fallback in case the
-        // SSE listener (already running since purchase creation) misses the
-        // update for any reason (dropped connection, etc).
         _ = Dispatcher.InvokeAsync(() =>
         {
             var msg = JsonSerializer.Serialize(new { action = "savedCardCharging" });
             PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
         });
-        _ = PollPurchaseStatusAsync();
-        _ = ConfirmPaymentDirectlyAsync(root);
+
+        if (paymentType == "CreateToken")
+        {
+            // Not a verified charge - route through the save-then-explicitly-charge
+            // path instead of trusting this OK to mean money moved.
+            _ = HandleTokenCreatedAsync(root);
+        }
+        else
+        {
+            _ = PollPurchaseStatusAsync();
+            _ = ConfirmPaymentDirectlyAsync(root);
+        }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// PaymentType=CreateToken succeeded per the iframe, but that alone isn't
+    /// proof the amount was actually captured (see HandlePaymentSuccessAsync).
+    /// So: persist the token WITHOUT crediting anything (confirmPayment
+    /// tokenOnly=true), then immediately run the same explicit,
+    /// server-verified charge path used for an existing saved card
+    /// (ChargeTokenAndCreditAsync) against this brand-new token. The user
+    /// only gets credited if that explicit charge actually succeeds.
+    /// </summary>
+    private async Task HandleTokenCreatedAsync(JsonElement root)
+    {
+        try
+        {
+            string? transactionId = null;
+            string? lastFourDigits = null;
+            if (root.TryGetProperty("response", out var responseEl))
+            {
+                foreach (var fieldName in new[] { "KevaId", "Tokef", "Token", "TransactionToken" })
+                {
+                    if (responseEl.TryGetProperty(fieldName, out var tokenEl))
+                    {
+                        var val = tokenEl.ValueKind == JsonValueKind.String ? tokenEl.GetString() : tokenEl.ToString();
+                        if (!string.IsNullOrEmpty(val))
+                        {
+                            transactionId = val;
+                            break;
+                        }
+                    }
+                }
+                if (responseEl.TryGetProperty("LastNum", out var lastNumEl))
+                    lastFourDigits = lastNumEl.ValueKind == JsonValueKind.String ? lastNumEl.GetString() : lastNumEl.ToString();
+            }
+
+            if (string.IsNullOrEmpty(transactionId))
+            {
+                Logger.Error("CreateToken reported Status:OK but no usable token field was found in the response - cannot charge. Raw: {Raw}", root.ToString());
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בשמירת הכרטיס" });
+                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
+                return;
+            }
+
+            Logger.Information("CreateToken succeeded (Token last4={LastFour}) - saving token only, no credit yet. PurchaseId={PurchaseId}",
+                lastFourDigits, _purchaseId);
+
+            var saveResult = await _firebase.CallFunctionAsync("confirmPayment", new
+            {
+                orgId = _firebase.OrgId,
+                purchaseId = _purchaseId,
+                transactionId,
+                lastFourDigits,
+                tokenOnly = true,
+            });
+            if (!saveResult.Success)
+            {
+                // Not fatal to the charge attempt below (we still have the token
+                // in hand), but it does mean the card won't be reusable next time
+                // if this charge fails, since it was never persisted.
+                Logger.Warning("confirmPayment tokenOnly save failed (continuing to charge anyway): {Error}", saveResult.Error);
+            }
+
+            // Now create a fresh pending purchase for the actual charge and run
+            // it through the exact same verified path as an existing saved card.
+            var purchaseResult = await _purchaseService.CreatePendingPurchaseAsync(_userId, _package);
+            if (!purchaseResult.IsSuccess || purchaseResult.Data is not { } data)
+            {
+                Logger.Warning("Post-tokenize charge aborted: failed to create pending purchase. Error={Error}", purchaseResult.Error);
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = purchaseResult.Error ?? "שגיאה" });
+                _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
+                return;
+            }
+            var type = data.GetType();
+            _purchaseId = type.GetProperty("purchaseId")?.GetValue(data)?.ToString() ?? "";
+            Logger.Information("Pending purchase created for post-tokenize charge: {PurchaseId}", _purchaseId);
+
+            await ChargeTokenAndCreditAsync(transactionId);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to save+charge newly created token. PurchaseId={PurchaseId}", _purchaseId);
+            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בעיבוד תשלום" });
+            _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
+        }
     }
 
     private async Task ConfirmPaymentDirectlyAsync(JsonElement root)

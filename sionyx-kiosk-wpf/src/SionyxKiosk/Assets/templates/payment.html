@@ -518,6 +518,13 @@
             // iframe src will be set after CONFIG is received
         };
 
+        // Tracks which Nedarim Action the currently in-flight transaction used
+        // ('Ragil' = real one-time charge, 'CreateToken' = tokenize, which we've
+        // observed can return Status:OK without the card actually being charged).
+        // Set in onPurchaseCreated, read in handleTransactionResponse - kept at
+        // module scope since those are two separate function calls.
+        var lastPaymentType = null;
+
         function initNedarimIframe() {
             // CVV is never required: Nedarim does not store it and it cannot be verified
             // for saved-card charges anyway, so we never ask for it - regardless of whether
@@ -614,6 +621,7 @@
             // calls (TashlumBodedNew), not the iframe.
             var apiValidToUse = CONFIG.saveCardApiValid || CONFIG.apiValid;
             var paymentType = saveCard ? 'CreateToken' : 'Ragil';
+            lastPaymentType = paymentType;
             postToNedarim({
                 'Name': 'FinishTransaction2',
                 'Value': {
@@ -654,6 +662,7 @@
                 document.getElementById('processingMessage').classList.add('active');
                 window.chrome.webview.postMessage({
                     action: 'paymentSuccess',
+                    paymentType: lastPaymentType,
                     response: response
                 });
             } else {
