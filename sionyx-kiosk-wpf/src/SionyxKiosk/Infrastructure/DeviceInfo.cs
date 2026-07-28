@@ -12,11 +12,20 @@ public static class DeviceInfo
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(DeviceInfo));
 
+    private static readonly Lazy<string> _deviceIdLazy = new(ComputeDeviceId);
+
     /// <summary>
     /// Generate a unique device ID based on hardware characteristics.
     /// Uses MAC address for stability, falls back to hash of computer name.
+    /// Computed once and cached: NetworkInterface.GetAllNetworkInterfaces()
+    /// enumeration order isn't guaranteed stable across calls on machines
+    /// with more than one active non-loopback adapter (Wi-Fi + VPN/Bluetooth/
+    /// virtual switch, etc), which previously made two calls in the same
+    /// process intermittently return different values.
     /// </summary>
-    public static string GetDeviceId()
+    public static string GetDeviceId() => _deviceIdLazy.Value;
+
+    private static string ComputeDeviceId()
     {
         try
         {
