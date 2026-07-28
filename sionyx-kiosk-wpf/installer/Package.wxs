@@ -159,8 +159,7 @@
                   ExeCommand="/install /quiet /norestart"
                   Execute="deferred"
                   Impersonate="no"
-                  Return="ignore"
-                  Timeout="300" />
+                  Return="ignore" />
 
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
