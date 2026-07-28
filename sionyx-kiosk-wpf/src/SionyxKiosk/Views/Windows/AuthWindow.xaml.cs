@@ -29,11 +29,25 @@ public partial class AuthWindow : Window
         // field instead of submitting - submitting straight from the phone
         // field meant Enter there tried to log in with whatever password was
         // already typed (usually none yet), instead of advancing.
-        LoginPasswordInput.KeyDown += OnLoginKeyDown;
-        LoginPhoneInput.KeyDown += OnLoginPhoneKeyDown;
-        RegPasswordInput.KeyDown += OnRegisterKeyDown;
+        // PreviewKeyDown (tunneling) instead of KeyDown (bubbling): guarantees
+        // this runs before anything else in the tree could react to Enter first.
+        LoginPasswordInput.PreviewKeyDown += OnLoginKeyDown;
+        LoginPhoneInput.PreviewKeyDown += OnLoginPhoneKeyDown;
+        RegPasswordInput.PreviewKeyDown += OnRegisterKeyDown;
 
-        Loaded += (_, _) => { LoginPhoneInput.Focus(); _ = viewModel.ReloadBackgroundAsync(); };
+        Loaded += (_, _) =>
+        {
+            // Element.Focus() alone can silently no-op here if the window
+            // hasn't actually received OS-level activation yet at the moment
+            // Loaded fires. Defer past the current layout/input pass and set
+            // keyboard focus explicitly so it actually sticks.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+            {
+                LoginPhoneInput.Focus();
+                Keyboard.Focus(LoginPhoneInput);
+            }));
+            _ = viewModel.ReloadBackgroundAsync();
+        };
     }
 
     public void AllowClose() => _allowClose = true;
@@ -96,6 +110,7 @@ public partial class AuthWindow : Window
         if (e.Key == Key.Enter)
         {
             LoginPasswordInput.Focus();
+            Keyboard.Focus(LoginPasswordInput);
             e.Handled = true;
         }
     }
