@@ -3,12 +3,14 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
+using Serilog;
 using SionyxKiosk.ViewModels;
 
 namespace SionyxKiosk.Views.Windows;
 
 public partial class AuthWindow : Window
 {
+    private static readonly ILogger Logger = Log.ForContext<AuthWindow>();
     private bool _allowClose;
     private bool _isLoginMode = true;
     private readonly AuthViewModel _vm;
@@ -24,6 +26,8 @@ public partial class AuthWindow : Window
         // WPF PasswordBox doesn't support binding — wire manually.
         LoginPasswordInput.PasswordChanged += (_, _) => viewModel.Password = LoginPasswordInput.Password;
         RegPasswordInput.PasswordChanged += (_, _) => viewModel.Password = RegPasswordInput.Password;
+
+        Logger.Information("AuthWindow constructed. AppVersion={AppVersion}", viewModel.AppVersion);
 
         // Enter key submits the form. Phone field's Enter moves to the password
         // field instead of submitting - submitting straight from the phone
@@ -98,7 +102,9 @@ public partial class AuthWindow : Window
 
     private void OnLoginKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && _vm.LoginCommand.CanExecute(null))
+        if (e.Key != Key.Enter) return;
+        Logger.Information("OnLoginKeyDown fired (submit) from sender={Sender}", (sender as FrameworkElement)?.Name);
+        if (_vm.LoginCommand.CanExecute(null))
         {
             _vm.LoginCommand.Execute(null);
             e.Handled = true;
@@ -107,12 +113,11 @@ public partial class AuthWindow : Window
 
     private void OnLoginPhoneKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == Key.Enter)
-        {
-            LoginPasswordInput.Focus();
-            Keyboard.Focus(LoginPasswordInput);
-            e.Handled = true;
-        }
+        if (e.Key != Key.Enter) return;
+        Logger.Information("OnLoginPhoneKeyDown fired (advance to password) from sender={Sender}", (sender as FrameworkElement)?.Name);
+        LoginPasswordInput.Focus();
+        Keyboard.Focus(LoginPasswordInput);
+        e.Handled = true;
     }
 
     private void OnRegisterKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
