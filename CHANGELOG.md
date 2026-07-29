@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [3.5.9] - 2026-07-28
+
+### Bug Fixes
+- make login phone-field focus/Enter handling actually reliable (67195327)
+- memoize DeviceInfo.GetDeviceId() to stop flaky test failures (18418ec0)
+- Enter in login phone field advances to password instead of submitting (a0b9d397)
+- never credit a purchase from CreateToken's OK alone (c78b7533)
+
+
 ## [3.5.8] - 2026-07-28
 
 ### Bug Fixes
