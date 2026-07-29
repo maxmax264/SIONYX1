@@ -339,6 +339,13 @@ public partial class App : Application
 
         var authWindow = new AuthWindow(authVm);
         authWindow.Show();
+        // Topmost only controls z-order (stays visually on top) - it does
+        // NOT give the window actual OS-level input focus. Without this,
+        // the window can appear on top while a click is still required
+        // before keyboard input (or our focus-setting code in AuthWindow)
+        // actually reaches it, especially right after closing MainWindow
+        // in the logout path.
+        authWindow.Activate();
         MainWindow = authWindow;
 
         _systemServices = _host!.Services.GetRequiredService<SystemServicesManager>();
