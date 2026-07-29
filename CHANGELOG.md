@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.5.11] - 2026-07-29
+
+### Bug Fixes
+- reapply phone-field focus on Activated, not just Loaded (aee779f6)
+
+
 ## [3.5.10] - 2026-07-29
 
 ### Other
