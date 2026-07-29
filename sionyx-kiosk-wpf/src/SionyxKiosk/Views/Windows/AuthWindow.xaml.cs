@@ -52,6 +52,23 @@ public partial class AuthWindow : Window
             }));
             _ = viewModel.ReloadBackgroundAsync();
         };
+
+        // Loaded can fire before a just-closed previous window (e.g. after
+        // logout: MainWindow.Close() then `new AuthWindow().Show()`) has
+        // actually released OS-level focus, so the Loaded-based attempt
+        // above can silently lose the race. Activated fires only once
+        // Windows has genuinely handed this window the foreground/focus -
+        // a much stronger signal - so re-apply there too as a fallback.
+        // Guarded so it never yanks focus away from a field the user has
+        // already clicked into themselves.
+        Activated += (_, _) =>
+        {
+            if (!LoginPhoneInput.IsKeyboardFocusWithin && !LoginPasswordInput.IsKeyboardFocusWithin)
+            {
+                LoginPhoneInput.Focus();
+                Keyboard.Focus(LoginPhoneInput);
+            }
+        };
     }
 
     public void AllowClose() => _allowClose = true;
