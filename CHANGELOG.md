@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.5.10] - 2026-07-29
+
+### Other
+- log AppVersion and which login Enter handler actually fires (ad375f95)
+
+
 ## [3.5.9] - 2026-07-28
 
 ### Bug Fixes
