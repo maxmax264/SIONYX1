@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.5.13] - 2026-07-30
+
+### Bug Fixes
+- force real OS foreground on AuthWindow via AttachThreadInput (6e1209af)
+
+
 ## [3.5.12] - 2026-07-29
 
 ### Bug Fixes
