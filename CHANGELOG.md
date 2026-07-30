@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.5.12] - 2026-07-29
+
+### Bug Fixes
+- explicitly Activate() AuthWindow after Show() in the logout path (dab4ef62)
+
+
 ## [3.5.11] - 2026-07-29
 
 ### Bug Fixes
