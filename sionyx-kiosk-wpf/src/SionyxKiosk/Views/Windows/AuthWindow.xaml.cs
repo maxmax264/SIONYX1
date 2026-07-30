@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Serilog;
 using SionyxKiosk.ViewModels;
@@ -14,6 +16,64 @@ public partial class AuthWindow : Window
     private bool _allowClose;
     private bool _isLoginMode = true;
     private readonly AuthViewModel _vm;
+
+    // Topmost (set in XAML) only controls z-order - it doesn't grant actual
+    // OS-level input focus, and plain WPF Activate() can lose to Windows'
+    // foreground-lock protection (a background/just-closed process isn't
+    // always allowed to steal focus outright). AttachThreadInput is the
+    // standard, reliable workaround: briefly share input state with
+    // whichever window currently has focus so SetForegroundWindow is
+    // actually honored instead of just flashing the taskbar icon.
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    /// <summary>
+    /// Forces this window to actually take OS-level foreground/input focus,
+    /// not just visual top-of-z-order (which Topmost already gives it).
+    /// Safe to call repeatedly - each call is a brief attach/detach.
+    /// </summary>
+    public void ForceForeground()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).EnsureHandle();
+            var foreground = GetForegroundWindow();
+            if (foreground == hwnd) return;
+
+            var foregroundThreadId = GetWindowThreadProcessId(foreground, IntPtr.Zero);
+            var thisThreadId = GetCurrentThreadId();
+            var attached = foregroundThreadId != thisThreadId &&
+                           AttachThreadInput(thisThreadId, foregroundThreadId, true);
+            try
+            {
+                BringWindowToTop(hwnd);
+                SetForegroundWindow(hwnd);
+            }
+            finally
+            {
+                if (attached) AttachThreadInput(thisThreadId, foregroundThreadId, false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "ForceForeground failed (non-fatal)");
+        }
+    }
 
     public AuthWindow(AuthViewModel viewModel)
     {
@@ -43,10 +103,11 @@ public partial class AuthWindow : Window
         {
             // Element.Focus() alone can silently no-op here if the window
             // hasn't actually received OS-level activation yet at the moment
-            // Loaded fires. Defer past the current layout/input pass and set
-            // keyboard focus explicitly so it actually sticks.
+            // Loaded fires. Defer past the current layout/input pass, force
+            // real OS foreground first, then set keyboard focus explicitly.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
             {
+                ForceForeground();
                 LoginPhoneInput.Focus();
                 Keyboard.Focus(LoginPhoneInput);
             }));

@@ -346,6 +346,7 @@ public partial class App : Application
         // actually reaches it, especially right after closing MainWindow
         // in the logout path.
         authWindow.Activate();
+        authWindow.ForceForeground();
         MainWindow = authWindow;
 
         _systemServices = _host!.Services.GetRequiredService<SystemServicesManager>();
