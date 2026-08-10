@@ -212,6 +212,8 @@ public partial class App : Application
                     sp.GetRequiredService<PrintHistoryService>(),
                     sp.GetRequiredService<AuthService>().CurrentUser?.Uid ?? "",
                     sp.GetRequiredService<FirebaseClient>()));
+                services.AddTransient(sp => new PaymentTestViewModel(
+                    sp.GetRequiredService<FirebaseClient>()));
 
                 // Views
                 services.AddTransient<AuthWindow>();
@@ -232,6 +234,8 @@ public partial class App : Application
                         sp.GetRequiredService<AuthService>());
                 });
                 services.AddTransient<HistoryPage>();
+                services.AddTransient(sp => new PaymentTestPage(
+                    sp.GetRequiredService<PaymentTestViewModel>()));
                 services.AddTransient(sp => new PrintHistoryPage(
                     sp.GetRequiredService<PrintHistoryViewModel>()));
                 services.AddTransient<HelpPage>();
