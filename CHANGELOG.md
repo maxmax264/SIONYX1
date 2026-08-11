@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.6.0] - 2026-08-10
+
+### Features
+- add payment test screen to sidebar for debugging Nedarim charges (48f8b3ba)
+
+
 ## [3.5.13] - 2026-07-30
 
 ### Bug Fixes
