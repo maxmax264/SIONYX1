@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -68,7 +69,11 @@ public partial class PaymentTestViewModel : ObservableObject
             }
 
             var data = (JsonElement)result.Data!;
-            var options = new JsonSerializerOptions { WriteIndented = true };
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            };
             var pretty = JsonSerializer.Serialize(data, options);
             ResultText = $"אסטרטגיה: {LastStrategyLabel}\n\n{pretty}";
             Logger.Information("debugChargeToken [{Strategy}] result: {Result}", strategyKey, pretty);
