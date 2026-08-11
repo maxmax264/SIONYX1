@@ -49,6 +49,7 @@
 
     <script>
         var CONFIG = null;
+        var lastTriedPaymentType = null;
 
         window.chrome.webview.addEventListener('message', function(event) {
             var msg = event.data;
@@ -86,6 +87,7 @@
 
         function tryPaymentType(paymentType) {
             if (!CONFIG) { showResult({Error: 'CONFIG לא הוגדר עדיין'}, ''); return; }
+            lastTriedPaymentType = paymentType;
             document.getElementById('result').textContent = 'שולח PaymentType=' + paymentType + '...';
             window.chrome.webview.postMessage({
                 action: 'debugLog',
@@ -95,10 +97,13 @@
                 'Name': 'FinishTransaction2',
                 'Value': {
                     'Mosad': CONFIG.mosadId,
+                    'MosadId': CONFIG.mosadId,
                     'ApiValid': CONFIG.saveCardApiValid,
                     'PaymentType': paymentType,
                     'Token': CONFIG.kevaId,
                     'KevaId': CONFIG.kevaId,
+                    'TransactionId': 'SIONYX-' + Date.now(),
+                    'Zihuy': 'SIONYX-' + Date.now(),
                     'Currency': '1',
                     'Zeout': '',
                     'FirstName': CONFIG.userFirstName || '',
@@ -114,11 +119,12 @@
         }
 
         function showResult(value, origin) {
-            var text = 'מקור (origin): ' + origin + '\n\n' + JSON.stringify(value, null, 2);
+            var text = 'PaymentType שנוסה: ' + (lastTriedPaymentType || '(לא ידוע)') + '\n' +
+                       'מקור (origin): ' + origin + '\n\n' + JSON.stringify(value, null, 2);
             document.getElementById('result').textContent = text;
             window.chrome.webview.postMessage({
                 action: 'debugLog',
-                message: '[TokenTest] Response from origin=' + origin + ': ' + JSON.stringify(value)
+                message: '[TokenTest] PaymentType=' + lastTriedPaymentType + ' response from origin=' + origin + ': ' + JSON.stringify(value)
             });
         }
     </script>
