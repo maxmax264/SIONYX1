@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [3.7.0] - 2026-08-11
+
+### Features
+- add iframe-based token charge test (not raw API) (076afbd7)
+
+### Bug Fixes
+- don't escape Hebrew text as \uXXXX in payment test result panel (b02c074d)
+
+
 ## [3.6.0] - 2026-08-10
 
 ### Features
