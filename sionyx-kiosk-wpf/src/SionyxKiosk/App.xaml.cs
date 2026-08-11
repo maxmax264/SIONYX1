@@ -213,7 +213,9 @@ public partial class App : Application
                     sp.GetRequiredService<AuthService>().CurrentUser?.Uid ?? "",
                     sp.GetRequiredService<FirebaseClient>()));
                 services.AddTransient(sp => new PaymentTestViewModel(
-                    sp.GetRequiredService<FirebaseClient>()));
+                    sp.GetRequiredService<FirebaseClient>(),
+                    sp.GetRequiredService<OrganizationMetadataService>(),
+                    sp.GetRequiredService<AuthService>().CurrentUser?.Uid ?? ""));
 
                 // Views
                 services.AddTransient<AuthWindow>();

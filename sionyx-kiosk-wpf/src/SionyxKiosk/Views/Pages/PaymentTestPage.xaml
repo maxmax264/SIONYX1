@@ -23,27 +23,39 @@
 
             <!-- Strategy list -->
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
-                <ItemsControl ItemsSource="{Binding Strategies}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border CornerRadius="{StaticResource RadiusLg}" Padding="16" Margin="0,0,0,10"
-                                    Background="White" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.65"
-                                               TextWrapping="Wrap" Margin="0,4,0,10" />
-                                    <Button Content="נסה אסטרטגיה זו" HorizontalAlignment="Stretch"
-                                            Command="{Binding DataContext.RunStrategyCommand,
-                                                      RelativeSource={RelativeSource AncestorType=Page}}"
-                                            CommandParameter="{Binding Key}"
-                                            IsEnabled="{Binding DataContext.IsBusy,
-                                                        RelativeSource={RelativeSource AncestorType=Page},
-                                                        Converter={StaticResource InverseBool}}" />
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <StackPanel>
+                    <Border CornerRadius="{StaticResource RadiusLg}" Padding="16" Margin="0,0,0,10"
+                            Background="#EEF2FF" BorderBrush="#6366F1" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="דרך האייפרם עצמו (לא API ישיר)" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
+                            <TextBlock Text="פותח את אותו אייפרם שכבר עובד, עם הטוקן השמור - כדי לבדוק אם נדרים מזהים חיוב מהיר בלי CAPTCHA"
+                                       FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,10" />
+                            <Button Content="פתח מסך בדיקת אייפרם" HorizontalAlignment="Stretch"
+                                    Command="{Binding OpenIframeTokenTestCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Strategies}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="{StaticResource RadiusLg}" Padding="16" Margin="0,0,0,10"
+                                        Background="White" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.65"
+                                                   TextWrapping="Wrap" Margin="0,4,0,10" />
+                                        <Button Content="נסה אסטרטגיה זו" HorizontalAlignment="Stretch"
+                                                Command="{Binding DataContext.RunStrategyCommand,
+                                                          RelativeSource={RelativeSource AncestorType=Page}}"
+                                                CommandParameter="{Binding Key}"
+                                                IsEnabled="{Binding DataContext.IsBusy,
+                                                            RelativeSource={RelativeSource AncestorType=Page},
+                                                            Converter={StaticResource InverseBool}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </ScrollViewer>
 
             <!-- Result panel -->

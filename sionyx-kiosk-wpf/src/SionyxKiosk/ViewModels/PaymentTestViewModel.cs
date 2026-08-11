@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using SionyxKiosk.Infrastructure;
+using SionyxKiosk.Services;
+using SionyxKiosk.Views.Dialogs;
 
 namespace SionyxKiosk.ViewModels;
 
@@ -23,14 +25,25 @@ public partial class PaymentTestViewModel : ObservableObject
 {
     private static readonly ILogger Logger = Log.ForContext<PaymentTestViewModel>();
     private readonly FirebaseClient _firebase;
+    private readonly OrganizationMetadataService _metadataService;
+    private readonly string _userId;
 
     [ObservableProperty] private string _resultText = "בחר אסטרטגיה כדי לנסות אותה מול הכרטיס השמור.";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _lastStrategyLabel = "";
 
-    public PaymentTestViewModel(FirebaseClient firebase)
+    public PaymentTestViewModel(FirebaseClient firebase, OrganizationMetadataService metadataService, string userId)
     {
         _firebase = firebase;
+        _metadataService = metadataService;
+        _userId = userId;
+    }
+
+    [RelayCommand]
+    private void OpenIframeTokenTest()
+    {
+        var dialog = new PaymentTokenTestDialog(_metadataService, _firebase, _userId);
+        dialog.ShowDialog();
     }
 
     public record StrategyOption(string Key, string Label, string Description);
