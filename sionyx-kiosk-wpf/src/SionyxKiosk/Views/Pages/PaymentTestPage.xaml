@@ -25,10 +25,21 @@
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
                 <StackPanel>
                     <Border CornerRadius="{StaticResource RadiusLg}" Padding="16" Margin="0,0,0,10"
+                            Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="תוקף אמיתי של הכרטיס (MMYY)" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Text="נדרש רק לשתי האסטרטגיות עם 'תוקף אמיתי' למטה - לבדיקת ההשערה שנדרים צריכים את התוקף המקורי יחד עם הטוקן"
+                                       FontSize="11" Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,8" />
+                            <TextBox Text="{Binding TokefInput, UpdateSourceTrigger=PropertyChanged}"
+                                     MaxLength="4" HorizontalContentAlignment="Center"
+                                     Padding="8" FontSize="14" />
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="{StaticResource RadiusLg}" Padding="16" Margin="0,0,0,10"
                             Background="#EEF2FF" BorderBrush="#6366F1" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="דרך האייפרם עצמו (לא API ישיר)" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
-                            <TextBlock Text="פותח את אותו אייפרם שכבר עובד, עם הטוקן השמור - כדי לבדוק אם נדרים מזהים חיוב מהיר בלי CAPTCHA"
+                            <TextBlock Text="פותח את אותו אייפרם שכבר עובד, עם הטוקן השמור - יש בו שדה טקסט חופשי לניסוי כל PaymentType"
                                        FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,10" />
                             <Button Content="פתח מסך בדיקת אייפרם" HorizontalAlignment="Stretch"
                                     Command="{Binding OpenIframeTokenTestCommand}" />

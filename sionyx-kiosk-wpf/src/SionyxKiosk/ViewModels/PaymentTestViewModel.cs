@@ -31,6 +31,7 @@ public partial class PaymentTestViewModel : ObservableObject
     [ObservableProperty] private string _resultText = "בחר אסטרטגיה כדי לנסות אותה מול הכרטיס השמור.";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _lastStrategyLabel = "";
+    [ObservableProperty] private string _tokefInput = "";
 
     public PaymentTestViewModel(FirebaseClient firebase, OrganizationMetadataService metadataService, string userId)
     {
@@ -56,6 +57,10 @@ public partial class PaymentTestViewModel : ObservableObject
         new("debitcard_token", "DebitCard.aspx + Token", "GET, כתובת מתועדת בפורומים, בלי ApiValid"),
         new("debitcard_token_apivalid", "DebitCard.aspx + Token + ApiValid", "אותו דבר, עם ApiValid מצורף"),
         new("debitkeva_token", "DebitKeva.aspx + Token", "GET, endpoint ייעודי להוראת קבע"),
+        new("debitcard_token_with_tokef", "DebitCard.aspx + Token + תוקף אמיתי",
+            "כמו למעלה אבל עם תוקף אמיתי של הכרטיס (מלא בשדה למטה) - חובה למלא תוקף"),
+        new("debitkeva_token_with_tokef", "DebitKeva.aspx + Token + תוקף אמיתי",
+            "כמו למעלה אבל עם תוקף אמיתי של הכרטיס (מלא בשדה למטה) - חובה למלא תוקף"),
     };
 
     [RelayCommand]
@@ -72,6 +77,7 @@ public partial class PaymentTestViewModel : ObservableObject
             {
                 orgId = _firebase.OrgId,
                 strategy = strategyKey,
+                tokef = string.IsNullOrWhiteSpace(TokefInput) ? null : TokefInput.Trim(),
             });
 
             if (!result.Success)

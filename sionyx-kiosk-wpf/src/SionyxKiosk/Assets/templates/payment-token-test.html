@@ -34,12 +34,40 @@
 <body>
     <div id="sidebar">
         <h3>PaymentType לניסיון (עם הטוקן השמור, דרך האייפרם עצמו)</h3>
+
+        <div style="margin-bottom:14px; padding:10px; background:#FEF3C7; border-radius:8px; border:1px solid #F59E0B;">
+            <label style="font-size:12px; display:block; margin-bottom:4px;">תוקף אמיתי של הכרטיס (MMYY, אופציונלי):</label>
+            <input type="text" id="tokefInput" placeholder="1229" maxlength="4"
+                   style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-size:13px; box-sizing:border-box;" />
+        </div>
+
+        <div style="margin-bottom:14px; padding:10px; background:#FEF3C7; border-radius:8px; border:1px solid #F59E0B;">
+            <input type="text" id="customPaymentType" placeholder="הקלד PaymentType משלך..."
+                   style="width:100%; padding:8px; margin-bottom:6px; border:1px solid #CBD5E1; border-radius:6px; font-size:13px; box-sizing:border-box;" />
+            <button class="strategy-btn" style="background:#F59E0B; color:white; border:none; margin:0;"
+                    onclick="tryCustomPaymentType()">נסה ערך מותאם אישית</button>
+        </div>
+
+        <button class="strategy-btn" onclick="tryPaymentType('Ragil')">Ragil (התשלום הרגיל שכן עובד)</button>
         <button class="strategy-btn" onclick="tryPaymentType('TashlumBodedNew')">TashlumBodedNew</button>
         <button class="strategy-btn" onclick="tryPaymentType('ChargeToken')">ChargeToken</button>
         <button class="strategy-btn" onclick="tryPaymentType('TokenCharge')">TokenCharge</button>
         <button class="strategy-btn" onclick="tryPaymentType('Token')">Token</button>
         <button class="strategy-btn" onclick="tryPaymentType('Keva')">Keva</button>
-        <button class="strategy-btn" onclick="tryPaymentType('HK')">HK (הוראת קבע)</button>
+        <button class="strategy-btn" onclick="tryPaymentType('HK')">HK (הוראת קבע - כבר ידוע: מזוהה, דורש כרטיס מלא)</button>
+        <button class="strategy-btn" onclick="tryPaymentType('TashlumKeva')">TashlumKeva</button>
+        <button class="strategy-btn" onclick="tryPaymentType('ChargeKeva')">ChargeKeva</button>
+        <button class="strategy-btn" onclick="tryPaymentType('KevaTashlum')">KevaTashlum</button>
+        <button class="strategy-btn" onclick="tryPaymentType('Bodded')">Bodded</button>
+        <button class="strategy-btn" onclick="tryPaymentType('TashlumBoded')">TashlumBoded</button>
+        <button class="strategy-btn" onclick="tryPaymentType('Immediate')">Immediate</button>
+        <button class="strategy-btn" onclick="tryPaymentType('Manual')">Manual</button>
+        <button class="strategy-btn" onclick="tryPaymentType('Regular')">Regular</button>
+        <button class="strategy-btn" onclick="tryPaymentType('SavedCard')">SavedCard</button>
+        <button class="strategy-btn" onclick="tryPaymentType('PayWithToken')">PayWithToken</button>
+        <button class="strategy-btn" onclick="tryPaymentType('ExistingToken')">ExistingToken</button>
+        <button class="strategy-btn" onclick="tryPaymentType('Recurring')">Recurring</button>
+        <button class="strategy-btn" onclick="tryPaymentType('UseToken')">UseToken</button>
         <div id="result">טרם נשלחה בקשה.</div>
     </div>
     <div id="frameCol">
@@ -85,10 +113,18 @@
             }
         }
 
+        function tryCustomPaymentType() {
+            var val = document.getElementById('customPaymentType').value.trim();
+            if (!val) { showResult({Error: 'לא הוקלד ערך'}, ''); return; }
+            tryPaymentType(val);
+        }
+
         function tryPaymentType(paymentType) {
             if (!CONFIG) { showResult({Error: 'CONFIG לא הוגדר עדיין'}, ''); return; }
             lastTriedPaymentType = paymentType;
-            document.getElementById('result').textContent = 'שולח PaymentType=' + paymentType + '...';
+            var tokefVal = document.getElementById('tokefInput').value.trim();
+            document.getElementById('result').textContent = 'שולח PaymentType=' + paymentType +
+                (tokefVal ? ' עם תוקף=' + tokefVal : '') + '...';
             window.chrome.webview.postMessage({
                 action: 'debugLog',
                 message: '[TokenTest] Trying PaymentType=' + paymentType
@@ -102,6 +138,7 @@
                     'PaymentType': paymentType,
                     'Token': CONFIG.kevaId,
                     'KevaId': CONFIG.kevaId,
+                    'Tokef': tokefVal,
                     'TransactionId': 'SIONYX-' + Date.now(),
                     'Zihuy': 'SIONYX-' + Date.now(),
                     'Currency': '1',
