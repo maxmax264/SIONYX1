@@ -51,16 +51,16 @@ public partial class PaymentTestViewModel : ObservableObject
 
     public List<StrategyOption> Strategies { get; } = new()
     {
-        new("manage3_v1", "Manage3 v1 (המקורי)", "POST ל-Reports/Manage3.aspx, MosadNumber/ApiPassword"),
-        new("manage3_v2", "Manage3 v2", "POST ל-Reports/Manage3.aspx, Mosad/ApiValid"),
-        new("manage3_v3", "Manage3 v3", "POST ל-Reports/Manage3.aspx, MosadId/Token"),
-        new("debitcard_token", "DebitCard.aspx + Token", "GET, כתובת מתועדת בפורומים, בלי ApiValid"),
-        new("debitcard_token_apivalid", "DebitCard.aspx + Token + ApiValid", "אותו דבר, עם ApiValid מצורף"),
-        new("debitkeva_token", "DebitKeva.aspx + Token", "GET, endpoint ייעודי להוראת קבע"),
+        // Manage3.aspx variants removed: confirmed wrong credentials there,
+        // and repeating them risks Nedarim's IP-ban counter ("נסיון X מתוך
+        // 10... כתובת ה-IP תיחסם לשעה"). DebitCard/DebitKeva without a real
+        // Tokef removed too: confirmed dead ends (CAPTCHA / "מבנה תוקף לא
+        // תקין"). Only the two Tokef-required variants remain - fill in
+        // TokefInput with the card's real expiry (MMYY) before trying these.
         new("debitcard_token_with_tokef", "DebitCard.aspx + Token + תוקף אמיתי",
-            "כמו למעלה אבל עם תוקף אמיתי של הכרטיס (מלא בשדה למטה) - חובה למלא תוקף"),
+            "GET, כתובת מתועדת בפורומים - חובה למלא תוקף אמיתי בשדה למעלה"),
         new("debitkeva_token_with_tokef", "DebitKeva.aspx + Token + תוקף אמיתי",
-            "כמו למעלה אבל עם תוקף אמיתי של הכרטיס (מלא בשדה למטה) - חובה למלא תוקף"),
+            "GET, endpoint ייעודי להוראת קבע - חובה למלא תוקף אמיתי בשדה למעלה"),
     };
 
     [RelayCommand]
