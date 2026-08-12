@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [3.8.0] - 2026-08-11
+
+### Features
+- label each iframe token-test result with the PaymentType tried (ce7de5b3)
+
+### Bug Fixes
+- register payment-token-test.html in the MSI installer (41489c08)
+
+
 ## [3.7.0] - 2026-08-11
 
 ### Features
