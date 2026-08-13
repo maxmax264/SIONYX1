@@ -57,10 +57,20 @@ public partial class PaymentTestViewModel : ObservableObject
         // Tokef removed too: confirmed dead ends (CAPTCHA / "מבנה תוקף לא
         // תקין"). Only the two Tokef-required variants remain - fill in
         // TokefInput with the card's real expiry (MMYY) before trying these.
-        new("debitcard_token_with_tokef", "DebitCard.aspx + Token + תוקף אמיתי",
-            "GET, כתובת מתועדת בפורומים - חובה למלא תוקף אמיתי בשדה למעלה"),
+        // DebitCard.aspx confirmed CAPTCHA-blocked even with a real tokef -
+        // categorically not usable server-to-server. Removed. Only
+        // DebitKeva.aspx variants remain, since tokef changed its error
+        // from "מבנה תוקף לא תקין" to "תאריך לא תקין" - real progress.
         new("debitkeva_token_with_tokef", "DebitKeva.aspx + Token + תוקף אמיתי",
             "GET, endpoint ייעודי להוראת קבע - חובה למלא תוקף אמיתי בשדה למעלה"),
+        new("debitkeva_startfrom_slashes", "DebitKeva.aspx - StartFrom עם /",
+            "אותו דבר, StartFrom בפורמט DD/MM/YYYY - חובה תוקף"),
+        new("debitkeva_startfrom_iso", "DebitKeva.aspx - StartFrom ISO",
+            "אותו דבר, StartFrom בפורמט YYYY-MM-DD - חובה תוקף"),
+        new("debitkeva_startfrom_compact_iso", "DebitKeva.aspx - StartFrom YYYYMMDD",
+            "אותו דבר, StartFrom בפורמט YYYYMMDD - חובה תוקף"),
+        new("debitkeva_no_startfrom", "DebitKeva.aspx - בלי StartFrom",
+            "אותו דבר, בלי שדה StartFrom בכלל - חובה תוקף"),
     };
 
     [RelayCommand]
