@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [3.9.0] - 2026-08-13
+
+### Features
+- add DebitKeva StartFrom date-format variant buttons (c020d01a)
+- add real-Tokef input to payment test screen (raw API + iframe) (00f3980e)
+
+### Other
+- remove dead-end strategy buttons from payment test screen (5af88975)
+
+
 ## [3.8.0] - 2026-08-11
 
 ### Features
