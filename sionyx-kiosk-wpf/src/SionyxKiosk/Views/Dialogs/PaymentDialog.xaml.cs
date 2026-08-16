@@ -406,16 +406,21 @@ public partial class PaymentDialog : Window
             _purchaseId = type.GetProperty("purchaseId")?.GetValue(data)?.ToString() ?? "";
             Logger.Information("Pending purchase created for saved card: {PurchaseId}", _purchaseId);
 
-            // Read savedKevaId from Firebase (only used to send to the server for
-            // cross-checking - the server re-reads it from the user's own record
-            // anyway and never trusts this value blindly).
+            // Read savedKevaId/tokef from Firebase (only used to send to the
+            // server for cross-checking - the server re-reads them from the
+            // user's own record anyway and never trusts these values blindly).
             var savedKevaId = "";
+            var savedTokef = "";
             var userResult = await _firebase.DbGetAsync($"users/{_userId}");
             if (userResult.Success && userResult.Data is JsonElement userData)
             {
-                if (userData.TryGetProperty("savedCard", out var sc) &&
-                    sc.TryGetProperty("kevaId", out var keva))
-                    savedKevaId = keva.GetString() ?? "";
+                if (userData.TryGetProperty("savedCard", out var sc))
+                {
+                    if (sc.TryGetProperty("kevaId", out var keva))
+                        savedKevaId = keva.GetString() ?? "";
+                    if (sc.TryGetProperty("tokef", out var tok))
+                        savedTokef = tok.GetString() ?? "";
+                }
             }
             if (string.IsNullOrEmpty(savedKevaId))
             {
@@ -425,7 +430,7 @@ public partial class PaymentDialog : Window
                 return;
             }
 
-            await ChargeTokenAndCreditAsync(savedKevaId);
+            await ChargeTokenAndCreditAsync(savedKevaId, savedTokef);
         }
         catch (Exception ex)
         {
@@ -442,16 +447,17 @@ public partial class PaymentDialog : Window
     /// tokenized" (see HandleTokenCreatedAsync) - both need the exact same
     /// server call and result handling.
     /// </summary>
-    private async Task ChargeTokenAndCreditAsync(string kevaId)
+    private async Task ChargeTokenAndCreditAsync(string kevaId, string? tokef = null)
     {
-        Logger.Information("Calling chargeWithSavedCard function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix}",
-            _firebase.OrgId, _purchaseId, kevaId.Length > 4 ? kevaId[^4..] : kevaId);
+        Logger.Information("Calling chargeWithSavedCard function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix} TokefProvided={TokefProvided}",
+            _firebase.OrgId, _purchaseId, kevaId.Length > 4 ? kevaId[^4..] : kevaId, !string.IsNullOrEmpty(tokef));
 
         var callResult = await _firebase.CallFunctionAsync("chargeWithSavedCard", new
         {
             orgId = _firebase.OrgId,
             purchaseId = _purchaseId,
             kevaId,
+            tokef,
         });
 
         if (!callResult.Success)
@@ -584,6 +590,10 @@ public partial class PaymentDialog : Window
     {
         try
         {
+            string? manualTokef = root.TryGetProperty("manualTokef", out var mtEl) && mtEl.ValueKind == JsonValueKind.String
+                ? mtEl.GetString()
+                : null;
+
             string? transactionId = null;
             string? lastFourDigits = null;
             if (root.TryGetProperty("response", out var responseEl))
@@ -612,8 +622,8 @@ public partial class PaymentDialog : Window
                 return;
             }
 
-            Logger.Information("CreateToken succeeded (Token last4={LastFour}) - saving token only, no credit yet. PurchaseId={PurchaseId}",
-                lastFourDigits, _purchaseId);
+            Logger.Information("CreateToken succeeded (Token last4={LastFour}, tokefProvided={TokefProvided}) - saving token only, no credit yet. PurchaseId={PurchaseId}",
+                lastFourDigits, !string.IsNullOrEmpty(manualTokef), _purchaseId);
 
             var saveResult = await _firebase.CallFunctionAsync("confirmPayment", new
             {
@@ -621,6 +631,7 @@ public partial class PaymentDialog : Window
                 purchaseId = _purchaseId,
                 transactionId,
                 lastFourDigits,
+                tokef = manualTokef,
                 tokenOnly = true,
             });
             if (!saveResult.Success)
@@ -645,7 +656,7 @@ public partial class PaymentDialog : Window
             _purchaseId = type.GetProperty("purchaseId")?.GetValue(data)?.ToString() ?? "";
             Logger.Information("Pending purchase created for post-tokenize charge: {PurchaseId}", _purchaseId);
 
-            await ChargeTokenAndCreditAsync(transactionId);
+            await ChargeTokenAndCreditAsync(transactionId, manualTokef);
         }
         catch (Exception ex)
         {

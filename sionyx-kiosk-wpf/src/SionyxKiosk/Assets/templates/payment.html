@@ -388,6 +388,16 @@
                         שמור כרטיס לרכישות הבאות
                     </label>
                     <p style="margin:6px 0 0 28px; font-size:12px; color:#94A3B8;">הכרטיס נשמר בצורה מאובטחת אצל נדרים פלוס. בפעם הבאה התשלום יתבצע בלחיצה אחת, ללא הזנת פרטים נוספים.</p>
+                    <div id="manualTokefBox" style="display:none; margin:10px 0 0 28px;">
+                        <label style="font-size:13px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">
+                            תוקף הכרטיס (כפי שמופיע עליו, MMYY):
+                        </label>
+                        <input type="text" id="manualTokefInput" placeholder="לדוגמה: 0829" maxlength="4"
+                               style="width:100px; padding:8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:14px; text-align:center;" />
+                        <p style="margin:4px 0 0 0; font-size:11px; color:#94A3B8;">
+                            נדרש כדי שנוכל לחייב את הכרטיש בפעם הבאה ללא הקלדה מחדש.
+                        </p>
+                    </div>
                 </div>
 
             <div class="iframe-card" id="iframeSection">
@@ -480,6 +490,8 @@
                         // Default to checked - saving the card is opt-out, not opt-in
                         var cb = document.getElementById('saveCardCheck');
                         if (cb) cb.checked = true;
+                        var mtb = document.getElementById('manualTokefBox');
+                        if (mtb) mtb.style.display = 'block';
                     }
                     initNedarimIframe();
                 }
@@ -524,6 +536,7 @@
         // Set in onPurchaseCreated, read in handleTransactionResponse - kept at
         // module scope since those are two separate function calls.
         var lastPaymentType = null;
+        var lastManualTokef = null;
 
         function initNedarimIframe() {
             // CVV is never required: Nedarim does not store it and it cannot be verified
@@ -545,6 +558,8 @@
 
         function onSaveCardToggle() {
             initNedarimIframe();
+            var checked = document.getElementById('saveCardCheck').checked;
+            document.getElementById('manualTokefBox').style.display = checked ? 'block' : 'none';
         }
 
         function postToNedarim(data) {
@@ -613,6 +628,19 @@
             var name = document.getElementById('clientName').value.trim();
             var checkboxEl = document.getElementById('saveCardCheck');
             var saveCard = CONFIG.saveCardEnabled && checkboxEl && checkboxEl.checked;
+
+            if (saveCard) {
+                var tokefVal = document.getElementById('manualTokefInput').value.trim();
+                if (!/^\d{4}$/.test(tokefVal)) {
+                    document.getElementById('manualTokefInput').style.borderColor = '#EF4444';
+                    showError('נא להזין תוקף כרטיס תקין (4 ספרות, MMYY) כדי לשמור את הכרטיס');
+                    return;
+                }
+                lastManualTokef = tokefVal;
+            } else {
+                lastManualTokef = null;
+            }
+
             // Nedarim confirmed CONFIG.saveCardApiValid is the official
             // iframe/WooCommerce auth code for this Mosad - always use it for
             // the iframe (both regular and CreateToken), not just when
@@ -627,7 +655,8 @@
                 message: 'onPurchaseCreated: saveCardEnabled=' + CONFIG.saveCardEnabled +
                     ' checkboxExists=' + !!checkboxEl +
                     ' checkboxChecked=' + (checkboxEl ? checkboxEl.checked : 'n/a') +
-                    ' -> saveCard=' + saveCard + ' paymentType=' + paymentType
+                    ' -> saveCard=' + saveCard + ' paymentType=' + paymentType +
+                    ' manualTokefProvided=' + !!lastManualTokef
             });
             postToNedarim({
                 'Name': 'FinishTransaction2',
@@ -670,6 +699,7 @@
                 window.chrome.webview.postMessage({
                     action: 'paymentSuccess',
                     paymentType: lastPaymentType,
+                    manualTokef: lastManualTokef,
                     response: response
                 });
             } else {
