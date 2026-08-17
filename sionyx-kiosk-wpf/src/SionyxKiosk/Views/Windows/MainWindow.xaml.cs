@@ -96,7 +96,6 @@ public partial class MainWindow : Window
                 "Profile" => _services.GetService(typeof(ProfilePage)),
                 "Help" => _services.GetService(typeof(HelpPage)),
                 "Messages" => _services.GetService(typeof(MessagesPage)),
-                "PaymentTest" => _services.GetService(typeof(PaymentTestPage)),
                 _ => _services.GetService(typeof(HomePage))
             };
 

@@ -134,15 +134,6 @@
                             <TextBlock Text="עזרה" FontSize="15" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
-                    <RadioButton x:Name="NavPaymentTest" AutomationProperties.AutomationId="NavPaymentTest" Tag="PaymentTest"
-                                 Style="{StaticResource SidebarNavButton}"
-                                 Checked="NavButton_Checked" GroupName="Nav">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <TextBlock Text="תשלום (בדיקה)" FontSize="15" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
                 </StackPanel>
             </DockPanel>
         </Border>

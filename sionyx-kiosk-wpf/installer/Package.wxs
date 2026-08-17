@@ -62,19 +62,15 @@
     </ComponentGroup>
 
     <ComponentGroup Id="TemplateFiles" Directory="TemplatesDir">
+      <!-- Every file under Assets\templates must be listed here individually -
+           there is no wildcard harvesting. A file missed here silently never
+           ships in any MSI (including ones auto-update pushes), even though
+           it's committed to the repo and copied to the publish dir by the
+           csproj's Content glob - this bit us once with a debug-only
+           template that's since been removed entirely. -->
       <Component Id="PaymentTemplate" Guid="*">
         <File Id="PaymentHtml"
               Source="$(var.PublishDir)\Assets\templates\payment.html"
-              KeyPath="yes" />
-      </Component>
-      <!-- Every file under Assets\templates must be listed here individually -
-           there is no wildcard harvesting. payment-token-test.html was missed
-           when first added, which meant it silently never shipped in any MSI
-           (including ones auto-update pushed) despite being committed to the
-           repo and copied to the publish dir by the csproj's Content glob. -->
-      <Component Id="PaymentTokenTestTemplate" Guid="*">
-        <File Id="PaymentTokenTestHtml"
-              Source="$(var.PublishDir)\Assets\templates\payment-token-test.html"
               KeyPath="yes" />
       </Component>
     </ComponentGroup>
