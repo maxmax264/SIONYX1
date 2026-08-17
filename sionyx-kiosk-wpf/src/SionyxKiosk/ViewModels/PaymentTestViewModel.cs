@@ -71,6 +71,8 @@ public partial class PaymentTestViewModel : ObservableObject
             "אותו דבר, StartFrom בפורמט YYYYMMDD - חובה תוקף"),
         new("debitkeva_no_startfrom", "DebitKeva.aspx - בלי StartFrom",
             "אותו דבר, בלי שדה StartFrom בכלל - חובה תוקף"),
+        new("debitkeva_iframe_flag", "DebitKeva.aspx - DebitIframe=1",
+            "בודק אם דגל DebitIframe=1 גורם לעיבוד מיידי (במקום סבב) - חובה תוקף"),
     };
 
     [RelayCommand]
