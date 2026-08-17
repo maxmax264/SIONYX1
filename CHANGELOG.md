@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [3.10.0] - 2026-08-17
+
+### Features
+- add DebitIframe=1 test button to payment test screen (4b109ccc)
+- capture and forward card Tokef for real saved-card charging (47dc2bc7)
+
+
 ## [3.9.0] - 2026-08-13
 
 ### Features
