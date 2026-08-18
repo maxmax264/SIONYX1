@@ -97,6 +97,62 @@ public partial class AuthViewModel : ObservableObject
 
     public async Task ReloadBackgroundAsync() => await LoadBackgroundAsync();
 
+    /// <summary>
+    /// Local disk cache for the background image, keyed by org. Loading
+    /// from here is instant and has zero network dependency, unlike
+    /// fetching the image fresh every time (which was the root cause of
+    /// the background "sometimes shows, sometimes doesn't" bug - a
+    /// transient network hiccup during BitmapImage's own HTTP fetch would
+    /// fail silently, leaving HasBackgroundImage=true with no actual
+    /// image). We still try to refresh from network on every load, but
+    /// only ever REPLACE what's showing on success - a failed refresh no
+    /// longer means a blank background.
+    /// </summary>
+    private static string GetBackgroundCachePath()
+    {
+        var dir = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SIONYX", "cache");
+        System.IO.Directory.CreateDirectory(dir);
+        return System.IO.Path.Combine(dir, "background.cache");
+    }
+
+    private void TryLoadBackgroundFromDiskCache()
+    {
+        try
+        {
+            var path = GetBackgroundCachePath();
+            if (!System.IO.File.Exists(path)) return;
+            var bytes = System.IO.File.ReadAllBytes(path);
+            if (bytes.Length == 0) return;
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.StreamSource = new System.IO.MemoryStream(bytes);
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            BackgroundImageSource = bmp;
+            HasBackgroundImage = true;
+            Serilog.Log.Information("[BG] Loaded from disk cache ({Bytes} bytes) while network refresh runs", bytes.Length);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[BG] Disk cache read failed (non-fatal)");
+        }
+    }
+
+    private static void TrySaveBackgroundToDiskCache(byte[] bytes)
+    {
+        try
+        {
+            System.IO.File.WriteAllBytes(GetBackgroundCachePath(), bytes);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[BG] Disk cache write failed (non-fatal)");
+        }
+    }
+
     private async Task StartRefreshListenerAsync()
     {
         if (_metadataService == null) return;
@@ -130,6 +186,11 @@ public partial class AuthViewModel : ObservableObject
     private async Task LoadBackgroundAsync()
     {
         if (_metadataService == null) { Serilog.Log.Warning("[BG] metadataService is null"); return; }
+
+        // Show whatever we have cached on disk immediately - don't make the
+        // login screen wait on network before displaying anything.
+        System.Windows.Application.Current.Dispatcher.Invoke(TryLoadBackgroundFromDiskCache);
+
         try
         {
             var result = await _metadataService.GetKioskBackgroundAsync();
@@ -143,24 +204,56 @@ public partial class AuthViewModel : ObservableObject
                 if (enabled && !string.IsNullOrWhiteSpace(url))
                 {
                     BackgroundImageUrl = url;
-                    HasBackgroundImage = true;
-                    try {
-                        System.Windows.Application.Current.Dispatcher.Invoke(() => {
-                            var bmp = new System.Windows.Media.Imaging.BitmapImage();
-                            bmp.BeginInit();
-                            if (url.StartsWith("data:image")) {
-                                var b64 = url.Substring(url.IndexOf(',')+1);
-                                var bytes = System.Convert.FromBase64String(b64);
+                    byte[]? bytes = null;
+                    try
+                    {
+                        if (url.StartsWith("data:image"))
+                        {
+                            var b64 = url.Substring(url.IndexOf(',') + 1);
+                            bytes = System.Convert.FromBase64String(b64);
+                        }
+                        else
+                        {
+                            // Download ourselves (instead of letting BitmapImage's
+                            // UriSource fetch implicitly) so a network failure is
+                            // just a failed refresh, not a blank background - and
+                            // so we have the raw bytes to cache to disk.
+                            using var http = new System.Net.Http.HttpClient
+                            {
+                                Timeout = TimeSpan.FromSeconds(15),
+                            };
+                            bytes = await http.GetByteArrayAsync(url);
+                        }
+                    }
+                    catch (Exception fetchEx)
+                    {
+                        Serilog.Log.Warning(fetchEx, "[BG] Network refresh failed - keeping whatever is already showing (cache or previous load)");
+                    }
+
+                    if (bytes is { Length: > 0 })
+                    {
+                        try
+                        {
+                            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                                bmp.BeginInit();
                                 bmp.StreamSource = new System.IO.MemoryStream(bytes);
                                 bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                            } else {
-                                bmp.UriSource = new Uri(url, UriKind.Absolute);
-                                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                            }
-                            bmp.EndInit();
-                            BackgroundImageSource = bmp;
-                        });
-                    } catch (Exception ex2) { Serilog.Log.Error(ex2, "[BG] BitmapImage failed"); }
+                                bmp.EndInit();
+                                bmp.Freeze();
+                                BackgroundImageSource = bmp;
+                                HasBackgroundImage = true;
+                            });
+                            TrySaveBackgroundToDiskCache(bytes);
+                            Serilog.Log.Information("[BG] Background refreshed from network OK ({Bytes} bytes)", bytes.Length);
+                        }
+                        catch (Exception ex2)
+                        {
+                            Serilog.Log.Error(ex2, "[BG] BitmapImage decode failed for freshly-downloaded bytes");
+                        }
+                    }
+
                     try {
                         using var http2 = new System.Net.Http.HttpClient();
                         var cfg = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
