@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.10.2] - 2026-08-18
+
+### Bug Fixes
+- cache background image to disk, stop blanking out on network hiccups (45f12156)
+
+
 ## [3.10.1] - 2026-08-17
 
 ### Other
