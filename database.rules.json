@@ -41,8 +41,8 @@
             "lastSeen"
           ],
           "$userId": {
-            ".read": "auth.uid == $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists()",
-            ".write": "auth.uid == $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
+            ".read": "auth.uid == $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists() || root.child('owners').child(auth.uid).exists()",
+            ".write": "auth.uid == $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists()",
             "isAdmin": {
               ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'"
             },
@@ -51,9 +51,11 @@
               ".validate": "newData.isString() && (newData.val() == 'user' || newData.val() == 'admin')"
             },
             "remainingTime": {
+              ".write": "auth.uid == $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists()",
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
             "printBalance": {
+              ".write": "auth.uid == $userId || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists()",
               ".validate": "newData.isNumber()"
             },
             "forceLogout": {
