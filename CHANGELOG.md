@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.10.1] - 2026-08-17
+
+### Other
+- remove payment debug/test screens now that real flow works (0ee2332e)
+
+
 ## [3.10.0] - 2026-08-17
 
 ### Features
