@@ -1043,12 +1043,11 @@ const RegistrationModal = memo(({ open, onClose, onSubmit, loading, form }) => {
               <Col xs={24} sm={12}>
                 <Form.Item
                   name='nedarimMosadId'
-                  label={<span style={labelStyle}>מזהה מוסד NEDARIM</span>}
-                  rules={[{ required: true, message: 'נא להזין מזהה מוסד' }]}
+                  label={<span style={labelStyle}>מזהה מוסד NEDARIM (אופציונלי)</span>}
                 >
                   <Input
                     prefix={<KeyOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder='מזהה המוסד'
+                    placeholder='ניתן להשלים בהגדרות מאוחר יותר'
                     style={inputStyle}
                   />
                 </Form.Item>
@@ -1056,17 +1055,19 @@ const RegistrationModal = memo(({ open, onClose, onSubmit, loading, form }) => {
               <Col xs={24} sm={12}>
                 <Form.Item
                   name='nedarimApiValid'
-                  label={<span style={labelStyle}>מפתח API של NEDARIM</span>}
-                  rules={[{ required: true, message: 'נא להזין מפתח API' }]}
+                  label={<span style={labelStyle}>מפתח API של NEDARIM (אופציונלי)</span>}
                 >
                   <Input
                     prefix={<SafetyOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder='מפתח ה-API'
+                    placeholder='ניתן להשלים בהגדרות מאוחר יותר'
                     style={inputStyle}
                   />
                 </Form.Item>
               </Col>
             </Row>
+            <div style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 8 }}>
+              ניתן להזין את פרטי החיוב של נדרים פלוס בהמשך מתוך מסך ההגדרות.
+            </div>
           </motion.div>
 
           {/* Admin User Section */}
