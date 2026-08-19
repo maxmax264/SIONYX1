@@ -1301,7 +1301,8 @@ exports.registerOrganization = onCall(async (request) => {
     } = request.data;
 
     // Minimal safety check - UI handles detailed validation
-    if (!organizationName || !nedarimMosadId || !nedarimApiValid ||
+    // Nedarim credentials are optional at registration and can be configured later
+    if (!organizationName ||
         !adminPhone || !adminPassword || !adminFirstName || !adminLastName) {
       throw new functions.https.HttpsError(
           "invalid-argument",
@@ -1310,8 +1311,9 @@ exports.registerOrganization = onCall(async (request) => {
     }
 
     const cleanOrgName = organizationName.trim();
-    const cleanMosadId = nedarimMosadId.trim();
-    const cleanApiValid = nedarimApiValid.trim();
+    const cleanMosadId = (nedarimMosadId || "").trim();
+    const cleanApiValid = (nedarimApiValid || "").trim();
+    const billingConfigured = !!(cleanMosadId && cleanApiValid);
     const cleanAdminPhone = adminPhone.replace(/\D/g, "");
 
     log.info("Processing registration", {
@@ -1405,6 +1407,7 @@ exports.registerOrganization = onCall(async (request) => {
       name: cleanOrgName,
       nedarim_mosad_id: encryptData(cleanMosadId),
       nedarim_api_valid: encryptData(cleanApiValid),
+      billing_configured: billingConfigured,
       created_at: new Date().toISOString(),
       status: "active",
       created_by: "public-registration",
