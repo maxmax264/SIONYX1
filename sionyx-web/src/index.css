@@ -410,6 +410,17 @@ h5.ant-typography {
   padding: var(--space-3) var(--space-4);
 }
 
+/* antd computes tab gutter as a physical margin-right (LTR assumption) -
+   ConfigProvider here has no direction="rtl", so that margin lands on
+   the outer edge of the row instead of between tabs. Force it onto the
+   logical "end" side, which the direction:rtl rule above resolves to
+   margin-left - the side that actually creates visible space between
+   tabs in this RTL layout. */
+.ant-tabs-tab:not(:last-of-type) {
+  margin-inline-end: 24px !important;
+  margin-right: 0 !important;
+}
+
 .ant-tabs-tab-active {
   font-weight: var(--font-semibold);
 }
