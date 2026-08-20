@@ -212,7 +212,16 @@ const OwnerDashboardPage = () => {
   ];
 
   const userColumns = [
-    { title: "ארגון", dataIndex: "orgName", key: "orgName", render: (v) => <Tag>{v}</Tag> },
+    {
+      title: "ארגון",
+      dataIndex: "orgName",
+      key: "orgName",
+      render: (v) => <Tag>{v}</Tag>,
+      sorter: (a, b) => (a.orgName || "").localeCompare(b.orgName || ""),
+      defaultSortOrder: "ascend",
+      filters: orgs.map((o) => ({ text: o.name || o.orgId, value: o.orgId })),
+      onFilter: (value, record) => record.orgId === value,
+    },
     { title: "שם", key: "name", render: (_, r) => r.name || r.displayName || r.phoneNumber || r.uid },
     { title: "טלפון", dataIndex: "phoneNumber", key: "phoneNumber" },
     { title: "זמן נותר", dataIndex: "remainingTime", key: "remainingTime", render: (v) => formatTimeHebrewCompact(v || 0) },
@@ -339,47 +348,47 @@ const OwnerDashboardPage = () => {
                 key: "overview",
                 label: "סקירה",
                 children: (
-                  <>
-                    <Row gutter={[12, 12]} style={{ marginBottom: 8 }}>
+                  <div style={{ paddingTop: 8 }}>
+                    <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
                       <Col span={12}>
-                        <Card size="small">
+                        <Card size="small" bodyStyle={{ padding: 16 }}>
                           <Statistic title="סה״כ הכנסות" value={orgStats?.totalRevenue || 0} prefix={<WalletOutlined />} suffix="₪" valueStyle={{ color: token.colorSuccess }} />
                         </Card>
                       </Col>
                       <Col span={12}>
-                        <Card size="small">
+                        <Card size="small" bodyStyle={{ padding: 16 }}>
                           <Statistic title="מספר רכישות" value={orgStats?.purchasesCount || 0} prefix={<ShoppingOutlined />} />
                         </Card>
                       </Col>
                       <Col span={12}>
-                        <Card size="small">
+                        <Card size="small" bodyStyle={{ padding: 16 }}>
                           <Statistic title="סה״כ דקות שנרכשו" value={orgStats?.totalTimeMinutes || 0} prefix={<ClockCircleOutlined />} />
                         </Card>
                       </Col>
                       <Col span={12}>
-                        <Card size="small">
+                        <Card size="small" bodyStyle={{ padding: 16 }}>
                           <Statistic title="משתמשים" value={orgDetailOrg?.userCount || 0} prefix={<UserOutlined />} />
                         </Card>
                       </Col>
                       <Col span={12}>
-                        <Card size="small">
+                        <Card size="small" bodyStyle={{ padding: 16 }}>
                           <Statistic title="פעילים עכשיו" value={orgDetailOrg?.activeUsers || 0} prefix={<TeamOutlined />} />
                         </Card>
                       </Col>
                       <Col span={12}>
-                        <Card size="small">
+                        <Card size="small" bodyStyle={{ padding: 16 }}>
                           <Statistic title="מחשבים" value={orgDetailOrg?.computerCount || 0} prefix={<LaptopOutlined />} />
                         </Card>
                       </Col>
                     </Row>
-                    <Card size="small" title="פרטים כלליים">
-                      <Space direction="vertical" size={6}>
+                    <Card size="small" title="פרטים כלליים" style={{ marginTop: 4 }} bodyStyle={{ padding: 16 }}>
+                      <Space direction="vertical" size={10}>
                         <Text>סטטוס: <Tag color={orgDetailOrg?.status === "active" ? "green" : "red"}>{orgDetailOrg?.status === "active" ? "פעיל" : orgDetailOrg?.status}</Tag></Text>
                         <Text>נוצר בתאריך: {orgDetailOrg?.createdAt ? dayjs(orgDetailOrg.createdAt).format("D/M/YYYY HH:mm") : "לא זמין"}</Text>
                         <Text>פיקוח: {orgDetailOrg?.isSupervised ? "מפוקח" : "לא מפוקח"}</Text>
                       </Space>
                     </Card>
-                  </>
+                  </div>
                 ),
               },
               {
