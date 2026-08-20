@@ -1,6 +1,29 @@
 # Changelog
 
 
+## [3.11.0] - 2026-08-20
+
+### Features
+- **owner dashboard**: reorganize into categorized org detail drawer (7e9d9a03)
+- call the Render backend for registerOrganization instead of the Firebase Cloud Function (a95dd845)
+- make Nedarim credentials optional during registration (sionyx-web/src/components/settings/PaymentSettings.jsx) (5fdc2e80)
+- make Nedarim credentials optional during registration (sionyx-web/src/services/paymentSettingsService.js) (066fc819)
+- make Nedarim credentials optional during registration (sionyx-web/src/pages/LandingPage.jsx) (2ffc29eb)
+- make Nedarim credentials optional during registration (functions/index.js) (977eb500)
+- developer dashboard - view/edit any user's balance across all orgs (511f02c8)
+
+### Bug Fixes
+- **rtl**: tab gutter now lands on the visible side in RTL layout (ba92c496)
+- **owner dashboard**: add spacing between drawer tab labels (2a28a8e6)
+- **owner dashboard**: breathing room in overview cards + group/filter users table by org (2115a517)
+- correct BRIDGE_BASE_URL fallback - understood-n5ok, not sionyx-payment-bridge (e9933624)
+
+### Other
+- try new chargeWithSavedCardRegular from kiosk UI (temp switch) (f45853d8)
+- resolve conflict, keep origin/main's env-var-driven bridge URL (004bc408)
+- route organization registration to Render bridge instead of Firebase Function (ad15e384)
+
+
 ## [3.10.2] - 2026-08-18
 
 ### Bug Fixes
