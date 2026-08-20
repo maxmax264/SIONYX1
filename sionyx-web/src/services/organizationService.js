@@ -1,6 +1,5 @@
-import { database, functions } from '../config/firebase';
+import { database } from '../config/firebase';
 import { ref, get } from 'firebase/database';
-import { httpsCallable } from 'firebase/functions';
 import { logger } from '../utils/logger';
 
 /**
@@ -11,6 +10,17 @@ import { logger } from '../utils/logger';
  * - Retrieving organization metadata (including NEDARIM credentials)
  * - Getting organization statistics for the admin dashboard
  */
+
+// registerOrganization moved from a Firebase Cloud Function to this Render
+// endpoint (same one used for payment bridging) because Gen2 Cloud
+// Functions require the Blaze (pay-as-you-go) plan - without it, the
+// deployed function stopped responding to browser calls entirely (CORS
+// preflight failing with no Access-Control-Allow-Origin header at all,
+// meaning requests never reached application code). The user chose not to
+// upgrade to Blaze, so this now lives on Render instead - same logic,
+// same Firebase Admin SDK, no Blaze dependency. See render-service/
+// index.js's /registerOrganization for the server-side implementation.
+const REGISTER_ORG_URL = 'https://understood-n5ok.onrender.com/registerOrganization';
 
 const decodeData = encodedData => {
   try {
@@ -35,7 +45,7 @@ const decodeCloudFunctionData = encodedData => {
 };
 
 /**
- * Register a new organization via Cloud Function
+ * Register a new organization via the Render backend
  *
  * WHY NEEDED: Landing page needs this to register new organizations
  * with their NEDARIM credentials for payment processing
@@ -45,29 +55,28 @@ const decodeCloudFunctionData = encodedData => {
  */
 export const registerOrganization = async organizationData => {
   try {
-    logger.info('Calling Cloud Function for organization registration:', {
+    logger.info('Calling Render backend for organization registration:', {
       hasData: !!organizationData,
     });
 
-    // Initialize Firebase Functions
-    const registerOrg = httpsCallable(functions, 'registerOrganization');
+    const response = await fetch(REGISTER_ORG_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: organizationData }),
+    });
 
-    // Call the Cloud Function
-    const result = await registerOrg(organizationData);
+    const body = await response.json().catch(() => null);
 
-    logger.info('Organization registered successfully:', result.data);
-    return result.data;
-  } catch (error) {
-    logger.error('Error calling Cloud Function:', error);
-
-    // Handle Firebase Functions errors
-    if (error.code) {
-      return {
-        success: false,
-        error: error.message || 'Registration failed',
-      };
+    if (!response.ok || !body) {
+      const message = body?.error?.message || 'Registration failed';
+      logger.error('Organization registration failed:', message);
+      return { success: false, error: message };
     }
 
+    logger.info('Organization registered successfully:', body.result);
+    return body.result;
+  } catch (error) {
+    logger.error('Error calling registration backend:', error);
     return {
       success: false,
       error: 'Failed to register organization. Please try again.',
