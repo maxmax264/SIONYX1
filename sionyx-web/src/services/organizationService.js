@@ -5,9 +5,13 @@ import { logger } from '../utils/logger';
 /**
  * Base URL of the Render bridge server that now hosts registerOrganization
  * (moved off Firebase Cloud Functions, which require the Blaze plan).
+ * This is the same server chargeWithSavedCard/confirmPayment/
+ * nedarimCallback already use - understood-n5ok.onrender.com, not
+ * sionyx-payment-bridge.onrender.com (a wrong URL that snuck in from a
+ * parallel edit - that hostname isn't a real deployed service).
  */
 const BRIDGE_BASE_URL = (
-  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://sionyx-payment-bridge.onrender.com'
+  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com'
 ).replace(/\/$/, '');
 
 /**
