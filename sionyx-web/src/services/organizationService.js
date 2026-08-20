@@ -1,7 +1,14 @@
-import { database, functions } from '../config/firebase';
+import { database } from '../config/firebase';
 import { ref, get } from 'firebase/database';
-import { httpsCallable } from 'firebase/functions';
 import { logger } from '../utils/logger';
+
+/**
+ * Base URL of the Render bridge server that now hosts registerOrganization
+ * (moved off Firebase Cloud Functions, which require the Blaze plan).
+ */
+const BRIDGE_BASE_URL = (
+  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://sionyx-payment-bridge.onrender.com'
+).replace(/\/$/, '');
 
 /**
  * Organization Service
@@ -35,7 +42,7 @@ const decodeCloudFunctionData = encodedData => {
 };
 
 /**
- * Register a new organization via Cloud Function
+ * Register a new organization via the Render bridge server
  *
  * WHY NEEDED: Landing page needs this to register new organizations
  * with their NEDARIM credentials for payment processing
@@ -45,29 +52,30 @@ const decodeCloudFunctionData = encodedData => {
  */
 export const registerOrganization = async organizationData => {
   try {
-    logger.info('Calling Cloud Function for organization registration:', {
+    logger.info('Calling Render bridge for organization registration:', {
       hasData: !!organizationData,
     });
 
-    // Initialize Firebase Functions
-    const registerOrg = httpsCallable(functions, 'registerOrganization');
+    const response = await fetch(`${BRIDGE_BASE_URL}/registerOrganization`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: organizationData }),
+    });
 
-    // Call the Cloud Function
-    const result = await registerOrg(organizationData);
+    const payload = await response.json().catch(() => null);
 
-    logger.info('Organization registered successfully:', result.data);
-    return result.data;
-  } catch (error) {
-    logger.error('Error calling Cloud Function:', error);
-
-    // Handle Firebase Functions errors
-    if (error.code) {
-      return {
-        success: false,
-        error: error.message || 'Registration failed',
-      };
+    if (!response.ok) {
+      const message =
+        (payload && payload.error && payload.error.message) || 'Registration failed';
+      logger.error('Registration failed:', { status: response.status, message });
+      return { success: false, error: message };
     }
 
+    const result = (payload && payload.result) || payload || {};
+    logger.info('Organization registered successfully:', result);
+    return result;
+  } catch (error) {
+    logger.error('Error calling registration server:', error);
     return {
       success: false,
       error: 'Failed to register organization. Please try again.',
