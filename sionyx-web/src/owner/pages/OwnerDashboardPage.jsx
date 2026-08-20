@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
-import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber } from "antd";
-import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, PictureOutlined, EditOutlined, SearchOutlined } from "@ant-design/icons";
+import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
+import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
 import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance } from "../services/ownerUserService";
+import { getOrganizationStats } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
 import { database } from "../../config/firebase";
 import { changeOwnerPassword, signOutOwner } from "../services/ownerAuthService";
 import { useOwnerAuthStore } from "../store/ownerAuthStore";
 import { useNavigate } from "react-router-dom";
 import { formatTimeHebrewCompact } from "../../utils/timeFormatter";
+import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
+
+const PURCHASE_TYPE_LABELS = {
+  time: "זמן",
+  print: "הדפסות",
+  ragil: "תשלום רגיל",
+  savedCard: "כרטיס שמור",
+};
 
 const OwnerDashboardPage = () => {
   const [orgs, setOrgs] = useState([]);
@@ -28,6 +37,13 @@ const OwnerDashboardPage = () => {
   const [adjustBalanceVisible, setAdjustBalanceVisible] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [balanceForm] = Form.useForm();
+
+  // Org detail drawer
+  const [orgDetailOrg, setOrgDetailOrg] = useState(null);
+  const [orgDetailVisible, setOrgDetailVisible] = useState(false);
+  const [orgStats, setOrgStats] = useState(null);
+  const [orgStatsLoading, setOrgStatsLoading] = useState(false);
+
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const logout = useOwnerAuthStore((s) => s.logout);
@@ -144,52 +160,54 @@ const OwnerDashboardPage = () => {
     }
   };
 
+  // ── Org detail drawer ──────────────────────────────────────────
+  const handleOpenOrgDetail = async (org) => {
+    setOrgDetailOrg(org);
+    setOrgDetailVisible(true);
+    setOrgStats(null);
+    setOrgStatsLoading(true);
+    const result = await getOrganizationStats(org.orgId);
+    if (result.success) setOrgStats(result.stats);
+    else message.error(result.error || "נכשל בטעינת נתוני הארגון");
+    setOrgStatsLoading(false);
+  };
+
+  const handleCloseOrgDetail = () => {
+    setOrgDetailVisible(false);
+    setOrgDetailOrg(null);
+    setOrgStats(null);
+  };
+
+  const handleAddOrg = () => {
+    window.open("/", "_blank", "noopener,noreferrer");
+  };
+
   const totalUsers = orgs.reduce((s, o) => s + o.userCount, 0);
   const totalActive = orgs.reduce((s, o) => s + o.activeUsers, 0);
   const totalComputers = orgs.reduce((s, o) => s + o.computerCount, 0);
   const supervised = orgs.filter((o) => o.isSupervised).length;
 
+  // Slim, tidy org table - detailed settings moved into the org detail drawer
   const columns = [
-    { title: "ארגון", dataIndex: "name", key: "name", render: (v, r) => <Text strong>{v || r.orgId}</Text> },
+    {
+      title: "ארגון",
+      dataIndex: "name",
+      key: "name",
+      render: (v, r) => (
+        <Button type="link" style={{ padding: 0, fontWeight: 600 }} onClick={() => handleOpenOrgDetail(r)}>
+          {v || r.orgId}
+        </Button>
+      ),
+    },
+    { title: "סטטוס", dataIndex: "status", key: "status", render: (v) => <Tag color={v === "active" ? "green" : "red"}>{v === "active" ? "פעיל" : v}</Tag> },
     { title: "משתמשים", dataIndex: "userCount", key: "userCount", render: (v) => <><UserOutlined /> {v}</> },
     { title: "פעילים", dataIndex: "activeUsers", key: "activeUsers", render: (v) => <Tag color={v > 0 ? "green" : "default"}>{v}</Tag> },
     { title: "מחשבים", dataIndex: "computerCount", key: "computerCount", render: (v) => <><LaptopOutlined /> {v}</> },
-    { title: "סטטוס", dataIndex: "status", key: "status", render: (v) => <Tag color={v === "active" ? "green" : "red"}>{v === "active" ? "פעיל" : v}</Tag> },
+    { title: "פיקוח", key: "supervision", render: (_, r) => <Tag icon={r.isSupervised ? <EyeOutlined /> : <EyeInvisibleOutlined />} color={r.isSupervised ? "blue" : "default"}>{r.isSupervised ? "מפוקח" : "לא מפוקח"}</Tag> },
     {
-      title: "תמונת רקע",
-      key: "bgSettings",
-      render: (_, r) => {
-        const s = orgSettings[r.orgId] || {};
-        const allowUpload = s.allowFileUpload !== false;
-        const maxMB = s.maxImageSizeMB || 0;
-        return (
-          <Space direction="vertical" size={2}>
-            <Space size={4}>
-              <Switch size="small" checked={allowUpload} loading={!!savingOrgSettings[r.orgId + "allowFileUpload"]} onChange={v => handleSaveOrgSetting(r.orgId, "allowFileUpload", v)} />
-              <Text style={{ fontSize: 11 }}>העלאת קובץ</Text>
-            </Space>
-            <Space size={4}>
-              <InputNumber size="small" min={0} value={maxMB} style={{ width: 60 }} onChange={v => setOrgSettings(prev => ({ ...prev, [r.orgId]: { ...(prev[r.orgId] || {}), maxImageSizeMB: v || 0 } }))} onBlur={() => handleSaveOrgSetting(r.orgId, "maxImageSizeMB", orgSettings[r.orgId]?.maxImageSizeMB || 0)} />
-              <Text style={{ fontSize: 11 }}>MB</Text>
-            </Space>
-          </Space>
-        );
-      },
-    },
-    {
-      title: "פיקוח",
-      key: "supervision",
-      render: (_, r) => (
-        <Space>
-          <Switch
-            checked={r.isSupervised}
-            checkedChildren={<EyeOutlined />}
-            unCheckedChildren={<EyeInvisibleOutlined />}
-            onChange={() => handleSupervisionToggle(r.orgId, r.isSupervised, r.supervisedBy)}
-          />
-          <Text type="secondary" style={{ fontSize: 12 }}>{r.isSupervised ? "מפוקח" : "לא מפוקח"}</Text>
-        </Space>
-      ),
+      title: "",
+      key: "open",
+      render: (_, r) => <Button size="small" onClick={() => handleOpenOrgDetail(r)}>פרטים מלאים</Button>,
     },
   ];
 
@@ -209,6 +227,30 @@ const OwnerDashboardPage = () => {
     },
   ];
 
+  // Same as userColumns, minus the org tag column - used inside the org detail drawer
+  const orgUserColumns = userColumns.filter((c) => c.key !== "orgName");
+
+  const purchaseColumns = [
+    {
+      title: "תאריך",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: (v) => (v ? dayjs(v).format("D/M/YYYY HH:mm") : "—"),
+      sorter: (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+      defaultSortOrder: "descend",
+    },
+    { title: "סכום", dataIndex: "amount", key: "amount", render: (v) => v ? `₪${v}` : "—" },
+    { title: "חבילה", dataIndex: "packageName", key: "packageName", render: (v) => v || "—" },
+    { title: "סוג", dataIndex: "type", key: "type", render: (v) => PURCHASE_TYPE_LABELS[v] || v || "—" },
+    { title: "דקות", dataIndex: "minutes", key: "minutes", render: (v) => v || "—" },
+    {
+      title: "סטטוס",
+      dataIndex: "status",
+      key: "status",
+      render: (v) => <Tag color={v === "completed" ? "green" : v === "pending" ? "orange" : "red"}>{v || "—"}</Tag>,
+    },
+  ];
+
   const filteredUsers = allUsers.filter((u) => {
     if (!userSearch.trim()) return true;
     const q = userSearch.trim().toLowerCase();
@@ -217,6 +259,9 @@ const OwnerDashboardPage = () => {
       (u.phoneNumber || "").includes(q) ||
       (u.orgName || "").toLowerCase().includes(q);
   });
+
+  const orgDetailUsers = orgDetailOrg ? allUsers.filter((u) => u.orgId === orgDetailOrg.orgId) : [];
+  const orgDetailSettings = orgDetailOrg ? (orgSettings[orgDetailOrg.orgId] || {}) : {};
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 80 }}><Spin size="large" /></div>;
 
@@ -245,7 +290,12 @@ const OwnerDashboardPage = () => {
           </Col>
         ))}
       </Row>
-      <Card title="כל הארגונים" size="small" style={{ marginBottom: 24 }}>
+      <Card
+        title="כל הארגונים"
+        size="small"
+        style={{ marginBottom: 24 }}
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={handleAddOrg}>ארגון חדש</Button>}
+      >
         <Table dataSource={orgs} columns={columns} rowKey="orgId" pagination={false} size="small" />
       </Card>
       <Card
@@ -270,6 +320,143 @@ const OwnerDashboardPage = () => {
           size="small"
         />
       </Card>
+
+      {/* Org detail drawer - everything about one org, organized into categories */}
+      <Drawer
+        title={orgDetailOrg ? (orgDetailOrg.name || orgDetailOrg.orgId) : ""}
+        placement="right"
+        width={720}
+        open={orgDetailVisible}
+        onClose={handleCloseOrgDetail}
+      >
+        {orgStatsLoading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spin size="large" /></div>
+        ) : (
+          <Tabs
+            defaultActiveKey="overview"
+            items={[
+              {
+                key: "overview",
+                label: "סקירה",
+                children: (
+                  <>
+                    <Row gutter={[12, 12]} style={{ marginBottom: 8 }}>
+                      <Col span={12}>
+                        <Card size="small">
+                          <Statistic title="סה״כ הכנסות" value={orgStats?.totalRevenue || 0} prefix={<WalletOutlined />} suffix="₪" valueStyle={{ color: token.colorSuccess }} />
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card size="small">
+                          <Statistic title="מספר רכישות" value={orgStats?.purchasesCount || 0} prefix={<ShoppingOutlined />} />
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card size="small">
+                          <Statistic title="סה״כ דקות שנרכשו" value={orgStats?.totalTimeMinutes || 0} prefix={<ClockCircleOutlined />} />
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card size="small">
+                          <Statistic title="משתמשים" value={orgDetailOrg?.userCount || 0} prefix={<UserOutlined />} />
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card size="small">
+                          <Statistic title="פעילים עכשיו" value={orgDetailOrg?.activeUsers || 0} prefix={<TeamOutlined />} />
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card size="small">
+                          <Statistic title="מחשבים" value={orgDetailOrg?.computerCount || 0} prefix={<LaptopOutlined />} />
+                        </Card>
+                      </Col>
+                    </Row>
+                    <Card size="small" title="פרטים כלליים">
+                      <Space direction="vertical" size={6}>
+                        <Text>סטטוס: <Tag color={orgDetailOrg?.status === "active" ? "green" : "red"}>{orgDetailOrg?.status === "active" ? "פעיל" : orgDetailOrg?.status}</Tag></Text>
+                        <Text>נוצר בתאריך: {orgDetailOrg?.createdAt ? dayjs(orgDetailOrg.createdAt).format("D/M/YYYY HH:mm") : "לא זמין"}</Text>
+                        <Text>פיקוח: {orgDetailOrg?.isSupervised ? "מפוקח" : "לא מפוקח"}</Text>
+                      </Space>
+                    </Card>
+                  </>
+                ),
+              },
+              {
+                key: "purchases",
+                label: "תשלומים והכנסות",
+                children: (
+                  <Table
+                    dataSource={orgStats?.purchases || []}
+                    columns={purchaseColumns}
+                    rowKey={(r, i) => r.id || i}
+                    pagination={{ pageSize: 10, showSizeChanger: false }}
+                    size="small"
+                    locale={{ emptyText: <Empty description="אין רכישות" /> }}
+                  />
+                ),
+              },
+              {
+                key: "users",
+                label: `משתמשים (${orgDetailUsers.length})`,
+                children: (
+                  <Table
+                    dataSource={orgDetailUsers}
+                    columns={orgUserColumns}
+                    rowKey={(r) => r.uid}
+                    pagination={{ pageSize: 10, showSizeChanger: false }}
+                    size="small"
+                  />
+                ),
+              },
+              {
+                key: "settings",
+                label: "הגדרות",
+                children: orgDetailOrg && (
+                  <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                    <Card size="small" title="פיקוח">
+                      <Space>
+                        <Switch
+                          checked={orgDetailOrg.isSupervised}
+                          checkedChildren={<EyeOutlined />}
+                          unCheckedChildren={<EyeInvisibleOutlined />}
+                          onChange={async () => {
+                            await handleSupervisionToggle(orgDetailOrg.orgId, orgDetailOrg.isSupervised, orgDetailOrg.supervisedBy);
+                            setOrgDetailOrg((prev) => prev ? { ...prev, isSupervised: !prev.isSupervised } : prev);
+                          }}
+                        />
+                        <Text type="secondary">{orgDetailOrg.isSupervised ? "מפוקח" : "לא מפוקח"}</Text>
+                      </Space>
+                    </Card>
+                    <Card size="small" title="תמונת רקע">
+                      <Space direction="vertical" size={10}>
+                        <Space size={8}>
+                          <Switch
+                            checked={orgDetailSettings.allowFileUpload !== false}
+                            loading={!!savingOrgSettings[orgDetailOrg.orgId + "allowFileUpload"]}
+                            onChange={(v) => handleSaveOrgSetting(orgDetailOrg.orgId, "allowFileUpload", v)}
+                          />
+                          <Text>אפשר העלאת קובץ</Text>
+                        </Space>
+                        <Space size={8}>
+                          <InputNumber
+                            min={0}
+                            value={orgDetailSettings.maxImageSizeMB || 0}
+                            onChange={(v) => setOrgSettings((prev) => ({ ...prev, [orgDetailOrg.orgId]: { ...(prev[orgDetailOrg.orgId] || {}), maxImageSizeMB: v || 0 } }))}
+                            onBlur={() => handleSaveOrgSetting(orgDetailOrg.orgId, "maxImageSizeMB", orgSettings[orgDetailOrg.orgId]?.maxImageSizeMB || 0)}
+                          />
+                          <Text>MB מקסימום לקובץ</Text>
+                        </Space>
+                      </Space>
+                    </Card>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        )}
+      </Drawer>
+
       <Modal
         title={adjustingUser ? `עדכון יתרה - ${adjustingUser.name || adjustingUser.phoneNumber || adjustingUser.uid} (${adjustingUser.orgName})` : "עדכון יתרה"}
         open={adjustBalanceVisible}
