@@ -449,10 +449,20 @@ public partial class PaymentDialog : Window
     /// </summary>
     private async Task ChargeTokenAndCreditAsync(string kevaId, string? tokef = null)
     {
-        Logger.Information("Calling chargeWithSavedCard function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix} TokefProvided={TokefProvided}",
-            _firebase.OrgId, _purchaseId, kevaId.Length > 4 ? kevaId[^4..] : kevaId, !string.IsNullOrEmpty(tokef));
+        // ── TEMPORARY TEST SWITCH ──────────────────────────────────────
+        // Calling the new EXPERIMENTAL /chargeWithSavedCardRegular instead
+        // of the proven /chargeWithSavedCard (DebitKeva = technically a
+        // standing order) so we can find out, from the real kiosk UI,
+        // whether any of the 3 DebitCard.aspx param variations actually
+        // works as a true one-time charge. To go back to the known-good
+        // path, change useRegularTestEndpoint back to false.
+        const bool useRegularTestEndpoint = true;
+        var endpointName = useRegularTestEndpoint ? "chargeWithSavedCardRegular" : "chargeWithSavedCard";
 
-        var callResult = await _firebase.CallFunctionAsync("chargeWithSavedCard", new
+        Logger.Information("Calling {Endpoint} function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix} TokefProvided={TokefProvided}",
+            endpointName, _firebase.OrgId, _purchaseId, kevaId.Length > 4 ? kevaId[^4..] : kevaId, !string.IsNullOrEmpty(tokef));
+
+        var callResult = await _firebase.CallFunctionAsync(endpointName, new
         {
             orgId = _firebase.OrgId,
             purchaseId = _purchaseId,
@@ -462,31 +472,33 @@ public partial class PaymentDialog : Window
 
         if (!callResult.Success)
         {
-            Logger.Error("chargeWithSavedCard function call failed: {Error}", callResult.Error);
+            Logger.Error("{Endpoint} function call failed: {Error}", endpointName, callResult.Error);
             var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = callResult.Error ?? "שגיאה בעיבוד תשלום" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
             return;
         }
 
-        // The function returns { success, message/error, correlationId, optionUsed }
-        // optionUsed tells us which of the numbered TashlumBodedNew parameter
-        // strategies (see chargeWithSavedCard in functions/index.js) actually
-        // got a response from Nedarim. Logged here too so it shows up in the
-        // kiosk's own public logs (C:\Users\Public\Documents\SIONYX\logs\)
-        // alongside everything else - once one option is confirmed working
-        // consistently in production, the others should be deleted from the
-        // Cloud Function.
         var resultData = (JsonElement)callResult.Data!;
         var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
         var correlationId = resultData.TryGetProperty("correlationId", out var cEl) ? cEl.GetString() : null;
+        // workingAttempt is the NEW field - only chargeWithSavedCardRegular sends it,
+        // and its value is the exact attempt.label from index.js (e.g. "DebitCard.aspx -
+        // Token field only (no CardNumber/CVV) - חיוב רגיל") - i.e. it tells you WHICH
+        // of the 3 new param variations actually worked, if any did.
+        var workingAttempt = resultData.TryGetProperty("workingAttempt", out var waEl) ? waEl.GetString() : null;
+        // optionUsed only comes from the old chargeWithSavedCard path.
         var optionUsed = resultData.TryGetProperty("optionUsed", out var oEl) && oEl.ValueKind == JsonValueKind.Number
             ? oEl.GetInt32().ToString()
             : "none-succeeded";
 
         if (success)
         {
-            Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
-                optionUsed, _purchaseId, correlationId);
+            if (useRegularTestEndpoint)
+                Logger.Information("[REGULAR-CHARGE TEST] Succeeded via attempt: \"{WorkingAttempt}\". PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
+                    workingAttempt ?? "(unknown - check Render logs)", _purchaseId, correlationId);
+            else
+                Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
+                    optionUsed, _purchaseId, correlationId);
             PaymentSucceeded = true;
             var successMsg = JsonSerializer.Serialize(new { action = "showSuccess" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(successMsg));
@@ -494,8 +506,12 @@ public partial class PaymentDialog : Window
         else
         {
             var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "שגיאה" : "שגיאה";
-            Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
-                optionUsed, _purchaseId, errorText, correlationId);
+            if (useRegularTestEndpoint)
+                Logger.Warning("[REGULAR-CHARGE TEST] All 3 new attempts failed (or a non-charge error occurred). PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId} — check Render logs for [REGULAR-CHARGE] entries to see each attempt's raw response.",
+                    _purchaseId, errorText, correlationId);
+            else
+                Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
+                    optionUsed, _purchaseId, errorText, correlationId);
             var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = errorText });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
         }
