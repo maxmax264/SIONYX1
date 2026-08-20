@@ -3,6 +3,14 @@ import { ref, get } from 'firebase/database';
 import { logger } from '../utils/logger';
 
 /**
+ * Base URL of the Render bridge server that now hosts registerOrganization
+ * (moved off Firebase Cloud Functions, which require the Blaze plan).
+ */
+const BRIDGE_BASE_URL = (
+  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://sionyx-payment-bridge.onrender.com'
+).replace(/\/$/, '');
+
+/**
  * Organization Service
  *
  * This service handles organization-related operations including:
@@ -10,17 +18,6 @@ import { logger } from '../utils/logger';
  * - Retrieving organization metadata (including NEDARIM credentials)
  * - Getting organization statistics for the admin dashboard
  */
-
-// registerOrganization moved from a Firebase Cloud Function to this Render
-// endpoint (same one used for payment bridging) because Gen2 Cloud
-// Functions require the Blaze (pay-as-you-go) plan - without it, the
-// deployed function stopped responding to browser calls entirely (CORS
-// preflight failing with no Access-Control-Allow-Origin header at all,
-// meaning requests never reached application code). The user chose not to
-// upgrade to Blaze, so this now lives on Render instead - same logic,
-// same Firebase Admin SDK, no Blaze dependency. See render-service/
-// index.js's /registerOrganization for the server-side implementation.
-const REGISTER_ORG_URL = 'https://understood-n5ok.onrender.com/registerOrganization';
 
 const decodeData = encodedData => {
   try {
@@ -45,7 +42,7 @@ const decodeCloudFunctionData = encodedData => {
 };
 
 /**
- * Register a new organization via the Render backend
+ * Register a new organization via the Render bridge server
  *
  * WHY NEEDED: Landing page needs this to register new organizations
  * with their NEDARIM credentials for payment processing
@@ -55,28 +52,30 @@ const decodeCloudFunctionData = encodedData => {
  */
 export const registerOrganization = async organizationData => {
   try {
-    logger.info('Calling Render backend for organization registration:', {
+    logger.info('Calling Render bridge for organization registration:', {
       hasData: !!organizationData,
     });
 
-    const response = await fetch(REGISTER_ORG_URL, {
+    const response = await fetch(`${BRIDGE_BASE_URL}/registerOrganization`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: organizationData }),
     });
 
-    const body = await response.json().catch(() => null);
+    const payload = await response.json().catch(() => null);
 
-    if (!response.ok || !body) {
-      const message = body?.error?.message || 'Registration failed';
-      logger.error('Organization registration failed:', message);
+    if (!response.ok) {
+      const message =
+        (payload && payload.error && payload.error.message) || 'Registration failed';
+      logger.error('Registration failed:', { status: response.status, message });
       return { success: false, error: message };
     }
 
-    logger.info('Organization registered successfully:', body.result);
-    return body.result;
+    const result = (payload && payload.result) || payload || {};
+    logger.info('Organization registered successfully:', result);
+    return result;
   } catch (error) {
-    logger.error('Error calling registration backend:', error);
+    logger.error('Error calling registration server:', error);
     return {
       success: false,
       error: 'Failed to register organization. Please try again.',
