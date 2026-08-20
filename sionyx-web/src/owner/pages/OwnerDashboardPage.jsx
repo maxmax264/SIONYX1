@@ -343,6 +343,7 @@ const OwnerDashboardPage = () => {
         ) : (
           <Tabs
             defaultActiveKey="overview"
+            tabBarGutter={28}
             items={[
               {
                 key: "overview",
