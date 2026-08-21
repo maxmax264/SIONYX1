@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.1] - 2026-08-21
+
+### Bug Fixes
+- revert saved-card charge back to proven DebitKeva path (5522b07b)
+
+
 ## [3.11.0] - 2026-08-20
 
 ### Features
