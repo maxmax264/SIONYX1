@@ -456,7 +456,7 @@ public partial class PaymentDialog : Window
         // whether any of the 3 DebitCard.aspx param variations actually
         // works as a true one-time charge. To go back to the known-good
         // path, change useRegularTestEndpoint back to false.
-        const bool useRegularTestEndpoint = true;
+        const bool useRegularTestEndpoint = false;
         var endpointName = useRegularTestEndpoint ? "chargeWithSavedCardRegular" : "chargeWithSavedCard";
 
         Logger.Information("Calling {Endpoint} function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix} TokefProvided={TokefProvided}",
