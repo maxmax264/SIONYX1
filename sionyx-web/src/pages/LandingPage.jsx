@@ -5,20 +5,14 @@
  */
 
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
-import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
-import { Form, Input, Typography, Space, message, Row, Col, Tag, Divider, Modal } from 'antd';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion'; // eslint-disable-line no-unused-vars
+import { Typography, Space, Row, Col, Tag, Divider } from 'antd';
 import {
   SettingOutlined,
   TeamOutlined,
-  RocketOutlined,
   CrownOutlined,
-  UserAddOutlined,
   PhoneOutlined,
-  LockOutlined,
   MailOutlined,
-  BankOutlined,
-  KeyOutlined,
-  SafetyOutlined,
   ThunderboltOutlined,
   SafetyCertificateOutlined,
   ClockCircleOutlined,
@@ -33,7 +27,6 @@ import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-import { registerOrganization } from '../services/organizationService';
 import {
   AnimatedBackground,
   AnimatedButton,
@@ -62,7 +55,7 @@ const colors = {
 // ============================================
 // Hero Section Component - Premium v2.0
 // ============================================
-const HeroSection = memo(({ onRegisterClick, onAdminLogin }) => {
+const HeroSection = memo(({ onAdminLogin }) => {
   const heroRef = useRef(null);
   const subtitleRef = useRef(null);
 
@@ -245,30 +238,6 @@ const HeroSection = memo(({ onRegisterClick, onAdminLogin }) => {
       >
         פתרון מקצועי לניהול זמני שימוש במחשבים, אישורי הדפסה ובקרת גישה למוסדות וארגונים
       </motion.p>
-
-      {/* CTA Button */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1, duration: 0.5 }}
-        style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', padding: '0 16px' }}
-      >
-        <AnimatedButton
-          variant='primary'
-          size='large'
-          icon={<RocketOutlined />}
-          onClick={onRegisterClick}
-          style={{
-            padding: '0 40px',
-            height: 54,
-            fontSize: 16,
-            fontWeight: 600,
-            boxShadow: '0 8px 30px rgba(102, 126, 234, 0.4)',
-          }}
-        >
-          התחל עכשיו
-        </AnimatedButton>
-      </motion.div>
 
       {/* Trust Badges */}
       <motion.div
@@ -630,7 +599,7 @@ StatsSection.displayName = 'StatsSection';
 // Action Cards Section Component - Premium v3.0
 // ============================================
 const ActionCardsSection = memo(
-  ({ onRegisterClick, onAdminLogin }) => {
+  ({ onAdminLogin }) => {
     return (
       <section
         style={{
@@ -675,114 +644,6 @@ const ActionCardsSection = memo(
         </motion.div>
 
         <Row gutter={[24, 24]} justify='center' style={{ maxWidth: 1100, margin: '0 auto' }}>
-          {/* Registration Card - Main CTA */}
-          <Col xs={24}>
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-              whileHover={{ y: -6, transition: { type: 'spring', stiffness: 300, damping: 20 } }}
-            >
-              <div
-                onClick={onRegisterClick}
-                style={{
-                  padding: 'clamp(40px, 6vw, 60px) clamp(24px, 4vw, 50px)',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: 24,
-                  boxShadow: '0 20px 60px rgba(102, 126, 234, 0.35)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Decorative elements */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: -50,
-                    right: -50,
-                    width: 200,
-                    height: 200,
-                    borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.1)',
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: -30,
-                    left: -30,
-                    width: 150,
-                    height: 150,
-                    borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.08)',
-                  }}
-                />
-
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <motion.div
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: 20,
-                      background: 'rgba(255,255,255,0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 24px',
-                    }}
-                  >
-                    <UserAddOutlined style={{ fontSize: 40, color: '#fff' }} />
-                  </motion.div>
-
-                  <h2
-                    style={{
-                      color: 'white',
-                      margin: '0 0 12px',
-                      fontSize: 'clamp(1.5rem, 4vw, 2rem)',
-                      fontWeight: 700,
-                    }}
-                  >
-                    רישום ארגון חדש
-                  </h2>
-
-                  <p
-                    style={{
-                      color: 'rgba(255,255,255,0.9)',
-                      fontSize: 'clamp(1rem, 2vw, 1.1rem)',
-                      marginBottom: 28,
-                      maxWidth: 450,
-                      margin: '0 auto 28px',
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    צור ארגון חדש וחשבון מנהל בכמה צעדים פשוטים
-                  </p>
-
-                  <AnimatedButton
-                    variant='secondary'
-                    size='large'
-                    icon={<RocketOutlined />}
-                    style={{
-                      background: 'white',
-                      color: colors.primary,
-                      border: 'none',
-                      fontWeight: 600,
-                      padding: '0 40px',
-                      height: 52,
-                    }}
-                  >
-                    התחל עכשיו
-                  </AnimatedButton>
-                </div>
-              </div>
-            </motion.div>
-          </Col>
-
           {/* Already Registered Card */}
           <Col xs={24} md={12}>
             <motion.div
@@ -862,407 +723,14 @@ const ActionCardsSection = memo(
 ActionCardsSection.displayName = 'ActionCardsSection';
 
 // ============================================
-// Registration Modal Component - Premium v2.0
-// ============================================
-const RegistrationModal = memo(({ open, onClose, onSubmit, loading, form }) => {
-  const inputStyle = {
-    textAlign: 'right',
-    height: 50,
-    fontSize: 15,
-    borderRadius: 12,
-    width: '100%',
-    border: '1.5px solid #e8e8e8',
-    transition: 'all 0.2s ease',
-  };
-
-  const labelStyle = {
-    fontSize: 13,
-    fontWeight: 600,
-    color: '#444',
-    marginBottom: 6,
-  };
-
-  const sectionStyle = {
-    padding: 'clamp(20px, 4vw, 28px)',
-    borderRadius: 18,
-    marginBottom: 20,
-  };
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width='95%'
-      centered
-      className='registration-modal'
-      styles={{
-        body: {
-          padding: 0,
-          direction: 'rtl',
-          maxHeight: '85vh',
-          overflowY: 'auto',
-        },
-        content: {
-          maxWidth: 680,
-          margin: '0 auto',
-          borderRadius: 24,
-          overflow: 'hidden',
-        },
-      }}
-      title={null}
-      closable={false}
-    >
-      {/* Custom Header */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: 'clamp(24px, 5vw, 36px) clamp(20px, 4vw, 32px)',
-          textAlign: 'center',
-          position: 'relative',
-        }}
-      >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: 16,
-            left: 16,
-            background: 'rgba(255,255,255,0.2)',
-            border: 'none',
-            borderRadius: 10,
-            width: 36,
-            height: 36,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: 18,
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.3)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
-        >
-          ×
-        </button>
-
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: 18,
-            background: 'rgba(255,255,255,0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-          }}
-        >
-          <TeamOutlined style={{ fontSize: 36, color: '#fff' }} />
-        </motion.div>
-
-        <h2
-          style={{
-            color: '#fff',
-            margin: '0 0 6px',
-            fontSize: 'clamp(1.3rem, 4vw, 1.6rem)',
-            fontWeight: 700,
-          }}
-        >
-          הרשמת ארגון חדש
-        </h2>
-        <p
-          style={{
-            color: 'rgba(255,255,255,0.85)',
-            margin: 0,
-            fontSize: 'clamp(0.9rem, 2.5vw, 1rem)',
-          }}
-        >
-          מלא את הפרטים ליצירת ארגון וחשבון מנהל
-        </p>
-      </div>
-
-      {/* Form Body */}
-      <div style={{ padding: 'clamp(20px, 4vw, 32px)' }}>
-        <Form form={form} onFinish={onSubmit} layout='vertical' size='large'>
-          {/* Organization Details Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            style={{
-              ...sectionStyle,
-              background: 'linear-gradient(135deg, #f8f9ff 0%, #f2f5ff 100%)',
-              border: '1px solid #e4e9ff',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: `${colors.primary}15`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginLeft: 12,
-                }}
-              >
-                <BankOutlined style={{ fontSize: 20, color: colors.primary }} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, color: '#333', fontSize: 16, fontWeight: 600 }}>
-                  פרטי הארגון
-                </h4>
-                <span style={{ fontSize: 12, color: '#888' }}>מידע בסיסי על הארגון</span>
-              </div>
-            </div>
-
-            <Form.Item
-              name='organizationName'
-              label={<span style={labelStyle}>שם הארגון</span>}
-              rules={[
-                { required: true, message: 'נא להזין שם ארגון' },
-                { min: 2, message: 'שם הארגון חייב להכיל לפחות 2 תווים' },
-              ]}
-            >
-              <Input
-                prefix={<BankOutlined style={{ color: '#bfbfbf' }} />}
-                placeholder='לדוגמה: ישיבת אור החיים'
-                style={inputStyle}
-              />
-            </Form.Item>
-
-            <Row gutter={[16, 0]}>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name='nedarimMosadId'
-                  label={<span style={labelStyle}>מזהה מוסד NEDARIM (אופציונלי)</span>}
-                >
-                  <Input
-                    prefix={<KeyOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder='ניתן להשלים בהגדרות מאוחר יותר'
-                    style={inputStyle}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name='nedarimApiValid'
-                  label={<span style={labelStyle}>מפתח API של NEDARIM (אופציונלי)</span>}
-                >
-                  <Input
-                    prefix={<SafetyOutlined style={{ color: '#bfbfbf' }} />}
-                    placeholder='ניתן להשלים בהגדרות מאוחר יותר'
-                    style={inputStyle}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-            <div style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 8 }}>
-              ניתן להזין את פרטי החיוב של נדרים פלוס בהמשך מתוך מסך ההגדרות.
-            </div>
-          </motion.div>
-
-          {/* Admin User Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            style={{
-              ...sectionStyle,
-              background: 'linear-gradient(135deg, #fff9f0 0%, #fff5e6 100%)',
-              border: '1px solid #ffe4c4',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: `${colors.warning}15`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginLeft: 12,
-                }}
-              >
-                <CrownOutlined style={{ fontSize: 20, color: colors.warning }} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, color: '#333', fontSize: 16, fontWeight: 600 }}>
-                  פרטי המנהל הראשי
-                </h4>
-                <span style={{ fontSize: 12, color: '#888' }}>יצירת חשבון מנהל לארגון</span>
-              </div>
-            </div>
-
-            <Row gutter={[16, 0]}>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name='adminFirstName'
-                  label={<span style={labelStyle}>שם פרטי</span>}
-                  rules={[{ required: true, message: 'נא להזין שם פרטי' }]}
-                >
-                  <Input placeholder='שם פרטי' style={inputStyle} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name='adminLastName'
-                  label={<span style={labelStyle}>שם משפחה</span>}
-                  rules={[{ required: true, message: 'נא להזין שם משפחה' }]}
-                >
-                  <Input placeholder='שם משפחה' style={inputStyle} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item
-              name='adminPhone'
-              label={<span style={labelStyle}>מספר טלפון (ישמש להתחברות)</span>}
-              rules={[
-                { required: true, message: 'נא להזין מספר טלפון' },
-                { pattern: /^0\d{9}$/, message: 'מספר טלפון לא תקין (10 ספרות)' },
-              ]}
-            >
-              <Input
-                prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />}
-                placeholder='0501234567'
-                style={inputStyle}
-                maxLength={10}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name='adminPassword'
-              label={<span style={labelStyle}>סיסמה</span>}
-              rules={[
-                { required: true, message: 'נא להזין סיסמה' },
-                { min: 6, message: 'הסיסמה חייבת להכיל לפחות 6 תווים' },
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
-                placeholder='לפחות 6 תווים'
-                style={inputStyle}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name='adminEmail'
-              label={<span style={labelStyle}>אימייל (אופציונלי)</span>}
-              rules={[{ type: 'email', message: 'כתובת אימייל לא תקינה' }]}
-              style={{ marginBottom: 0 }}
-            >
-              <Input
-                prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
-                placeholder='admin@example.com'
-                style={inputStyle}
-              />
-            </Form.Item>
-          </motion.div>
-
-          {/* Submit Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            style={{
-              display: 'flex',
-              gap: 12,
-              justifyContent: 'center',
-              flexWrap: 'wrap',
-              paddingTop: 8,
-            }}
-          >
-            <AnimatedButton
-              variant='ghost'
-              onClick={onClose}
-              style={{
-                color: '#666',
-                borderColor: '#ddd',
-                background: '#fff',
-                minWidth: 100,
-                height: 48,
-                borderRadius: 12,
-              }}
-            >
-              ביטול
-            </AnimatedButton>
-            <AnimatedButton
-              variant='primary'
-              loading={loading}
-              onClick={() => form.submit()}
-              icon={<RocketOutlined />}
-              style={{
-                minWidth: 180,
-                height: 48,
-                borderRadius: 12,
-                fontWeight: 600,
-              }}
-            >
-              {loading ? 'יוצר ארגון...' : 'צור ארגון חדש'}
-            </AnimatedButton>
-          </motion.div>
-        </Form>
-      </div>
-    </Modal>
-  );
-});
-
-RegistrationModal.displayName = 'RegistrationModal';
-
-// ============================================
 // Main Landing Page Component
 // ============================================
 const LandingPage = memo(() => {
-  const [registrationForm] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const navigate = useNavigate();
-
-  const handleRegistration = useCallback(
-    async values => {
-      setLoading(true);
-      try {
-        const result = await registerOrganization(values);
-        if (result.success) {
-          message.success('הארגון נוצר בהצלחה! כעת תוכל להתחבר עם פרטי המנהל');
-          registrationForm.resetFields();
-          setShowRegistrationModal(false);
-          navigate(`/admin/login?orgId=${result.orgId}`);
-        } else {
-          message.error(result.error || 'שגיאה ביצירת הארגון');
-        }
-      } catch {
-        message.error('שגיאה ביצירת הארגון');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [registrationForm, navigate]
-  );
 
   const handleAdminLogin = useCallback(() => {
     navigate('/login');
   }, [navigate]);
-
-  const openRegistrationModal = useCallback(() => {
-    setShowRegistrationModal(true);
-  }, []);
-
-  const closeRegistrationModal = useCallback(() => {
-    setShowRegistrationModal(false);
-    registrationForm.resetFields();
-  }, [registrationForm]);
 
   return (
     <div
@@ -1280,7 +748,6 @@ const LandingPage = memo(() => {
       <div style={{ position: 'relative', zIndex: 1 }}>
         {/* Hero Section */}
         <HeroSection
-          onRegisterClick={openRegistrationModal}
           onAdminLogin={handleAdminLogin}
         />
 
@@ -1292,7 +759,6 @@ const LandingPage = memo(() => {
 
         {/* Action Cards Section */}
         <ActionCardsSection
-          onRegisterClick={openRegistrationModal}
           onAdminLogin={handleAdminLogin}
         />
 
@@ -1353,7 +819,6 @@ const LandingPage = memo(() => {
                       action: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
                     },
                     { label: 'כניסת מנהל', action: handleAdminLogin },
-                    { label: 'הרשמה', action: openRegistrationModal },
                   ].map((link, i) => (
                     <a
                       key={i}
@@ -1435,19 +900,6 @@ const LandingPage = memo(() => {
           </div>
         </motion.footer>
       </div>
-
-      {/* Registration Modal */}
-      <AnimatePresence>
-        {showRegistrationModal && (
-          <RegistrationModal
-            open={showRegistrationModal}
-            onClose={closeRegistrationModal}
-            onSubmit={handleRegistration}
-            loading={loading}
-            form={registrationForm}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 });

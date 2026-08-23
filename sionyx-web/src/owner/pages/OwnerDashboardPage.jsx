@@ -3,7 +3,7 @@ import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Spac
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
 import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance } from "../services/ownerUserService";
-import { getOrganizationStats } from "../../services/organizationService";
+import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
 import { database } from "../../config/firebase";
 import { changeOwnerPassword, signOutOwner } from "../services/ownerAuthService";
@@ -11,6 +11,7 @@ import { useOwnerAuthStore } from "../store/ownerAuthStore";
 import { useNavigate } from "react-router-dom";
 import { formatTimeHebrewCompact } from "../../utils/timeFormatter";
 import dayjs from "dayjs";
+import OrgRegistrationModal from "../components/OrgRegistrationModal";
 
 const { Title, Text } = Typography;
 
@@ -37,6 +38,9 @@ const OwnerDashboardPage = () => {
   const [adjustBalanceVisible, setAdjustBalanceVisible] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [balanceForm] = Form.useForm();
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [registerForm] = Form.useForm();
 
   // Org detail drawer
   const [orgDetailOrg, setOrgDetailOrg] = useState(null);
@@ -179,7 +183,31 @@ const OwnerDashboardPage = () => {
   };
 
   const handleAddOrg = () => {
-    window.open("/", "_blank", "noopener,noreferrer");
+    setRegisterModalOpen(true);
+  };
+
+  const handleCloseRegisterModal = () => {
+    setRegisterModalOpen(false);
+    registerForm.resetFields();
+  };
+
+  const handleRegisterOrgSubmit = async (values) => {
+    setRegistering(true);
+    try {
+      const result = await registerOrganization(values);
+      if (result.success) {
+        message.success("הארגון נוצר בהצלחה");
+        registerForm.resetFields();
+        setRegisterModalOpen(false);
+        load();
+      } else {
+        message.error(result.error || "שגיאה ביצירת הארגון");
+      }
+    } catch {
+      message.error("שגיאה ביצירת הארגון");
+    } finally {
+      setRegistering(false);
+    }
   };
 
   const totalUsers = orgs.reduce((s, o) => s + o.userCount, 0);
@@ -494,6 +522,13 @@ const OwnerDashboardPage = () => {
           <Button type="primary" htmlType="submit" loading={passwordLoading} block>שמור סיסמה</Button>
         </Form>
       </Modal>
+      <OrgRegistrationModal
+        open={registerModalOpen}
+        onClose={handleCloseRegisterModal}
+        onSubmit={handleRegisterOrgSubmit}
+        loading={registering}
+        form={registerForm}
+      />
     </div>
   );
 };
