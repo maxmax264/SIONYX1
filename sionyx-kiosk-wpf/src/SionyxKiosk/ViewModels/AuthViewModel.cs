@@ -271,12 +271,25 @@ public partial class AuthViewModel : ObservableObject
                     await LoadAuthDesignAsync();
                     return;
                 }
+
+                // Server explicitly confirmed there's no background configured for
+                // this org (a successful metadata fetch, not a network failure) -
+                // this is the only case where clearing what's on screen is correct.
+                BackgroundImageUrl = "";
+                HasBackgroundImage = false;
+                Serilog.Log.Information("[BG] Org has no background configured (confirmed by server)");
+                await LoadAuthDesignAsync();
+                return;
             }
         }
         catch (Exception ex) { Serilog.Log.Error(ex, "[BG] Exception loading background"); }
-        BackgroundImageUrl = "";
-        HasBackgroundImage = false;
-        Serilog.Log.Warning("[BG] No background set");
+
+        // We only reach here when the metadata fetch itself failed (network
+        // hiccup, timeout, etc.) - NOT when the server said there's no
+        // background. Whatever TryLoadBackgroundFromDiskCache already put on
+        // screen above stays exactly as it is; a failed refresh must never
+        // blank out an already-successful disk-cache load.
+        Serilog.Log.Warning("[BG] Metadata refresh failed - keeping whatever is currently on screen (cache or previous load)");
         await LoadAuthDesignAsync();
     }
 
