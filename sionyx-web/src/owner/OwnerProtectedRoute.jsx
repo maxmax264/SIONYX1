@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { ref, get } from "firebase/database";
-import { database } from "../config/firebase";
+import { ownerAuth, ownerDatabase } from "../config/firebase";
 import { Spin } from "antd";
 
 const OwnerProtectedRoute = ({ children }) => {
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(ownerAuth, async (user) => {
       if (!user) { setStatus("unauth"); return; }
-      const snap = await get(ref(database, `owners/${user.uid}`));
+      const snap = await get(ref(ownerDatabase, `owners/${user.uid}`));
       setStatus(snap.exists() ? "auth" : "unauth");
     });
     return () => unsub();

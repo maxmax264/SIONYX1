@@ -1,5 +1,5 @@
 ﻿import { ref, get, set, remove } from "firebase/database";
-import { auth, database } from "../../config/firebase";
+import { ownerAuth as auth, ownerDatabase as database } from "../../config/firebase";
 
 const waitForAuth = () =>
   new Promise((resolve) => {

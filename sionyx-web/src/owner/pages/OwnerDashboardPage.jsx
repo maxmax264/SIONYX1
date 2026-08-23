@@ -5,7 +5,7 @@ import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupe
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
-import { database } from "../../config/firebase";
+import { ownerAuth, ownerDatabase as database } from "../../config/firebase";
 import { changeOwnerPassword, signOutOwner } from "../services/ownerAuthService";
 import { useOwnerAuthStore } from "../store/ownerAuthStore";
 import { useNavigate } from "react-router-dom";
@@ -56,11 +56,9 @@ const OwnerDashboardPage = () => {
 
   const load = async () => {
     setLoading(true);
-    const { getAuth } = await import("firebase/auth");
-    const auth = getAuth();
     await new Promise(resolve => {
-      if (auth.currentUser) return resolve();
-      const unsub = auth.onAuthStateChanged(u => { unsub(); resolve(); });
+      if (ownerAuth.currentUser) return resolve();
+      const unsub = ownerAuth.onAuthStateChanged(u => { unsub(); resolve(); });
     });
     const [orgsRes, supRes, usersRes] = await Promise.all([getAllOrgs(), getAllSupervisors(), getAllUsersAcrossOrgs()]);
     try {
@@ -170,7 +168,7 @@ const OwnerDashboardPage = () => {
     setOrgDetailVisible(true);
     setOrgStats(null);
     setOrgStatsLoading(true);
-    const result = await getOrganizationStats(org.orgId);
+    const result = await getOrganizationStats(org.orgId, database);
     if (result.success) setOrgStats(result.stats);
     else message.error(result.error || "נכשל בטעינת נתוני הארגון");
     setOrgStatsLoading(false);

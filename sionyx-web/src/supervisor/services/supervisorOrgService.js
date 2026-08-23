@@ -1,5 +1,5 @@
 import { ref, get } from 'firebase/database';
-import { database, auth } from '../../config/firebase';
+import { supervisorDatabase as database, supervisorAuth as auth } from '../../config/firebase';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
 
 const waitForAuth = () =>

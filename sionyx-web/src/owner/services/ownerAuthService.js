@@ -1,6 +1,6 @@
 ﻿import { signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword } from "firebase/auth";
 import { ref, get } from "firebase/database";
-import { auth, database } from "../../config/firebase";
+import { ownerAuth as auth, ownerDatabase as database } from "../../config/firebase";
 
 const phoneToEmail = (phone) => `${phone.replace(/\D/g, "")}@sionyx.app`;
 

@@ -147,24 +147,31 @@ export const getOrganizationMetadata = async orgId => {
  * including user count, package count, purchases, revenue, and time metrics
  *
  * @param {string} orgId - Organization ID
+ * @param {object} [dbInstance] - Optional Firebase Database instance to read
+ *   from. Defaults to the shared admin/org "database". Callers authenticated
+ *   on a different Firebase Auth instance (e.g. the owner dashboard, which
+ *   uses its own separate "ownerAuth"/"ownerDatabase" pair - see
+ *   src/config/firebase.js) must pass their own database instance here,
+ *   since Realtime Database security rules are evaluated against the auth
+ *   context tied to the specific database instance used for the call.
  * @returns {Object} Success status and statistics data
  */
-export const getOrganizationStats = async orgId => {
+export const getOrganizationStats = async (orgId, dbInstance = database) => {
   try {
     // Get users count
-    const usersRef = ref(database, `organizations/${orgId}/users`);
+    const usersRef = ref(dbInstance, `organizations/${orgId}/users`);
     const usersSnapshot = await get(usersRef);
     const usersCount = usersSnapshot.exists() ? Object.keys(usersSnapshot.val()).length : 0;
 
     // Get packages count
-    const packagesRef = ref(database, `organizations/${orgId}/packages`);
+    const packagesRef = ref(dbInstance, `organizations/${orgId}/packages`);
     const packagesSnapshot = await get(packagesRef);
     const packagesCount = packagesSnapshot.exists()
       ? Object.keys(packagesSnapshot.val()).length
       : 0;
 
     // Get purchases count and total revenue
-    const purchasesRef = ref(database, `organizations/${orgId}/purchases`);
+    const purchasesRef = ref(dbInstance, `organizations/${orgId}/purchases`);
     const purchasesSnapshot = await get(purchasesRef);
 
     let purchasesCount = 0;

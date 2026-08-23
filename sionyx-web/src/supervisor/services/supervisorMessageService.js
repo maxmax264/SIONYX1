@@ -1,5 +1,5 @@
 import { ref, get, push, set, update, remove } from 'firebase/database';
-import { database } from '../../config/firebase';
+import { supervisorDatabase as database } from '../../config/firebase';
 
 export const getSupervisorDisplayName = async (supervisorId) => {
   try {

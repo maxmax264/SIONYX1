@@ -1,6 +1,6 @@
 import { signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 import { ref, get } from 'firebase/database';
-import { auth, database } from '../../config/firebase';
+import { supervisorAuth as auth, supervisorDatabase as database } from '../../config/firebase';
 
 const phoneToEmail = phone => {
   const cleanPhone = phone.replace(/\D/g, '');

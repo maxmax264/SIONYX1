@@ -1,5 +1,5 @@
 import { ref, get, set, remove, update } from 'firebase/database';
-import { database, auth } from '../../config/firebase';
+import { supervisorDatabase as database, supervisorAuth as auth } from '../../config/firebase';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
 
 export const blockUser = async (phone, reason, userName) => {

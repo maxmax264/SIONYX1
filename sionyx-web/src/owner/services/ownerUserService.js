@@ -1,5 +1,5 @@
 import { ref, get, update, push, set } from "firebase/database";
-import { database } from "../../config/firebase";
+import { ownerDatabase as database } from "../../config/firebase";
 
 /**
  * Flattens users across every organization into a single list, each

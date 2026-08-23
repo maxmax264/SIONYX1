@@ -1,5 +1,5 @@
 import { ref, get, update } from 'firebase/database';
-import { database } from '../../config/firebase';
+import { supervisorDatabase as database } from '../../config/firebase';
 
 export const getOrgOperatingHours = async orgId => {
   try {
