@@ -505,38 +505,61 @@ public partial class App : Application
         StartSystemServices();
     }
 
+    private async Task RunLogoutCleanupAsync()
+    {
+        await StopSystemServicesAsync();
+
+        _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
+
+        var auth = _host!.Services.GetRequiredService<AuthService>();
+        await auth.LogoutAsync();
+
+        // Clean browser data so next user sees no trace of previous user.
+        // Runs on a background thread (like before) since it's blocking I/O,
+        // but everything above this stays on the dispatcher thread because
+        // StopSystemServicesAsync touches WPF windows (FloatingTimer) that
+        // can only be manipulated from the thread that created them.
+        await Task.Run(() =>
+        {
+            try
+            {
+                var browserCleanup = _host!.Services.GetRequiredService<BrowserCleanupService>();
+                // Only clean browser/downloads if user actually entered desktop
+                if (Services.SessionStateService.HasEnteredDesktop())
+                {
+                    browserCleanup.CleanupWithBrowserClose();
+                    browserCleanup.CleanupDownloads();
+                }
+                Services.SessionStateService.ClearSession();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Browser cleanup failed during logout (non-fatal)");
+            }
+        });
+    }
+
     private void OnLogoutRequested()
     {
         _ = Current.Dispatcher.InvokeAsync(async () =>
         {
             try
             {
-                await StopSystemServicesAsync();
+                // Show the goodbye screen immediately, on top of everything,
+                // before any cleanup starts - people need to see this the
+                // moment they hit logout, not after cleanup already ran.
+                var logoutScreen = new Views.Windows.LogoutScreenWindow();
+                logoutScreen.Show();
 
-                _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
+                // Minimum time the goodbye screen stays up regardless of how
+                // fast cleanup finishes, so it's never just a flash - and if
+                // cleanup takes longer than this, the screen simply stays up
+                // until cleanup is actually done (never cut short).
+                var minDisplay = Task.Delay(TimeSpan.FromSeconds(4));
 
-                var auth = _host!.Services.GetRequiredService<AuthService>();
-                await auth.LogoutAsync();
+                var cleanup = RunLogoutCleanupAsync();
 
-                // Clean browser data so next user sees no trace of previous user
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        var browserCleanup = _host!.Services.GetRequiredService<BrowserCleanupService>();
-                        // Only clean browser/downloads if user actually entered desktop
-                        if (Services.SessionStateService.HasEnteredDesktop())
-                        {
-                            browserCleanup.CleanupWithBrowserClose();
-                            browserCleanup.CleanupDownloads();
-                        }
-                        Services.SessionStateService.ClearSession();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "Browser cleanup failed during logout (non-fatal)");
-                    }
-                });
+                await Task.WhenAll(cleanup, minDisplay);
 
                 if (MainWindow is Views.Windows.MainWindow mw)
                 {
@@ -544,6 +567,7 @@ public partial class App : Application
                     mw.Close();
                 }
                 ShowAuthWindow();
+                logoutScreen.Close();
             }
             catch (Exception ex)
             {

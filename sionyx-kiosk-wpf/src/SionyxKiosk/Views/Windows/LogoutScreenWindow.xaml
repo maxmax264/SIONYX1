@@ -1,0 +1,93 @@
+﻿<Window x:Class="SionyxKiosk.Views.Windows.LogoutScreenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="להתראות" WindowState="Maximized" WindowStyle="None"
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False"
+        FlowDirection="RightToLeft">
+
+    <Window.Resources>
+        <Storyboard x:Key="FadeInStoryboard">
+            <DoubleAnimation Storyboard.TargetName="RootGrid"
+                              Storyboard.TargetProperty="Opacity"
+                              From="0" To="1" Duration="0:0:0.5"/>
+        </Storyboard>
+
+        <!-- פעימה עדינה ומתמשכת על אייקון ה-USB: לא מבהוב חד, אלא נשימה רכה -->
+        <Storyboard x:Key="PulseStoryboard" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="IconScale"
+                              Storyboard.TargetProperty="ScaleX"
+                              From="1.0" To="1.12" Duration="0:0:1"
+                              AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="IconScale"
+                              Storyboard.TargetProperty="ScaleY"
+                              From="1.0" To="1.12" Duration="0:0:1"
+                              AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="IconText"
+                              Storyboard.TargetProperty="Opacity"
+                              From="0.75" To="1.0" Duration="0:0:1"
+                              AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Window.Resources>
+
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard Storyboard="{StaticResource FadeInStoryboard}"/>
+            <BeginStoryboard Storyboard="{StaticResource PulseStoryboard}"/>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid x:Name="RootGrid" Opacity="0">
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#0f1117" Offset="0"/>
+                <GradientStop Color="#1a1330" Offset="0.55"/>
+                <GradientStop Color="#241a3d" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="640">
+
+            <TextBlock x:Name="IconText" Text="🔌" FontSize="120"
+                       HorizontalAlignment="Center" Margin="0,0,0,32">
+                <TextBlock.RenderTransform>
+                    <ScaleTransform x:Name="IconScale" CenterX="60" CenterY="60"/>
+                </TextBlock.RenderTransform>
+                <TextBlock.RenderTransformOrigin>0.5,0.5</TextBlock.RenderTransformOrigin>
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="#8B5CF6" BlurRadius="40" ShadowDepth="0" Opacity="0.6"/>
+                </TextBlock.Effect>
+            </TextBlock>
+
+            <TextBlock Text="להתראות!" FontSize="44" FontWeight="Bold"
+                       Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+
+            <Border Background="#241a3dcc" CornerRadius="16" Padding="36,28"
+                    BorderBrush="#8B5CF6" BorderThickness="1.5" Margin="0,0,0,28">
+                <StackPanel>
+                    <TextBlock Text="לפני שתלך —" FontSize="20" Foreground="#c9b8ff"
+                               HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="אל תשכח את התקן ה-USB שלך ואת החפצים האישיים!"
+                               FontSize="30" FontWeight="Bold" Foreground="White"
+                               HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <ProgressBar IsIndeterminate="True" Height="4" Width="360"
+                         Background="#1e2130" Foreground="#8B5CF6"
+                         HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>
