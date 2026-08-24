@@ -3,9 +3,6 @@ import { database } from '../config/firebase';
 import { logger } from '../utils/logger';
 import { useNotificationStore } from '../store/notificationStore';
 
-// Track previous message counts per org for new-message notifications
-const prevMessageCountByOrg = new Map();
-
 /**
  * Subscribe to real-time updates for users
  * @param {string} orgId - Organization ID
@@ -33,8 +30,11 @@ export const subscribeToUsers = (orgId, callback) => {
 };
 
 /**
- * Subscribe to real-time updates for messages
- * Fires in-app notification when new messages arrive (count increases)
+ * Subscribe to real-time updates for the admin's own sent messages.
+ * NOTE: this does NOT fire an in-app notification, since these are
+ * messages the admin sent - a "new message received" popup here would
+ * fire every time the admin sends something themselves. See
+ * subscribeToReplies for genuine incoming-message notifications.
  * @param {string} orgId - Organization ID
  * @param {Function} callback - Callback receiving message list
  * @returns {Function} Unsubscribe function
@@ -48,22 +48,57 @@ export const subscribeToMessages = (orgId, callback) => {
       if (snapshot.exists()) {
         const messages = snapshot.val();
         const messageList = Object.keys(messages).map(id => ({ id, ...messages[id] })).filter(m => !m.fromSupervisor);
-        const prevCount = prevMessageCountByOrg.get(orgId) ?? 0;
-        if (prevCount > 0 && messageList.length > prevCount) {
-          useNotificationStore.getState().addNotification({
-            type: 'message',
-            message: 'הודעה חדשה התקבלה',
-          });
-        }
-        prevMessageCountByOrg.set(orgId, messageList.length);
         callback(messageList);
       } else {
-        prevMessageCountByOrg.set(orgId, 0);
         callback([]);
       }
     },
     error => {
       logger.error('Messages listener error:', error);
+    }
+  );
+};
+
+// Track previous reply counts per org for new-reply notifications
+const prevReplyCountByOrg = new Map();
+
+/**
+ * Subscribe to real-time updates for user replies (genuine incoming
+ * messages from users, as opposed to messages the admin sent them).
+ * Fires the "new message received" in-app notification only here, since
+ * this is the only path that represents something actually arriving from
+ * a user rather than something the admin just did.
+ * @param {string} orgId - Organization ID
+ * @param {Function} callback - Callback receiving reply list
+ * @returns {Function} Unsubscribe function
+ */
+export const subscribeToReplies = (orgId, callback) => {
+  if (!orgId) return () => {};
+  const repliesRef = ref(database, `organizations/${orgId}/userReplies`);
+  return onValue(
+    repliesRef,
+    snapshot => {
+      if (snapshot.exists()) {
+        const repliesData = snapshot.val();
+        const replyList = Object.keys(repliesData)
+          .map(id => ({ id, ...repliesData[id], isReply: true }))
+          .filter(r => !r.fromSupervisorReply);
+        const prevCount = prevReplyCountByOrg.get(orgId) ?? 0;
+        if (prevCount > 0 && replyList.length > prevCount) {
+          useNotificationStore.getState().addNotification({
+            type: 'message',
+            message: 'הודעה חדשה התקבלה',
+          });
+        }
+        prevReplyCountByOrg.set(orgId, replyList.length);
+        callback(replyList);
+      } else {
+        prevReplyCountByOrg.set(orgId, 0);
+        callback([]);
+      }
+    },
+    error => {
+      logger.error('Replies listener error:', error);
     }
   );
 };

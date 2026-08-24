@@ -45,7 +45,7 @@ import {
   isUserActive,
   cleanupOldMessages,
 } from '../services/chatService';
-import { subscribeToMessages, subscribeToUsers, subscribeToComputers } from '../services/realtimeService';
+import { subscribeToMessages, subscribeToReplies, subscribeToUsers, subscribeToComputers } from '../services/realtimeService';
 import { logger } from '../utils/logger';
 
 dayjs.extend(relativeTime);
@@ -100,6 +100,9 @@ const MessagesPage = () => {
       setMessages(data);
       setLoading(false);
     });
+    const unsubReplies = subscribeToReplies(orgId, data => {
+      setReplies(data);
+    });
     const unsubUsers = subscribeToUsers(orgId, data => {
       setUsers(data);
       setLoading(false);
@@ -110,6 +113,7 @@ const MessagesPage = () => {
 
         return () => {
       unsubMessages();
+      unsubReplies();
       unsubUsers();
       unsubComputers();
     };
@@ -195,12 +199,7 @@ const MessagesPage = () => {
     setSending(true);
     try {
       const adminName = user?.displayName || user?.admin?.displayName || user?.email || "מנהל";
-      const userComputer = computers.find(c => c.currentUserId === selectedUser.uid);
-      const computerName = userComputer?.computerName || "";
-      const messageWithComputer = computerName
-        ? `[מחשב: ${computerName}] ${newMessage.trim()}`
-        : newMessage.trim();
-      const result = await sendMessage(orgId, selectedUser.uid, messageWithComputer, adminUid, adminName);
+      const result = await sendMessage(orgId, selectedUser.uid, newMessage.trim(), adminUid, adminName);
       if (result.success) {
         setNewMessage('');
         const [msgResult2, repliesResult2] = await Promise.all([
