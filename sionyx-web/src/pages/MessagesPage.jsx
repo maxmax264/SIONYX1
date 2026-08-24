@@ -35,11 +35,13 @@ import { useOrgId } from '../hooks/useOrgId';
 import { getAllUsers } from '../services/userService';
 import {
   getAllMessages,
+  getAllReplies,
   getMessagesForUser,
   sendMessage,
   deleteMessage,
   deleteUserReply,
   getUserReplies,
+  markUserRepliesAsRead,
   isUserActive,
   cleanupOldMessages,
 } from '../services/chatService';
@@ -70,6 +72,7 @@ const tokens = {
 // ג”€ג”€ MessagesPage ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
 const MessagesPage = () => {
   const [messages, setMessages] = useState([]);
+  const [replies, setReplies] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -122,13 +125,15 @@ const MessagesPage = () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      const [usersResult, messagesResult] = await Promise.all([
+      const [usersResult, messagesResult, repliesResult] = await Promise.all([
         getAllUsers(orgId),
         getAllMessages(orgId),
+        getAllReplies(orgId),
       ]);
 
       if (usersResult.success) setUsers(usersResult.users);
       if (messagesResult.success) setMessages(messagesResult.messages);
+      if (repliesResult.success) setReplies(repliesResult.replies);
     } catch (error) {
       logger.error('Error loading data:', error);
       message.error('שגיאה בטעינת הנתונים');
@@ -148,11 +153,21 @@ const MessagesPage = () => {
         getUserReplies(orgId, userItem.uid),
       ]);
       const msgs = msgsResult.success ? msgsResult.messages : [];
-      const replies = repliesResult.success ? repliesResult.replies : [];
-      const merged = [...msgs, ...replies].sort(
+      const chatReplies = repliesResult.success ? repliesResult.replies : [];
+      const merged = [...msgs, ...chatReplies].sort(
         (a, b) => (a.timestamp || 0) - (b.timestamp || 0)
       );
       setUserMessages(merged);
+
+      // Clear the "unread from user" badge for this conversation now that
+      // the admin has actually opened and seen it.
+      const unreadReplyIds = chatReplies.filter(r => !r.read).map(r => r.id);
+      if (unreadReplyIds.length > 0) {
+        await markUserRepliesAsRead(orgId, userItem.uid, unreadReplyIds);
+        setReplies(prev =>
+          prev.map(r => (unreadReplyIds.includes(r.id) ? { ...r, read: true } : r))
+        );
+      }
     } catch (error) {
       logger.error('Error loading chat:', error);
       message.error('שגיאה בטעינת ההודעות');
@@ -211,28 +226,54 @@ const MessagesPage = () => {
     }
   };
 
-  // ג”€ג”€ Conversation summaries ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+  // ─── Conversation summaries ───────────────────────────────
+  // Merges the admin's own sent messages (outgoing) with the user's replies
+  // (incoming) per conversation, so:
+  //  - latestMessage/latestTimestamp reflect whichever side actually sent
+  //    the most recent thing (not just the admin's own messages).
+  //  - unreadCount reflects only unread REPLIES FROM THE USER (genuine
+  //    incoming, not-yet-seen-by-admin messages) - previously this counted
+  //    the admin's own sent messages the user hadn't read yet, which made
+  //    every message the admin sent look like a new incoming message with
+  //    an unread badge, even though nothing had been received at all.
   const getUserConversations = () => {
     const userMap = new Map();
-    messages.forEach(msg => {
-      const userId = msg.toUserId;
+
+    const touch = userId => {
       if (!userMap.has(userId)) {
         userMap.set(userId, {
           userId,
           messages: [],
+          unreadReplyIds: [],
           unreadCount: 0,
           latestMessage: null,
           latestTimestamp: null,
         });
       }
-      const userData = userMap.get(userId);
-      userData.messages.push(msg);
-      if (!msg.read) userData.unreadCount++;
+      return userMap.get(userId);
+    };
 
+    messages.forEach(msg => {
+      const userData = touch(msg.toUserId);
+      userData.messages.push(msg);
       const msgTime = dayjs(msg.timestamp);
       if (!userData.latestTimestamp || msgTime.isAfter(userData.latestTimestamp)) {
         userData.latestTimestamp = msgTime;
         userData.latestMessage = msg.message;
+      }
+    });
+
+    replies.forEach(reply => {
+      const userData = touch(reply.fromUserId);
+      userData.messages.push(reply);
+      if (!reply.read) {
+        userData.unreadCount++;
+        userData.unreadReplyIds.push(reply.id);
+      }
+      const msgTime = dayjs(reply.timestamp);
+      if (!userData.latestTimestamp || msgTime.isAfter(userData.latestTimestamp)) {
+        userData.latestTimestamp = msgTime;
+        userData.latestMessage = reply.message;
       }
     });
 

@@ -123,6 +123,53 @@ export const getMessagesForUser = async (orgId, userId) => {
 };
 
 /**
+ * Get all user replies for an organization (admin view) - mirrors getAllMessages
+ * but for the userReplies path, so the admin conversation list can show true
+ * incoming activity from users, not just the admin's own sent messages.
+ */
+export const getAllReplies = async orgId => {
+  try {
+    const repliesRef = ref(database, `organizations/${orgId}/userReplies`);
+    const snapshot = await get(repliesRef);
+
+    if (!snapshot.exists()) {
+      return { success: true, replies: [] };
+    }
+
+    const repliesData = snapshot.val();
+    const replies = Object.keys(repliesData)
+      .map(key => ({ id: key, ...repliesData[key], isReply: true }))
+      .filter(r => !r.fromSupervisorReply);
+
+    return { success: true, replies };
+  } catch (error) {
+    logger.error('Error getting all replies:', error);
+    return { success: false, error: error.message, replies: [] };
+  }
+};
+
+/**
+ * Mark all of a user's replies as read by the admin (called when the admin
+ * opens that user's conversation) - clears the "unread from user" badge.
+ */
+export const markUserRepliesAsRead = async (orgId, userId, replyIds) => {
+  try {
+    await Promise.all(
+      replyIds.map(id =>
+        update(ref(database, `organizations/${orgId}/userReplies/${id}`), {
+          read: true,
+          readAt: Date.now(),
+        })
+      )
+    );
+    return { success: true };
+  } catch (error) {
+    logger.error('Error marking replies as read:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Get unread messages for a user (client view)
  */
 export const getUnreadMessages = async (orgId, userId) => {
