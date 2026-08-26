@@ -16,6 +16,7 @@ dist/
 *.msi
 *.exe
 !src/**/*.exe
+!installer/remote-control/*.exe
 
 ## IDE
 .idea/

@@ -167,6 +167,29 @@
                   Impersonate="no"
                   Return="ignore" />
 
+    <!-- MeshCentral remote-control agent (installer/remote-control/meshagent64.exe) -
+         downloaded once from our own MeshCentral server's "Add Agent" dialog with
+         our server URL and device group already embedded in it, so it needs no
+         further configuration at install time. -fullinstall / -fulluninstall are
+         MeshCentral's own documented silent-install switches (no GUI, runs as a
+         Windows service): https://github.com/Ylianst/MeshCentral/discussions/4634
+         Unlike vc_redist, this file is NOT downloaded at build time (see build.ps1)
+         because it's specific to our own server/device-group, not a generic public
+         download - it's committed to the repo instead. -->
+    <Binary Id="MeshAgentExe" SourceFile="$(var.SourceDir)\installer\remote-control\meshagent64.exe" />
+    <CustomAction Id="CA_InstallMeshAgent"
+                  BinaryRef="MeshAgentExe"
+                  ExeCommand="-fullinstall"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+    <CustomAction Id="CA_UninstallMeshAgent"
+                  BinaryRef="MeshAgentExe"
+                  ExeCommand="-fulluninstall"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
     <SetProperty Id="CA_VerifyInstallation" Before="CA_VerifyInstallation" Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
@@ -185,13 +208,15 @@
     <InstallExecuteSequence>
       <!-- INSTALL -->
       <Custom Action="CA_InstallVCRedist"    After="InstallFiles"         Condition="NOT VCREDIST64 AND NOT REMOVE" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallVCRedist"   Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallMeshAgent"   After="CA_InstallVCRedist"   Condition="NOT REMOVE" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallMeshAgent"  Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
 
       <!-- UNINSTALL -->
       <Custom Action="CA_StopProcesses"   Before="RemoveFiles"           Condition="REMOVE = &quot;ALL&quot;" />
+      <Custom Action="CA_UninstallMeshAgent" After="CA_StopProcesses"    Condition="REMOVE = &quot;ALL&quot;" />
       <Custom Action="CA_RemoveAutoStart" After="CA_StopProcesses"       Condition="REMOVE = &quot;ALL&quot;" />
       <Custom Action="CA_RevertSecurity"  After="CA_RemoveAutoStart"     Condition="REMOVE = &quot;ALL&quot;" />
     </InstallExecuteSequence>
