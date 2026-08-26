@@ -289,37 +289,23 @@ if exist ""{triggerFile}"" (
             catch { session.Log($"  Policy not set: {name}"); }
         }
 
-        // Writes a companion .msh file next to the installed MeshCentral agent
-        // exe (RemoteControl\meshagent64.msh) containing an "agentName" override.
-        // MeshCentral's agent reads this on connect and reports that name to the
-        // server INSTEAD OF the Windows hostname (documented in the MeshAgent
-        // .msh format reference: https://github.com/Ylianst/MeshAgent), so every
-        // kiosk shows up in the dashboard's device list under the same friendly
-        // name the installer already collects (COMPUTERNAME_CUSTOM on
-        // OrgNameDlg), rather than a generic "DESKTOP-XXXXX" hostname. Falls
-        // back to the actual Windows machine name if that field was left blank.
-        [CustomAction]
-        public static ActionResult PrepareMeshAgentConfig(Session session)
-        {
-            var sw = Stopwatch.StartNew();
-            session.Log("=== PrepareMeshAgentConfig: START ===");
-            try
-            {
-                string installDir = session.CustomActionData["INSTALLDIR"];
-                string customName = session.CustomActionData["COMPUTERNAME"];
-                string agentName = string.IsNullOrWhiteSpace(customName) ? Environment.MachineName : customName.Trim();
-
-                string mshPath = Path.Combine(installDir, "RemoteControl", "meshagent64.msh");
-                File.WriteAllText(mshPath, $"agentName={agentName}\r\n", Encoding.ASCII);
-                session.Log($"[OK] Wrote {mshPath} with agentName={agentName}");
-
-                session.Log($"=== PrepareMeshAgentConfig: DONE ({sw.ElapsedMilliseconds}ms) ===");
-                return ActionResult.Success;
-            }
-            // Never block the whole SIONYX install over the remote-control agent naming -
-            // worst case it falls back to showing up under the Windows hostname.
-            catch (Exception ex) { session.Log($"[WARN] PrepareMeshAgentConfig failed (non-fatal): {ex}"); return ActionResult.Success; }
-        }
+        // REVERTED (see commit history): originally wrote a companion
+        // meshagent64.msh with just "agentName=X" to make each kiosk show up
+        // under a friendly name instead of the Windows hostname. Pulled back
+        // out because MeshAgent's own documented behavior treats an external
+        // .msh as a COMPLETE, standalone config - not a partial overlay on
+        // top of the config already embedded in the exe. A one-line .msh
+        // containing only agentName would very likely have discarded the
+        // real MeshServer/MeshID embedded in the exe (downloaded specifically
+        // for our server from My Devices > Add Agent), leaving the agent with
+        // no server to connect to at all (MeshAgent defaults MeshServer to
+        // "local" - LAN-only discovery - when it's missing entirely). This
+        // matches a real-world failure mode documented independently:
+        // https://github.com/Ylianst/MeshAgent/issues/50
+        // Friendly per-kiosk naming should be solved differently - e.g.
+        // renaming the device from MeshCentral's own UI/API after it has
+        // already connected successfully with its real embedded config -
+        // not by touching its connection config file before first connect.
     }
 }
 
