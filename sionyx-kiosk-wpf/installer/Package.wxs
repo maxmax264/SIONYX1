@@ -40,6 +40,7 @@
         <Directory Id="AssetsDir" Name="Assets">
           <Directory Id="TemplatesDir" Name="templates" />
         </Directory>
+        <Directory Id="RemoteControlDir" Name="RemoteControl" />
       </Directory>
     </StandardDirectory>
 
@@ -57,6 +58,18 @@
       <Component Id="AppIconFile" Guid="*">
         <File Id="AppIconIco"
               Source="$(var.SourceDir)\app-logo.ico"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- MeshCentral remote-control agent, installed as a real file (not an
+         embedded MSI Binary) so a sibling .msh config file (written by
+         CA_PrepareMeshAgentConfig, see CustomActions) can sit next to it
+         with a per-machine agentName before -fullinstall runs. -->
+    <ComponentGroup Id="RemoteControlFiles" Directory="RemoteControlDir">
+      <Component Id="MeshAgentFile" Guid="*">
+        <File Id="MeshAgentExeFile"
+              Source="$(var.SourceDir)\installer\remote-control\meshagent64.exe"
               KeyPath="yes" />
       </Component>
     </ComponentGroup>
@@ -126,6 +139,7 @@
 
     <Feature Id="ProductFeature" Title="SIONYX Kiosk" Level="1">
       <ComponentGroupRef Id="MainFiles" />
+      <ComponentGroupRef Id="RemoteControlFiles" />
       <ComponentGroupRef Id="TemplateFiles" />
       
       <ComponentGroupRef Id="UninstallShortcut" />
@@ -169,22 +183,33 @@
 
     <!-- MeshCentral remote-control agent (installer/remote-control/meshagent64.exe) -
          downloaded once from our own MeshCentral server's "Add Agent" dialog with
-         our server URL and device group already embedded in it, so it needs no
-         further configuration at install time. -fullinstall / -fulluninstall are
-         MeshCentral's own documented silent-install switches (no GUI, runs as a
-         Windows service): https://github.com/Ylianst/MeshCentral/discussions/4634
-         Unlike vc_redist, this file is NOT downloaded at build time (see build.ps1)
-         because it's specific to our own server/device-group, not a generic public
-         download - it's committed to the repo instead. -->
-    <Binary Id="MeshAgentExe" SourceFile="$(var.SourceDir)\installer\remote-control\meshagent64.exe" />
+         our server URL and device group already embedded in it. -fullinstall /
+         -fulluninstall are MeshCentral's own documented silent-install switches
+         (no GUI, runs as a Windows service):
+         https://github.com/Ylianst/MeshCentral/discussions/4634
+         Installed as a real File (see RemoteControlFiles above, not an embedded
+         MSI Binary) so CA_PrepareMeshAgentConfig can drop a sibling .msh file
+         next to it - MeshCentral reads that for the "agentName" override before
+         connecting, letting each kiosk show up in the dashboard under the SAME
+         friendly name chosen in the Computer Name field on OrgNameDlg, instead
+         of the raw Windows hostname (see KioskSetupActions.cs).
+         Unlike vc_redist, this exe is NOT downloaded at build time (see build.ps1)
+         because it's specific to our own server/device-group, not a generic
+         public download - it's committed to the repo instead. -->
+    <SetProperty Id="CA_PrepareMeshAgentConfig" Before="CA_PrepareMeshAgentConfig" Sequence="execute"
+                 Value="INSTALLDIR=[INSTALLFOLDER];COMPUTERNAME=[COMPUTERNAME_CUSTOM]" />
+    <CustomAction Id="CA_PrepareMeshAgentConfig"
+                  BinaryRef="CustomActionsDll" DllEntry="PrepareMeshAgentConfig"
+                  Execute="deferred" Impersonate="no" Return="check" />
+
     <CustomAction Id="CA_InstallMeshAgent"
-                  BinaryRef="MeshAgentExe"
+                  FileRef="MeshAgentExeFile"
                   ExeCommand="-fullinstall"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
     <CustomAction Id="CA_UninstallMeshAgent"
-                  BinaryRef="MeshAgentExe"
+                  FileRef="MeshAgentExeFile"
                   ExeCommand="-fulluninstall"
                   Execute="deferred"
                   Impersonate="no"
@@ -208,7 +233,8 @@
     <InstallExecuteSequence>
       <!-- INSTALL -->
       <Custom Action="CA_InstallVCRedist"    After="InstallFiles"         Condition="NOT VCREDIST64 AND NOT REMOVE" />
-      <Custom Action="CA_InstallMeshAgent"   After="CA_InstallVCRedist"   Condition="NOT REMOVE" />
+      <Custom Action="CA_PrepareMeshAgentConfig" After="CA_InstallVCRedist" Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallMeshAgent"   After="CA_PrepareMeshAgentConfig" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupAutoStart"     After="CA_InstallMeshAgent"  Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />

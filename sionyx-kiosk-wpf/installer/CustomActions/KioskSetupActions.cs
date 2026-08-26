@@ -288,6 +288,38 @@ if exist ""{triggerFile}"" (
             }
             catch { session.Log($"  Policy not set: {name}"); }
         }
+
+        // Writes a companion .msh file next to the installed MeshCentral agent
+        // exe (RemoteControl\meshagent64.msh) containing an "agentName" override.
+        // MeshCentral's agent reads this on connect and reports that name to the
+        // server INSTEAD OF the Windows hostname (documented in the MeshAgent
+        // .msh format reference: https://github.com/Ylianst/MeshAgent), so every
+        // kiosk shows up in the dashboard's device list under the same friendly
+        // name the installer already collects (COMPUTERNAME_CUSTOM on
+        // OrgNameDlg), rather than a generic "DESKTOP-XXXXX" hostname. Falls
+        // back to the actual Windows machine name if that field was left blank.
+        [CustomAction]
+        public static ActionResult PrepareMeshAgentConfig(Session session)
+        {
+            var sw = Stopwatch.StartNew();
+            session.Log("=== PrepareMeshAgentConfig: START ===");
+            try
+            {
+                string installDir = session.CustomActionData["INSTALLDIR"];
+                string customName = session.CustomActionData["COMPUTERNAME"];
+                string agentName = string.IsNullOrWhiteSpace(customName) ? Environment.MachineName : customName.Trim();
+
+                string mshPath = Path.Combine(installDir, "RemoteControl", "meshagent64.msh");
+                File.WriteAllText(mshPath, $"agentName={agentName}\r\n", Encoding.ASCII);
+                session.Log($"[OK] Wrote {mshPath} with agentName={agentName}");
+
+                session.Log($"=== PrepareMeshAgentConfig: DONE ({sw.ElapsedMilliseconds}ms) ===");
+                return ActionResult.Success;
+            }
+            // Never block the whole SIONYX install over the remote-control agent naming -
+            // worst case it falls back to showing up under the Windows hostname.
+            catch (Exception ex) { session.Log($"[WARN] PrepareMeshAgentConfig failed (non-fatal): {ex}"); return ActionResult.Success; }
+        }
     }
 }
 
