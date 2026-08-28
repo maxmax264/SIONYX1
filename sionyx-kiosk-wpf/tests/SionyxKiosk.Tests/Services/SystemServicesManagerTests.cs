@@ -16,6 +16,7 @@ public class SystemServicesManagerTests : IDisposable
     private readonly KeyboardRestrictionService _keyboard;
     private readonly ProcessRestrictionService _processRestriction;
     private readonly GlobalHotkeyService _globalHotkey;
+    private readonly RemoteControlReportingService _remoteControl;
     private readonly SystemServicesManager _manager;
 
     public SystemServicesManagerTests()
@@ -30,6 +31,7 @@ public class SystemServicesManagerTests : IDisposable
         _keyboard = new KeyboardRestrictionService(enabled: false);
         _processRestriction = new ProcessRestrictionService(enabled: false);
         _globalHotkey = new GlobalHotkeyService();
+        _remoteControl = new RemoteControlReportingService(_firebase);
         _session = new SessionService(
             _firebase, "user-123", "test-org",
             new ComputerService(_firebase),
@@ -39,7 +41,7 @@ public class SystemServicesManagerTests : IDisposable
 
         _manager = new SystemServicesManager(
             _forceLogout, _chat, _printMonitor, _operatingHours,
-            _keyboard, _processRestriction, _globalHotkey);
+            _keyboard, _processRestriction, _globalHotkey, _remoteControl);
     }
 
     public void Dispose() => _firebase.Dispose();
