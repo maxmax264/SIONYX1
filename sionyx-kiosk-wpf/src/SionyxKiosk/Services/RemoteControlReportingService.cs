@@ -72,7 +72,12 @@ public class RemoteControlReportingService
                 ["password"] = pwMatch.Groups[1].Value,
                 ["reportedAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             };
-            await _firebase.DbUpdateAsync(path, data);
+            var result = await _firebase.DbUpdateAsync(path, data);
+            if (!result.Success)
+            {
+                Logger.Warning("{Tool} info FAILED to report to Firebase for computer {ComputerId}: {Error}", tool, computerId, result.Error);
+                return;
+            }
             Logger.Information("{Tool} info reported to Firebase for computer {ComputerId}", tool, computerId);
         }
         catch (Exception ex)
