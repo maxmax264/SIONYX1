@@ -228,8 +228,8 @@
     <InstallExecuteSequence>
       <!-- INSTALL -->
       <Custom Action="CA_InstallVCRedist"    After="InstallFiles"         Condition="NOT VCREDIST64 AND NOT REMOVE" />
-      <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE" />
-      <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE AND NOT Installed" />
+      <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE AND NOT Installed" />
       <Custom Action="CA_SetupAutoStart"     After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
