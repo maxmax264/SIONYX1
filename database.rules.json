@@ -122,7 +122,7 @@
           ],
           "$purchaseId": {
             ".read": "data.child('userId').val() == auth.uid || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists()",
-            ".write": "(!data.exists() && newData.child('userId').val() == auth.uid) || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
+            ".write": "(!data.exists() && newData.child('userId').val() == auth.uid) || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists()",
             ".validate": "newData.hasChildren(['userId', 'status', 'createdAt'])",
             "userId": {
               ".validate": "newData.isString()"
