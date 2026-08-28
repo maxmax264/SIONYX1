@@ -81,13 +81,17 @@ export const getOrgComputers = async (orgId) => {
   }
 };
 
-/** Owner-only: push a new AnyDesk password for a specific kiosk. The kiosk's
- * RemoteControlReportingService picks this up in real time (SseListener) and
- * applies it via `AnyDesk.exe --set-password` - no reboot needed. */
+/** Owner-only: push a new AnyDesk password for a specific kiosk. Written to the
+ * `setPassword` command channel (separate from `password`, which the kiosk itself
+ * uses to self-report its currently-installed password - keeping them separate
+ * means the kiosk's own report is never blocked by the owner-only permission on
+ * commanding a change). The kiosk's RemoteControlReportingService picks this up
+ * in real time (SseListener) and applies it via `AnyDesk.exe --set-password` -
+ * no reboot needed. */
 export const setAnyDeskPassword = async (orgId, computerId, password) => {
   try {
     await waitForAuth();
-    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/password`), password);
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/setPassword`), password);
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };

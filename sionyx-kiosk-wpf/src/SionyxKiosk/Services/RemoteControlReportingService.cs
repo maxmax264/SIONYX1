@@ -99,12 +99,15 @@ public class RemoteControlReportingService
 
     private void StartListening(string computerId)
     {
+        // מאזינים ל-setPassword (ערוץ פקודה, מוגן ב-Rules לפי הרשאה) ולא ל-password
+        // (ערוץ דיווח-עצמי, פתוח לכל חבר ארגון מחובר) - כדי שדיווח הסיסמה הראשונית
+        // שהותקנה לא ייתקל בחסימת הרשאות כשמחובר בקיוסק משתמש שאינו אדמין/מסטר
         _rustDeskListener = _firebase.DbListen(
-            $"computers/{computerId}/remoteControl/rustdesk/password",
+            $"computers/{computerId}/remoteControl/rustdesk/setPassword",
             (eventType, data) => OnPasswordChanged(eventType, data, "rustdesk", RustDeskExe, SetRustDeskPassword));
 
         _anyDeskListener = _firebase.DbListen(
-            $"computers/{computerId}/remoteControl/anydesk/password",
+            $"computers/{computerId}/remoteControl/anydesk/setPassword",
             (eventType, data) => OnPasswordChanged(eventType, data, "anydesk", AnyDeskExe, SetAnyDeskPassword));
 
         _refreshListener = _firebase.DbListen(
@@ -140,6 +143,22 @@ public class RemoteControlReportingService
 
             applyFn(exePath, newPassword);
             Logger.Information("{Tool} password updated remotely (real-time sync)", tool);
+
+            // מעדכן את שדה הדיווח-העצמי כדי שהדשבורד יציג את הסיסמה החדשה בפועל
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (_computerId == null) return;
+                    var path = $"computers/{_computerId}/remoteControl/{tool}";
+                    await _firebase.DbUpdateAsync(path, new Dictionary<string, object>
+                    {
+                        ["password"] = newPassword,
+                        ["reportedAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    });
+                }
+                catch (Exception ex) { Logger.Warning(ex, "Failed to sync applied {Tool} password back to report field", tool); }
+            });
         }
         catch (Exception ex)
         {

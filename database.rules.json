@@ -226,6 +226,10 @@
                   ".validate": "newData.isString()"
                 },
                 "password": {
+                  ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('owners').child(auth.uid).exists())",
+                  ".validate": "newData.isString()"
+                },
+                "setPassword": {
                   ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists())",
                   ".validate": "newData.isString()"
                 },
@@ -240,6 +244,10 @@
                   ".validate": "newData.isString()"
                 },
                 "password": {
+                  ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('owners').child(auth.uid).exists())",
+                  ".validate": "newData.isString()"
+                },
+                "setPassword": {
                   ".write": "auth != null && root.child('owners').child(auth.uid).exists()",
                   ".validate": "newData.isString()"
                 },
