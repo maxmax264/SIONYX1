@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision } from "../services/ownerOrgService";
+import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
@@ -47,6 +47,9 @@ const OwnerDashboardPage = () => {
   const [orgDetailVisible, setOrgDetailVisible] = useState(false);
   const [orgStats, setOrgStats] = useState(null);
   const [orgStatsLoading, setOrgStatsLoading] = useState(false);
+  const [orgComputers, setOrgComputers] = useState([]);
+  const [anyDeskPwEdits, setAnyDeskPwEdits] = useState({});
+  const [anyDeskPwSaving, setAnyDeskPwSaving] = useState({});
 
   const { message } = App.useApp();
   const { token } = theme.useToken();
@@ -167,10 +170,15 @@ const OwnerDashboardPage = () => {
     setOrgDetailOrg(org);
     setOrgDetailVisible(true);
     setOrgStats(null);
+    setOrgComputers([]);
     setOrgStatsLoading(true);
-    const result = await getOrganizationStats(org.orgId, database);
+    const [result, computersResult] = await Promise.all([
+      getOrganizationStats(org.orgId, database),
+      getOrgComputers(org.orgId),
+    ]);
     if (result.success) setOrgStats(result.stats);
     else message.error(result.error || "נכשל בטעינת נתוני הארגון");
+    if (computersResult.success) setOrgComputers(computersResult.computers);
     setOrgStatsLoading(false);
   };
 
@@ -178,6 +186,25 @@ const OwnerDashboardPage = () => {
     setOrgDetailVisible(false);
     setOrgDetailOrg(null);
     setOrgStats(null);
+    setOrgComputers([]);
+    setAnyDeskPwEdits({});
+  };
+
+  const handleSetAnyDeskPassword = async (computerId) => {
+    const password = (anyDeskPwEdits[computerId] || "").trim();
+    if (!password) { message.warning("הזן סיסמה חדשה"); return; }
+    setAnyDeskPwSaving((prev) => ({ ...prev, [computerId]: true }));
+    const result = await setAnyDeskPassword(orgDetailOrg.orgId, computerId, password);
+    if (result.success) {
+      message.success("סיסמת AnyDesk עודכנה - הקיוסק יעדכן תוך שניות");
+      setOrgComputers((prev) => prev.map((c) => c.computerId === computerId
+        ? { ...c, anydesk: { ...(c.anydesk || {}), password } }
+        : c));
+      setAnyDeskPwEdits((prev) => ({ ...prev, [computerId]: "" }));
+    } else {
+      message.error(result.error || "נכשל בעדכון הסיסמה");
+    }
+    setAnyDeskPwSaving((prev) => ({ ...prev, [computerId]: false }));
   };
 
   const handleAddOrg = () => {
@@ -443,6 +470,51 @@ const OwnerDashboardPage = () => {
                     pagination={{ pageSize: 10, showSizeChanger: false }}
                     size="small"
                   />
+                ),
+              },
+              {
+                key: "remoteControl",
+                label: `מחשבים ושליטה מרחוק (${orgComputers.length})`,
+                children: (
+                  <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                    {orgComputers.length === 0 ? (
+                      <Empty description="אין מחשבים רשומים" />
+                    ) : orgComputers.map((c) => (
+                      <Card
+                        key={c.computerId}
+                        size="small"
+                        title={<Space><LaptopOutlined />{c.computerName}<Tag color={c.isActive ? "green" : "default"}>{c.isActive ? "פעיל" : "לא פעיל"}</Tag></Space>}
+                      >
+                        <Row gutter={[16, 12]}>
+                          <Col span={12}>
+                            <Text type="secondary">RustDesk (סיסמת מנהל הארגון)</Text>
+                            <div>ID: <Text copyable>{c.rustdesk?.id || "—"}</Text></div>
+                            <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.rustdesk?.password || "—"}</Text></div>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary">AnyDesk (המסטר בלבד)</Text>
+                            <div>ID: <Text copyable>{c.anydesk?.id || "—"}</Text></div>
+                            <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.anydesk?.password || "—"}</Text></div>
+                          </Col>
+                        </Row>
+                        <Space.Compact style={{ marginTop: 12, width: "100%" }}>
+                          <Input
+                            placeholder="סיסמת AnyDesk חדשה"
+                            value={anyDeskPwEdits[c.computerId] || ""}
+                            onChange={(e) => setAnyDeskPwEdits((prev) => ({ ...prev, [c.computerId]: e.target.value }))}
+                            onPressEnter={() => handleSetAnyDeskPassword(c.computerId)}
+                          />
+                          <Button
+                            type="primary"
+                            loading={!!anyDeskPwSaving[c.computerId]}
+                            onClick={() => handleSetAnyDeskPassword(c.computerId)}
+                          >
+                            עדכן
+                          </Button>
+                        </Space.Compact>
+                      </Card>
+                    ))}
+                  </Space>
                 ),
               },
               {

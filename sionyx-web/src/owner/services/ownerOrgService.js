@@ -61,6 +61,39 @@ export const disconnectFromSupervision = async (orgId, supervisorUid) => {
   }
 };
 
+export const getOrgComputers = async (orgId) => {
+  try {
+    await waitForAuth();
+    const snap = await get(ref(database, `organizations/${orgId}/computers`));
+    if (!snap.exists()) return { success: true, computers: [] };
+    const data = snap.val();
+    const computers = Object.entries(data).map(([computerId, c]) => ({
+      computerId,
+      computerName: c.computerName || computerId,
+      isActive: !!c.isActive,
+      lastSeen: c.lastSeen || null,
+      rustdesk: c.remoteControl?.rustdesk || null,
+      anydesk: c.remoteControl?.anydesk || null,
+    }));
+    return { success: true, computers };
+  } catch (e) {
+    return { success: false, error: e.message, computers: [] };
+  }
+};
+
+/** Owner-only: push a new AnyDesk password for a specific kiosk. The kiosk's
+ * RemoteControlReportingService picks this up in real time (SseListener) and
+ * applies it via `AnyDesk.exe --set-password` - no reboot needed. */
+export const setAnyDeskPassword = async (orgId, computerId, password) => {
+  try {
+    await waitForAuth();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/password`), password);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+};
+
 export const getAllSupervisors = async () => {
   try {
     await waitForAuth();
