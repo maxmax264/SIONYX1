@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.6] - 2026-08-28
+
+### Other
+- check DbUpdateAsync result before logging success (a8d2dcc3)
+
+
 ## [3.11.5] - 2026-08-26
 
 
