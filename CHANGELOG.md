@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.9] - 2026-08-28
+
+### Other
+- resolve version.json conflict (7ebd2329)
+
+
 ## [3.11.6] - 2026-08-28
 
 ### Other
