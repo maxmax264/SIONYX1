@@ -62,14 +62,21 @@
       </Component>
     </ComponentGroup>
 
-    <!-- MeshCentral remote-control agent, installed as a real file (not an
-         embedded MSI Binary) so a sibling .msh config file (written by
-         CA_PrepareMeshAgentConfig, see CustomActions) can sit next to it
-         with a per-machine agentName before -fullinstall runs. -->
+    <!-- Two independent remote-control tools, installed as real files (not
+         embedded MSI Binaries) and run in place as PowerShell scripts by
+         CA_InstallRustDesk / CA_InstallAnyDesk below. RustDesk = org admin's
+         day-to-day tool (password set from the dashboard). AnyDesk = master
+         (owner) only, fully independent of RustDesk. MeshCentral was tried
+         first but is down / unreliable - dropped in favor of this pair. -->
     <ComponentGroup Id="RemoteControlFiles" Directory="RemoteControlDir">
-      <Component Id="MeshAgentFile" Guid="*">
-        <File Id="MeshAgentExeFile"
-              Source="$(var.SourceDir)\installer\remote-control\meshagent64.exe"
+      <Component Id="RustDeskInstallScript" Guid="*">
+        <File Id="InstallRustDeskPs1"
+              Source="$(var.SourceDir)\installer\remote-control\install-rustdesk.ps1"
+              KeyPath="yes" />
+      </Component>
+      <Component Id="AnyDeskInstallScript" Guid="*">
+        <File Id="InstallAnyDeskPs1"
+              Source="$(var.SourceDir)\installer\remote-control\install-anydesk.ps1"
               KeyPath="yes" />
       </Component>
     </ComponentGroup>
@@ -181,25 +188,24 @@
                   Impersonate="no"
                   Return="ignore" />
 
-    <!-- MeshCentral remote-control agent (installer/remote-control/meshagent64.exe) -
-         downloaded once from our own MeshCentral server's "Add Agent" dialog with
-         our server URL and device group already embedded in it, so it needs no
-         further configuration at install time. -fullinstall / -fulluninstall are
-         MeshCentral's own documented silent-install switches (no GUI, runs as a
-         Windows service): https://github.com/Ylianst/MeshCentral/discussions/4634
-         Installed as a real File (RemoteControlFiles above) rather than an
-         embedded MSI Binary. Deliberately NOT paired with any external .msh
-         config file - see the removed PrepareMeshAgentConfig in
-         KioskSetupActions.cs for why that was reverted. -->
-    <CustomAction Id="CA_InstallMeshAgent"
-                  FileRef="MeshAgentExeFile"
-                  ExeCommand="-fullinstall"
+    <!-- RustDesk + AnyDesk: each script downloads its tool fresh, installs it
+         as a Windows service, sets a random per-machine password, and writes
+         ID+password to C:\ProgramData\SIONYX\*-info.txt for
+         RemoteControlReportingService to pick up and report to Firebase.
+         Run via powershell.exe (not FileRef+ExeCommand on the .ps1 itself -
+         .ps1 isn't directly executable). No uninstall action: both tools are
+         left in place on uninstall, same as RustDesk/AnyDesk would be if
+         removed by hand - matches how MeshCentral's uninstall was the only
+         one wired before, not a deliberate asymmetry. -->
+    <CustomAction Id="CA_InstallRustDesk"
+                  Directory="RemoteControlDir"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-rustdesk.ps1&quot;"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
-    <CustomAction Id="CA_UninstallMeshAgent"
-                  FileRef="MeshAgentExeFile"
-                  ExeCommand="-fulluninstall"
+    <CustomAction Id="CA_InstallAnyDesk"
+                  Directory="RemoteControlDir"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-anydesk.ps1&quot;"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
@@ -222,15 +228,15 @@
     <InstallExecuteSequence>
       <!-- INSTALL -->
       <Custom Action="CA_InstallVCRedist"    After="InstallFiles"         Condition="NOT VCREDIST64 AND NOT REMOVE" />
-      <Custom Action="CA_InstallMeshAgent"   After="CA_InstallVCRedist"   Condition="NOT REMOVE" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallMeshAgent"  Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
 
       <!-- UNINSTALL -->
       <Custom Action="CA_StopProcesses"   Before="RemoveFiles"           Condition="REMOVE = &quot;ALL&quot;" />
-      <Custom Action="CA_UninstallMeshAgent" After="CA_StopProcesses"    Condition="REMOVE = &quot;ALL&quot;" />
       <Custom Action="CA_RemoveAutoStart" After="CA_StopProcesses"       Condition="REMOVE = &quot;ALL&quot;" />
       <Custom Action="CA_RevertSecurity"  After="CA_RemoveAutoStart"     Condition="REMOVE = &quot;ALL&quot;" />
     </InstallExecuteSequence>

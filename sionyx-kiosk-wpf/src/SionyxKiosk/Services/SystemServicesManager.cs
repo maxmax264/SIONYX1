@@ -21,6 +21,7 @@ public class SystemServicesManager
     private readonly KeyboardRestrictionService _keyboard;
     private readonly ProcessRestrictionService _processRestriction;
     private readonly GlobalHotkeyService _globalHotkey;
+    private readonly RemoteControlReportingService _remoteControl;
 
     private Action<string>? _forceLogoutHandler;
     private Action? _adminExitHandler;
@@ -32,7 +33,8 @@ public class SystemServicesManager
         OperatingHoursService operatingHours,
         KeyboardRestrictionService keyboard,
         ProcessRestrictionService processRestriction,
-        GlobalHotkeyService globalHotkey)
+        GlobalHotkeyService globalHotkey,
+        RemoteControlReportingService remoteControl)
     {
         _forceLogout = forceLogout;
         _chat = chat;
@@ -41,6 +43,7 @@ public class SystemServicesManager
         _keyboard = keyboard;
         _processRestriction = processRestriction;
         _globalHotkey = globalHotkey;
+        _remoteControl = remoteControl;
     }
 
     /// <summary>Raised when a force-logout is received from the server.</summary>
@@ -84,6 +87,13 @@ public class SystemServicesManager
 
         RewireAdminExitHandler();
 
+        _remoteControl.StopListening();
+        _ = Task.Run(async () =>
+        {
+            try { await _remoteControl.InitializeAsync(); }
+            catch (Exception ex) { Logger.Warning(ex, "RemoteControl reporting init failed (non-fatal)"); }
+        });
+
         Logger.Information("System services started (kiosk={IsKiosk})", isKiosk);
     }
 
@@ -120,6 +130,7 @@ public class SystemServicesManager
             _keyboard.Stop();
             KioskPolicyService.Remove();
             _printMonitor.StopMonitoring();
+            _remoteControl.StopListening();
 
             if (session.IsActive)
                 await session.EndSessionAsync("logout");
@@ -140,6 +151,7 @@ public class SystemServicesManager
         _forceLogout.StopListening();
         _chat.StopListening();
         _printMonitor.StopMonitoring();
+        _remoteControl.StopListening();
     }
 
     private void WireForceLogout(string userId)

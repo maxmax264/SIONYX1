@@ -109,6 +109,7 @@ public partial class App : Application
                 services.AddSingleton(sp => new OperatingHoursService(sp.GetRequiredService<FirebaseClient>()));
                 services.AddSingleton(sp => new ForceLogoutService(sp.GetRequiredService<FirebaseClient>()));
                 services.AddSingleton(sp => new AnnouncementService(sp.GetRequiredService<FirebaseClient>()));
+                services.AddSingleton(sp => new RemoteControlReportingService(sp.GetRequiredService<FirebaseClient>()));
 
                 // System Services
                 services.AddSingleton(_ => new ProcessCleanupService());
@@ -157,7 +158,8 @@ public partial class App : Application
                     sp.GetRequiredService<OperatingHoursService>(),
                     sp.GetRequiredService<KeyboardRestrictionService>(),
                     sp.GetRequiredService<ProcessRestrictionService>(),
-                    sp.GetRequiredService<GlobalHotkeyService>()));
+                    sp.GetRequiredService<GlobalHotkeyService>(),
+                    sp.GetRequiredService<RemoteControlReportingService>()));
                 services.AddSingleton<IdleTimeoutService>();
                 services.AddSingleton(sp => new SessionCoordinator(
                     sp.GetRequiredService<SessionService>(),
