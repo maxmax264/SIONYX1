@@ -430,6 +430,8 @@ const ComputersPage = () => {
     // Derive isActive from currentUserId (if user is associated, it's active)
     const isActive = !!computer.currentUserId;
     const computerId = computer.id;
+    const rustdesk = computer.remoteControl?.rustdesk;
+    const [showRemote, setShowRemote] = useState(false);
 
     return (
       <Card
@@ -467,6 +469,15 @@ const ComputersPage = () => {
               />
               <Button
                 type='text'
+                size='small'
+                icon={<DesktopOutlined />}
+                onClick={() => setShowRemote(v => !v)}
+                title='שליטה מרחוק (RustDesk)'
+              >
+                שליטה מרחוק
+              </Button>
+              <Button
+                type='text'
                 danger
                 size='small'
                 icon={<DeleteOutlined />}
@@ -476,6 +487,20 @@ const ComputersPage = () => {
             </Space>
           </Col>
         </Row>
+        {showRemote && (
+          <Row style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
+            <Col span={24}>
+              {rustdesk?.id ? (
+                <Space direction='vertical' size={4}>
+                  <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.id}</Text></Text>
+                  <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.password || '—'}</Text></Text>
+                </Space>
+              ) : (
+                <Text type='secondary'>עדיין לא דווח מהקיוסק (ידווח אחרי login ראשון על גרסת ה-MSI החדשה)</Text>
+              )}
+            </Col>
+          </Row>
+        )}
       </Card>
     );
   };
