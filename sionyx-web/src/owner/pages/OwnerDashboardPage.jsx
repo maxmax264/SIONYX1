@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword } from "../services/ownerOrgService";
+import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
@@ -50,6 +50,7 @@ const OwnerDashboardPage = () => {
   const [orgComputers, setOrgComputers] = useState([]);
   const [anyDeskPwEdits, setAnyDeskPwEdits] = useState({});
   const [anyDeskPwSaving, setAnyDeskPwSaving] = useState({});
+  const [refreshingComputer, setRefreshingComputer] = useState({});
 
   const { message } = App.useApp();
   const { token } = theme.useToken();
@@ -205,6 +206,17 @@ const OwnerDashboardPage = () => {
       message.error(result.error || "נכשל בעדכון הסיסמה");
     }
     setAnyDeskPwSaving((prev) => ({ ...prev, [computerId]: false }));
+  };
+
+  const handleRefreshRemoteControl = async (computerId) => {
+    setRefreshingComputer((prev) => ({ ...prev, [computerId]: true }));
+    const result = await requestRemoteControlRefresh(orgDetailOrg.orgId, computerId);
+    if (result.success) {
+      message.success("בקשת רענון נשלחה - הקיוסק ידווח מחדש תוך שניות (רענן את המסך כדי לראות)");
+    } else {
+      message.error(result.error || "נכשל בשליחת בקשת הרענון");
+    }
+    setRefreshingComputer((prev) => ({ ...prev, [computerId]: false }));
   };
 
   const handleAddOrg = () => {
@@ -484,6 +496,16 @@ const OwnerDashboardPage = () => {
                         key={c.computerId}
                         size="small"
                         title={<Space><LaptopOutlined />{c.computerName}<Tag color={c.isActive ? "green" : "default"}>{c.isActive ? "פעיל" : "לא פעיל"}</Tag></Space>}
+                        extra={
+                          <Button
+                            size="small"
+                            icon={<ReloadOutlined />}
+                            loading={!!refreshingComputer[c.computerId]}
+                            onClick={() => handleRefreshRemoteControl(c.computerId)}
+                          >
+                            רענן סוכן
+                          </Button>
+                        }
                       >
                         <Row gutter={[16, 12]}>
                           <Col span={12}>

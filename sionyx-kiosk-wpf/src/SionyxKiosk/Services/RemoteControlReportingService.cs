@@ -28,6 +28,8 @@ public class RemoteControlReportingService
     private readonly FirebaseClient _firebase;
     private SseListener? _rustDeskListener;
     private SseListener? _anyDeskListener;
+    private SseListener? _refreshListener;
+    private string? _computerId;
 
     public RemoteControlReportingService(FirebaseClient firebase)
     {
@@ -37,12 +39,21 @@ public class RemoteControlReportingService
     /// <summary>קריאה חד-פעמית באתחול האפליקציה, אחרי שהמשתמש/הקיוסק מאומת מול Firebase.</summary>
     public async Task InitializeAsync()
     {
-        var computerId = DeviceInfo.GetDeviceId();
+        _computerId = DeviceInfo.GetDeviceId();
 
-        await ReportInitialInfoAsync("rustdesk", RustDeskInfoFile, "RustDesk", computerId);
-        await ReportInitialInfoAsync("anydesk", AnyDeskInfoFile, "AnyDesk", computerId);
+        await ReportCurrentInfoAsync();
 
-        StartListening(computerId);
+        StartListening(_computerId);
+    }
+
+    /// <summary>קורא מחדש את קבצי ה-info של שני הכלים ומדווח ל-Firebase. נקרא גם
+    /// באתחול וגם כשמתקבלת בקשת רענון מהדשבורד (remoteControl/refreshRequested) -
+    /// מכסה מקרה של דיווח ראשוני שנכשל, או ID/סיסמה שהתחלפו (למשל אחרי התקנה מחדש).</summary>
+    private async Task ReportCurrentInfoAsync()
+    {
+        if (_computerId == null) return;
+        await ReportInitialInfoAsync("rustdesk", RustDeskInfoFile, "RustDesk", _computerId);
+        await ReportInitialInfoAsync("anydesk", AnyDeskInfoFile, "AnyDesk", _computerId);
     }
 
     private async Task ReportInitialInfoAsync(string tool, string infoFilePath, string idLabel, string computerId)
@@ -95,6 +106,22 @@ public class RemoteControlReportingService
         _anyDeskListener = _firebase.DbListen(
             $"computers/{computerId}/remoteControl/anydesk/password",
             (eventType, data) => OnPasswordChanged(eventType, data, "anydesk", AnyDeskExe, SetAnyDeskPassword));
+
+        _refreshListener = _firebase.DbListen(
+            $"computers/{computerId}/remoteControl/refreshRequested",
+            (eventType, data) => OnRefreshRequested(eventType, data));
+    }
+
+    private void OnRefreshRequested(string eventType, JsonElement? data)
+    {
+        if (eventType != "put" || data == null) return;
+        if (data.Value.ValueKind != JsonValueKind.Number) return;
+        Logger.Information("Remote-control refresh requested from dashboard - re-reporting current info");
+        _ = Task.Run(async () =>
+        {
+            try { await ReportCurrentInfoAsync(); }
+            catch (Exception ex) { Logger.Warning(ex, "Refresh-triggered re-report failed"); }
+        });
     }
 
     private void OnPasswordChanged(string eventType, JsonElement? data, string tool, string exePath, Action<string, string> applyFn)
@@ -155,5 +182,6 @@ public class RemoteControlReportingService
     {
         _rustDeskListener?.Stop();
         _anyDeskListener?.Stop();
+        _refreshListener?.Stop();
     }
 }

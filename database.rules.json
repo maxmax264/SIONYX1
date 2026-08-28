@@ -247,6 +247,10 @@
                   ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('owners').child(auth.uid).exists())",
                   ".validate": "newData.isNumber()"
                 }
+              },
+              "refreshRequested": {
+                ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('owners').child(auth.uid).exists())",
+                ".validate": "newData.isNumber()"
               }
             }
           }

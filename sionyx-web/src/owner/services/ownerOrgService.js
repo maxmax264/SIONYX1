@@ -94,6 +94,20 @@ export const setAnyDeskPassword = async (orgId, computerId, password) => {
   }
 };
 
+/** Owner-only: ask a kiosk to re-report its current RustDesk/AnyDesk ID+password.
+ * Covers a failed initial report or IDs that changed (e.g. reinstall). The kiosk's
+ * RemoteControlReportingService listens for this in real time and re-reports within
+ * seconds - no need to touch the machine. */
+export const requestRemoteControlRefresh = async (orgId, computerId) => {
+  try {
+    await waitForAuth();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/refreshRequested`), Date.now());
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+};
+
 export const getAllSupervisors = async () => {
   try {
     await waitForAuth();

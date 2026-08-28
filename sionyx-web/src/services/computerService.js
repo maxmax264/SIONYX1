@@ -316,6 +316,21 @@ export const deleteComputer = async computerId => {
   }
 };
 
+/** Asks a kiosk to re-report its current RustDesk ID+password to Firebase.
+ * Covers a failed initial report or an ID/password that changed (e.g. reinstall).
+ * The kiosk's RemoteControlReportingService listens for this in real time and
+ * re-reports within seconds - no need to touch the machine. */
+export const requestRemoteControlRefresh = async computerId => {
+  try {
+    const orgId = getOrgId();
+    await update(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl`), { refreshRequested: Date.now() });
+    return { success: true };
+  } catch (error) {
+    logger.error('Error requesting remote-control refresh:', error);
+    return { success: false, error: 'Failed to request refresh' };
+  }
+};
+
 /**
  * Get users currently using computers
  */

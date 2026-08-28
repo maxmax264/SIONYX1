@@ -37,6 +37,7 @@ import {
   deleteComputer,
   updateComputer,
   deriveFromComputersAndUsers,
+  requestRemoteControlRefresh,
 } from '../services/computerService';
 import { subscribeToComputers, subscribeToUsers } from '../services/realtimeService';
 import { getUserStatus, getStatusLabel, getStatusColor } from '../constants/userStatus';
@@ -432,6 +433,18 @@ const ComputersPage = () => {
     const computerId = computer.id;
     const rustdesk = computer.remoteControl?.rustdesk;
     const [showRemote, setShowRemote] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const handleRefresh = async () => {
+      setRefreshing(true);
+      const result = await requestRemoteControlRefresh(computerId);
+      if (result.success) {
+        message.success('בקשת רענון נשלחה - הקיוסק ידווח מחדש תוך שניות');
+      } else {
+        message.error(result.error || 'נכשל בשליחת בקשת הרענון');
+      }
+      setRefreshing(false);
+    };
 
     return (
       <Card
@@ -498,6 +511,11 @@ const ComputersPage = () => {
               ) : (
                 <Text type='secondary'>עדיין לא דווח מהקיוסק (ידווח אחרי login ראשון על גרסת ה-MSI החדשה)</Text>
               )}
+              <div style={{ marginTop: 8 }}>
+                <Button size='small' icon={<ReloadOutlined />} loading={refreshing} onClick={handleRefresh}>
+                  רענן סוכן
+                </Button>
+              </div>
             </Col>
           </Row>
         )}
