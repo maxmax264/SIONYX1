@@ -24,8 +24,12 @@ public class ProcessRestrictionService : IDisposable
         "wscript.exe", "cscript.exe", "mshta.exe",
         "certutil.exe", "bitsadmin.exe", "wmic.exe",
         // Remote access
-        "teamviewer.exe", "anydesk.exe", "ultraviewer.exe",
+        "teamviewer.exe", "ultraviewer.exe",
         "systemsettings.exe",
+        // NOTE: anydesk.exe intentionally NOT blacklisted - it is SIONYX's own
+        // controlled owner-only remote-control tool (see RemoteControlReportingService),
+        // password-gated and managed centrally via Firebase, not something a
+        // customer can connect through on their own.
     };
 
     private readonly HashSet<string> _blacklist;
