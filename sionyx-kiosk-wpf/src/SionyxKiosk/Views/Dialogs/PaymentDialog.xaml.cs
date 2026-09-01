@@ -71,21 +71,21 @@ public partial class PaymentDialog : Window
     private void PopulatePackageSummary()
     {
         PackageNameText.Text = _package.Name;
-        PackageMinutesText.Text = $"{_package.Minutes} דקות";
-        PackagePrintsText.Text = $"{_package.Prints}₪";
+        PackageMinutesText.Text = $"{_package.Minutes} ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ³ג€”";
+        PackagePrintsText.Text = $"{_package.Prints}׳³ג€™׳’ג‚¬ֲײ³ג€”";
         PackageValidityText.Text = _package.ValidityDisplay;
 
         if (_package.HasDiscount)
         {
-            OriginalPriceText.Text = $"₪{_package.Price:F0}";
+            OriginalPriceText.Text = $"׳³ג€™׳’ג‚¬ֲײ³ג€”{_package.Price:F0}";
             OriginalPriceText.Visibility = Visibility.Visible;
-            PackagePriceText.Text = $"₪{_package.FinalPrice:F0}";
+            PackagePriceText.Text = $"׳³ג€™׳’ג‚¬ֲײ³ג€”{_package.FinalPrice:F0}";
             DiscountBadge.Visibility = Visibility.Visible;
-            DiscountBadgeText.Text = $"חסכת ₪{_package.Savings:F0}";
+            DiscountBadgeText.Text = $"׳³ֲ³׳’ג‚¬ג€׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ³ג€” ׳³ג€™׳’ג‚¬ֲײ³ג€”{_package.Savings:F0}";
         }
         else
         {
-            PackagePriceText.Text = $"₪{_package.Price:F0}";
+            PackagePriceText.Text = $"׳³ג€™׳’ג‚¬ֲײ³ג€”{_package.Price:F0}";
         }
     }
 
@@ -110,11 +110,11 @@ public partial class PaymentDialog : Window
             }
             catch (WebView2RuntimeNotFoundException)
             {
-                Logger.Warning("WebView2 Runtime not found — attempting automatic install");
+                Logger.Warning("WebView2 Runtime not found ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ attempting automatic install");
                 var installed = await InstallWebView2Async();
                 if (!installed)
                 {
-                    MessageBox.Show("שגיאה בטעינת דף התשלום", "שגיאה", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ»ֲ׳³ֲ³ײ²ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ³ג€” ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ£ ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ", "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ", MessageBoxButton.OK, MessageBoxImage.Error);
                     Close();
                     return;
                 }
@@ -140,7 +140,7 @@ public partial class PaymentDialog : Window
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to load payment dialog");
-            MessageBox.Show("שגיאה בטעינת דף התשלום", "שגיאה", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show("׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ»ֲ׳³ֲ³ײ²ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ³ג€” ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ£ ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ", "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ", MessageBoxButton.OK, MessageBoxImage.Error);
             Close();
         }
     }
@@ -232,7 +232,7 @@ public partial class PaymentDialog : Window
 
             if (string.IsNullOrEmpty(mosadId) || string.IsNullOrEmpty(apiValid))
                 Logger.Warning(
-                    "Nedarim credentials missing for OrgId={OrgId} — payment will fail. " +
+                    "Nedarim credentials missing for OrgId={OrgId} ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ payment will fail. " +
                     "MetaResult.Success={Success} MetaResult.Error={Error} mosadId.IsEmpty={MosadEmpty} apiValid.IsEmpty={ApiEmpty}",
                     _firebase.OrgId, metaResult.IsSuccess, metaResult.Error, string.IsNullOrEmpty(mosadId), string.IsNullOrEmpty(apiValid));
 
@@ -371,14 +371,14 @@ public partial class PaymentDialog : Window
             }
             else
             {
-                var errorMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = result.Error ?? "שגיאה" });
+                var errorMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = result.Error ?? "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errorMsg));
             }
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to create pending purchase");
-            var errorMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה ביצירת רכישה" });
+            var errorMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¦׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errorMsg));
         }
     }
@@ -398,7 +398,7 @@ public partial class PaymentDialog : Window
             if (!result.IsSuccess || result.Data is not { } data)
             {
                 Logger.Warning("Saved-card charge aborted: failed to create pending purchase. Error={Error}", result.Error);
-                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = result.Error ?? "שגיאה" });
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = result.Error ?? "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
                 return;
             }
@@ -425,7 +425,7 @@ public partial class PaymentDialog : Window
             if (string.IsNullOrEmpty(savedKevaId))
             {
                 Logger.Warning("Saved-card charge aborted: no savedKevaId found for user {UserId}", _userId);
-                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "לא נמצא כרטיס שמור" });
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ¨׳³ֲ³ײ»ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡ ׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
                 return;
             }
@@ -435,7 +435,7 @@ public partial class PaymentDialog : Window
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to charge with saved card. PurchaseId={PurchaseId}", _purchaseId);
-            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בעיבוד תשלום" });
+            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
         }
     }
@@ -449,15 +449,7 @@ public partial class PaymentDialog : Window
     /// </summary>
     private async Task ChargeTokenAndCreditAsync(string kevaId, string? tokef = null)
     {
-        // ── TEMPORARY TEST SWITCH ──────────────────────────────────────
-        // Calling the new EXPERIMENTAL /chargeWithSavedCardRegular instead
-        // of the proven /chargeWithSavedCard (DebitKeva = technically a
-        // standing order) so we can find out, from the real kiosk UI,
-        // whether any of the 3 DebitCard.aspx param variations actually
-        // works as a true one-time charge. To go back to the known-good
-        // path, change useRegularTestEndpoint back to false.
-        const bool useRegularTestEndpoint = false;
-        var endpointName = useRegularTestEndpoint ? "chargeWithSavedCardRegular" : "chargeWithSavedCard";
+        const string endpointName = "chargeWithSavedCard";
 
         Logger.Information("Calling {Endpoint} function: OrgId={OrgId} PurchaseId={PurchaseId} KevaIdSuffix={KevaIdSuffix} TokefProvided={TokefProvided}",
             endpointName, _firebase.OrgId, _purchaseId, kevaId.Length > 4 ? kevaId[^4..] : kevaId, !string.IsNullOrEmpty(tokef));
@@ -473,7 +465,7 @@ public partial class PaymentDialog : Window
         if (!callResult.Success)
         {
             Logger.Error("{Endpoint} function call failed: {Error}", endpointName, callResult.Error);
-            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = callResult.Error ?? "שגיאה בעיבוד תשלום" });
+            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = callResult.Error ?? "׳³ֲ©׳³ג€™׳³ג„¢׳³ֲ׳³ג€ ׳³ג€˜׳³ֲ¢׳³ג„¢׳³ג€˜׳³ג€¢׳³ג€ ׳³ֳ—׳³ֲ©׳³ֲ׳³ג€¢׳³ֲ" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
             return;
         }
@@ -481,37 +473,23 @@ public partial class PaymentDialog : Window
         var resultData = (JsonElement)callResult.Data!;
         var success = resultData.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
         var correlationId = resultData.TryGetProperty("correlationId", out var cEl) ? cEl.GetString() : null;
-        // workingAttempt is the NEW field - only chargeWithSavedCardRegular sends it,
-        // and its value is the exact attempt.label from index.js (e.g. "DebitCard.aspx -
-        // Token field only (no CardNumber/CVV) - חיוב רגיל") - i.e. it tells you WHICH
-        // of the 3 new param variations actually worked, if any did.
-        var workingAttempt = resultData.TryGetProperty("workingAttempt", out var waEl) ? waEl.GetString() : null;
-        // optionUsed only comes from the old chargeWithSavedCard path.
         var optionUsed = resultData.TryGetProperty("optionUsed", out var oEl) && oEl.ValueKind == JsonValueKind.Number
             ? oEl.GetInt32().ToString()
             : "none-succeeded";
 
         if (success)
         {
-            if (useRegularTestEndpoint)
-                Logger.Information("[REGULAR-CHARGE TEST] Succeeded via attempt: \"{WorkingAttempt}\". PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
-                    workingAttempt ?? "(unknown - check Render logs)", _purchaseId, correlationId);
-            else
-                Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
-                    optionUsed, _purchaseId, correlationId);
+            Logger.Information("Saved-card charge succeeded server-side via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} CorrelationId={CorrelationId}",
+                optionUsed, _purchaseId, correlationId);
             PaymentSucceeded = true;
             var successMsg = JsonSerializer.Serialize(new { action = "showSuccess" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(successMsg));
         }
         else
         {
-            var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "שגיאה" : "שגיאה";
-            if (useRegularTestEndpoint)
-                Logger.Warning("[REGULAR-CHARGE TEST] All 3 new attempts failed (or a non-charge error occurred). PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId} — check Render logs for [REGULAR-CHARGE] entries to see each attempt's raw response.",
-                    _purchaseId, errorText, correlationId);
-            else
-                Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
-                    optionUsed, _purchaseId, errorText, correlationId);
+            var errorText = resultData.TryGetProperty("error", out var eEl) ? eEl.GetString() ?? "׳³ֲ©׳³ג€™׳³ג„¢׳³ֲ׳³ג€" : "׳³ֲ©׳³ג€™׳³ג„¢׳³ֲ׳³ג€";
+            Logger.Warning("Saved-card charge declined by server via [OPTION {OptionUsed}]. PurchaseId={PurchaseId} Error={Error} CorrelationId={CorrelationId}",
+                optionUsed, _purchaseId, errorText, correlationId);
             var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = errorText });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
         }
@@ -633,7 +611,7 @@ public partial class PaymentDialog : Window
             if (string.IsNullOrEmpty(transactionId))
             {
                 Logger.Error("CreateToken reported Status:OK but no usable token field was found in the response - cannot charge. Raw: {Raw}", root.ToString());
-                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בשמירת הכרטיס" });
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³ײ³ג€” ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ¨׳³ֲ³ײ»ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
                 return;
             }
@@ -664,7 +642,7 @@ public partial class PaymentDialog : Window
             if (!purchaseResult.IsSuccess || purchaseResult.Data is not { } data)
             {
                 Logger.Warning("Post-tokenize charge aborted: failed to create pending purchase. Error={Error}", purchaseResult.Error);
-                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = purchaseResult.Error ?? "שגיאה" });
+                var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = purchaseResult.Error ?? "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ" });
                 _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
                 return;
             }
@@ -677,7 +655,7 @@ public partial class PaymentDialog : Window
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to save+charge newly created token. PurchaseId={PurchaseId}", _purchaseId);
-            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "שגיאה בעיבוד תשלום" });
+            var errMsg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ" });
             _ = Dispatcher.InvokeAsync(() => PaymentWebView.CoreWebView2.PostWebMessageAsJson(errMsg));
         }
     }
@@ -771,7 +749,7 @@ public partial class PaymentDialog : Window
                 Logger.Warning("Purchase {Id} marked failed via SSE", purchaseId);
                 _ = Dispatcher.InvokeAsync(() =>
                 {
-                    var msg = JsonSerializer.Serialize(new { action = "purchaseError", error = "התשלום נכשל. אם חויבת, נא לפנות לתמיכה." });
+                    var msg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ. ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ³ג€”, ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֳ—׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³׳’ג‚¬ֲ." });
                     PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
                 });
             }
@@ -812,7 +790,7 @@ public partial class PaymentDialog : Window
                     Logger.Warning("Purchase {Id} marked failed via polling", _purchaseId);
                     _ = Dispatcher.InvokeAsync(() =>
                     {
-                        var msg = JsonSerializer.Serialize(new { action = "purchaseError", error = "התשלום נכשל. אם חויבת, נא לפנות לתמיכה." });
+                        var msg = JsonSerializer.Serialize(new { action = "purchaseError", error = "׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ. ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ³ג€”, ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֳ—׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³׳’ג‚¬ֲ." });
                         PaymentWebView.CoreWebView2.PostWebMessageAsJson(msg);
                     });
                     return;

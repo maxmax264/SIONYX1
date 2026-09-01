@@ -41,7 +41,7 @@ public class AuthService : BaseService, IAuthService
         var refreshed = await Firebase.RefreshTokenAsync();
         if (!refreshed)
         {
-            // Token expired or revoked — clear local storage
+            // Token expired or revoked ג€” clear local storage
             _localDb.Delete("refresh_token");
             _localDb.Delete("user_id");
             _localDb.Delete("phone");
@@ -104,7 +104,7 @@ public class AuthService : BaseService, IAuthService
 
         var email = PhoneToEmail(phone);
 
-        var result = await Firebase.SignInAsync(email, password);
+        var result = await Firebase.SignInAsync(email, ToFirebasePassword(password));
         if (!result.Success)
         {
             RecordFailedAttempt(phone);
@@ -130,7 +130,7 @@ public class AuthService : BaseService, IAuthService
         await RecoverOrphanedSessionAsync(uid, userData);
         await HandleComputerRegistrationAsync(uid);
 
-        // Store tokens locally — persist the REAL refresh token for auto-login
+        // Store tokens locally ג€” persist the REAL refresh token for auto-login
         _localDb.Set("refresh_token", Firebase.RefreshToken ?? "");
         _localDb.Set("user_id", uid);
         _localDb.Set("phone", phone);
@@ -144,11 +144,11 @@ public class AuthService : BaseService, IAuthService
     {
         Logger.Information("Registration attempt for {Phone}", phone);
 
-        if (password.Length < 6)
+        if (password.Length < 4)
             return Error(ErrorTranslations.Translate("password must be at least 6 characters"));
 
         var firebaseEmail = PhoneToEmail(phone);
-        var result = await Firebase.SignUpAsync(firebaseEmail, password);
+        var result = await Firebase.SignUpAsync(firebaseEmail, ToFirebasePassword(password));
         if (!result.Success)
             return Error(result.Error ?? "Registration failed");
 
@@ -221,9 +221,9 @@ public class AuthService : BaseService, IAuthService
     /// <summary>Change current user password in Firebase Auth.</summary>
     public async Task<ServiceResult> ChangePasswordAsync(string newPassword)
     {
-        var result = await Firebase.ChangePasswordAsync(newPassword);
+        var result = await Firebase.ChangePasswordAsync(ToFirebasePassword(newPassword));
         if (!result.Success)
-            return Error(result.Error ?? "שגיאה בשינוי הסיסמה");
+            return Error(result.Error ?? "׳©׳’׳™׳׳” ׳‘׳©׳™׳ ׳•׳™ ׳”׳¡׳™׳¡׳׳”");
         if (!string.IsNullOrEmpty(Firebase.RefreshToken))
             _localDb.Set("refresh_token", Firebase.RefreshToken);
         return Success();
@@ -302,7 +302,7 @@ public class AuthService : BaseService, IAuthService
             if (!computerResult.IsSuccess)
                 Logger.Warning("Computer registration failed (non-fatal): {Id}", computerId);
 
-            // Always attempt user association — sets isLoggedIn and computer link
+            // Always attempt user association ג€” sets isLoggedIn and computer link
             var assocResult = await _computerService.AssociateUserWithComputerAsync(userId, computerId, isLogin: true);
 
             if (assocResult.IsSuccess && CurrentUser != null)
@@ -375,6 +375,11 @@ public class AuthService : BaseService, IAuthService
         var clean = new string(phone.Where(char.IsDigit).ToArray());
         return $"{clean}@sionyx.app";
     }
+
+    /// <summary>Ensures the password sent to Firebase meets its hard 6-char floor.
+    /// Existing 6+ char passwords pass through unchanged (backward compatible);
+    /// shorter PINs get a fixed prefix. Must match the Cloud Function's version exactly.</summary>
+    private static string ToFirebasePassword(string raw) => raw.Length >= 6 ? raw : $"px_{raw}";
 
     // ==================== RATE LIMITING ====================
 

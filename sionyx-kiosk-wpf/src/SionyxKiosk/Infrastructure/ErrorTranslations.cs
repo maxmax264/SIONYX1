@@ -52,7 +52,7 @@ public static class ErrorTranslations
         ["session-expired"] = "הפעלה פגה - התחבר שוב",
 
         // Password validation
-        ["password must be at least 6 characters"] = "הסיסמה חייבת להכיל לפחות 6 תווים",
+        ["password must be at least 6 characters"] = "הסיסמה חייבת להכיל לפחות 4 תווים",
         ["password-too-short"] = "הסיסמה קצרה מדי",
         ["password too weak"] = "הסיסמה חלשה מדי",
         ["password-too-weak"] = "הסיסמה חלשה מדי",

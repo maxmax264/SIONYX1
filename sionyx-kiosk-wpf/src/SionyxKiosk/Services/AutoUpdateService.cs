@@ -37,7 +37,7 @@ public static class AutoUpdateService
     private static readonly ILogger Logger = Log.ForContext(typeof(AutoUpdateService));
 
 
-    private const string UpdateServerUrl = "https://sionyx-auth-server.onrender.com/latest-version";
+    private const string UpdateServerUrl = "https://pc-sion-default-rtdb.firebaseio.com/public/latestRelease.json";
 
 
     private static string? _pendingUpdatePath = null;
@@ -64,7 +64,7 @@ public static class AutoUpdateService
 
 
 
-    // Progress events — UI subscribes to these
+    // Progress events ׳’ג‚¬ג€ UI subscribes to these
 
 
     public static event Action<string>? UpdateStarted;   // version
@@ -88,7 +88,7 @@ public static class AutoUpdateService
 
 
 
-    /// <summary>Called on startup — checks for updates and starts periodic check.</summary>
+    /// <summary>Called on startup ׳’ג‚¬ג€ checks for updates and starts periodic check.</summary>
 
 
     public static async Task CheckAndUpdateAsync(string currentVersion)
@@ -193,7 +193,7 @@ public static class AutoUpdateService
             {
 
 
-                Logger.Information("[Update] No active session — installing immediately");
+                Logger.Information("[Update] No active session ׳’ג‚¬ג€ installing immediately");
 
 
                 await DownloadAndInstallAsync(downloadUrl, latestVersion, currentVersion);
@@ -208,7 +208,7 @@ public static class AutoUpdateService
 
 
 
-            Logger.Information("[Update] Active session detected — downloading in background");
+            Logger.Information("[Update] Active session detected ׳’ג‚¬ג€ downloading in background");
 
 
             _ = Task.Run(async () => await DownloadInBackgroundAsync(downloadUrl, latestVersion));
@@ -244,7 +244,7 @@ public static class AutoUpdateService
             // Start (or restart) the periodic timer here, in `finally`, so it
 
 
-            // always runs exactly once after every check — regardless of
+            // always runs exactly once after every check ׳’ג‚¬ג€ regardless of
 
 
             // whether the check exited early via `return` (e.g. "no active
@@ -451,7 +451,7 @@ public static class AutoUpdateService
         {
 
 
-            statusCallback?.Invoke("בודק עדכון...");
+            statusCallback?.Invoke("׳³ג€˜׳³ג€¢׳³ג€׳³ֲ§ ׳³ֲ¢׳³ג€׳³ג€÷׳³ג€¢׳³ֲ...");
 
 
             var (hasUpdate, latestVersion, downloadUrl) = await CheckForUpdateNowAsync(currentVersion);
@@ -463,7 +463,7 @@ public static class AutoUpdateService
             {
 
 
-                statusCallback?.Invoke("מעודכן לגרסה האחרונה");
+                statusCallback?.Invoke("׳³ֲ׳³ֲ¢׳³ג€¢׳³ג€׳³ג€÷׳³ֲ ׳³ֲ׳³ג€™׳³ֲ¨׳³ֲ¡׳³ג€ ׳³ג€׳³ֲ׳³ג€”׳³ֲ¨׳³ג€¢׳³ֲ ׳³ג€");
 
 
                 return;
@@ -472,7 +472,7 @@ public static class AutoUpdateService
             }
 
 
-            statusCallback?.Invoke($"מוריד גרסה {latestVersion}...");
+            statusCallback?.Invoke($"׳³ֲ׳³ג€¢׳³ֲ¨׳³ג„¢׳³ג€ ׳³ג€™׳³ֲ¨׳³ֲ¡׳³ג€ {latestVersion}...");
 
 
             await DownloadAndInstallAsync(downloadUrl, latestVersion, currentVersion);
@@ -490,7 +490,7 @@ public static class AutoUpdateService
             Logger.Error(ex, "[Update] ForceUpdateNow failed");
 
 
-            statusCallback?.Invoke("שגיאה בעדכון");
+            statusCallback?.Invoke("׳³ֲ©׳³ג€™׳³ג„¢׳³ֲ׳³ג€ ׳³ג€˜׳³ֲ¢׳³ג€׳³ג€÷׳³ג€¢׳³ֲ");
 
 
         }
@@ -613,7 +613,7 @@ public static class AutoUpdateService
             UpdateStarted?.Invoke(newVersion);
 
 
-            ProgressChanged?.Invoke(0, "מתחיל הורדה...");
+            ProgressChanged?.Invoke(0, "׳³ֲ׳³ֳ—׳³ג€”׳³ג„¢׳³ֲ ׳³ג€׳³ג€¢׳³ֲ¨׳³ג€׳³ג€...");
 
 
 
@@ -718,7 +718,7 @@ public static class AutoUpdateService
 
             {
 
-                Logger.Error("[Update] Size mismatch: expected {Expected}, got {Actual} — deleting corrupt file", totalBytes, fileInfo.Length);
+                Logger.Error("[Update] Size mismatch: expected {Expected}, got {Actual} ׳’ג‚¬ג€ deleting corrupt file", totalBytes, fileInfo.Length);
 
                 try { File.Delete(tempPath); } catch { }
 
@@ -730,7 +730,7 @@ public static class AutoUpdateService
 
             Logger.Information("[Update] Download verified OK: {Bytes} bytes", fileInfo.Length);
 
-            ProgressChanged?.Invoke(90, "מתקין עדכון...");
+            ProgressChanged?.Invoke(90, "׳³ֲ׳³ֳ—׳³ֲ§׳³ג„¢׳³ֲ ׳³ֲ¢׳³ג€׳³ג€÷׳³ג€¢׳³ֲ...");
 
 
             await InstallAsync(tempPath, newVersion);
@@ -772,7 +772,7 @@ public static class AutoUpdateService
         {
 
 
-            Logger.Information("[Update] Skipping install attempt — cooldown active ({Remaining}s remaining)", (int)(InstallCooldown - sinceLastAttempt).TotalSeconds);
+            Logger.Information("[Update] Skipping install attempt ׳’ג‚¬ג€ cooldown active ({Remaining}s remaining)", (int)(InstallCooldown - sinceLastAttempt).TotalSeconds);
 
 
             return;
@@ -808,7 +808,7 @@ public static class AutoUpdateService
             {
 
 
-                Logger.Warning("[Update] Could not write trigger file — aborting install, will retry next periodic check");
+                Logger.Warning("[Update] Could not write trigger file ׳’ג‚¬ג€ aborting install, will retry next periodic check");
 
 
                 await LogUpdateToFirebase("failed", version);
@@ -823,7 +823,7 @@ public static class AutoUpdateService
 
 
 
-            ProgressChanged?.Invoke(92, "ממתין למשימה להתקין...");
+            ProgressChanged?.Invoke(92, "׳³ֲ׳³ֲ׳³ֳ—׳³ג„¢׳³ֲ ׳³ֲ׳³ֲ׳³ֲ©׳³ג„¢׳³ֲ׳³ג€ ׳³ֲ׳³ג€׳³ֳ—׳³ֲ§׳³ג„¢׳³ֲ...");
 
 
 
@@ -853,13 +853,13 @@ public static class AutoUpdateService
             {
 
 
-                Logger.Warning("[Update] Install did not complete within timeout — will retry on next periodic check (no immediate retry)");
+                Logger.Warning("[Update] Install did not complete within timeout ׳’ג‚¬ג€ will retry on next periodic check (no immediate retry)");
 
 
                 await LogUpdateToFirebase("timeout", version);
 
 
-                ProgressChanged?.Invoke(95, "ההתקנה מתעכבת, ממתין...");
+                ProgressChanged?.Invoke(95, "׳³ג€׳³ג€׳³ֳ—׳³ֲ§׳³ֲ ׳³ג€ ׳³ֲ׳³ֳ—׳³ֲ¢׳³ג€÷׳³ג€˜׳³ֳ—, ׳³ֲ׳³ֲ׳³ֳ—׳³ג„¢׳³ֲ...");
 
 
                 // Do not restart the kiosk and do not clear pending state here;
@@ -889,7 +889,7 @@ public static class AutoUpdateService
             await LogUpdateToFirebase("installed", version);
 
 
-            Logger.Information("[Update] Install confirmed via registry — restarting kiosk");
+            Logger.Information("[Update] Install confirmed via registry ׳’ג‚¬ג€ restarting kiosk");
 
 
 
@@ -1105,7 +1105,7 @@ public static class AutoUpdateService
         {
 
 
-            // Write trigger file to C:\Windows\Temp — SIONYX_Update scheduled task
+            // Write trigger file to C:\Windows\Temp ׳’ג‚¬ג€ SIONYX_Update scheduled task
 
 
             // runs every minute as SYSTEM and picks it up automatically
@@ -1117,7 +1117,7 @@ public static class AutoUpdateService
             File.WriteAllText(triggerFile, msiPath, System.Text.Encoding.ASCII);
 
 
-            Logger.Information("[Update] Trigger file written — waiting for scheduled task to pick up");
+            Logger.Information("[Update] Trigger file written ׳’ג‚¬ג€ waiting for scheduled task to pick up");
 
 
             // Also trigger the task directly in case the time trigger is disabled

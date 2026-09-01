@@ -22,6 +22,7 @@ public class SystemServicesManager
     private readonly ProcessRestrictionService _processRestriction;
     private readonly GlobalHotkeyService _globalHotkey;
     private readonly RemoteControlReportingService _remoteControl;
+    private readonly ComputerHeartbeatService _heartbeat;
 
     private Action<string>? _forceLogoutHandler;
     private Action? _adminExitHandler;
@@ -34,7 +35,8 @@ public class SystemServicesManager
         KeyboardRestrictionService keyboard,
         ProcessRestrictionService processRestriction,
         GlobalHotkeyService globalHotkey,
-        RemoteControlReportingService remoteControl)
+        RemoteControlReportingService remoteControl,
+        ComputerHeartbeatService heartbeat)
     {
         _forceLogout = forceLogout;
         _chat = chat;
@@ -44,6 +46,7 @@ public class SystemServicesManager
         _processRestriction = processRestriction;
         _globalHotkey = globalHotkey;
         _remoteControl = remoteControl;
+        _heartbeat = heartbeat;
     }
 
     /// <summary>Raised when a force-logout is received from the server.</summary>
@@ -108,6 +111,7 @@ public class SystemServicesManager
         _adminExitHandler = () => AdminExitRequested?.Invoke();
         _globalHotkey.AdminExitRequested += _adminExitHandler;
         _globalHotkey.Start();
+        _heartbeat.Start();
     }
 
     /// <summary>Stop all system services and unsubscribe event handlers.</summary>

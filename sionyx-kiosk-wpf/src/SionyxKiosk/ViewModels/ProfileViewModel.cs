@@ -101,9 +101,9 @@ public partial class ProfileViewModel : ObservableObject
             IsSuccess = false;
             return;
         }
-        if (NewPassword.Length < 6)
+        if (NewPassword.Length < 4)
         {
-            StatusMessage = "הסיסמא חייבת להכיל לפחות 6 תווים";
+            StatusMessage = "הסיסמא חייבת להכיל לפחות 4 תווים";
             IsSuccess = false;
             return;
         }

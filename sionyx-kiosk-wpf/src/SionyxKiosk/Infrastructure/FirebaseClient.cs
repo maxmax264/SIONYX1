@@ -104,6 +104,24 @@ public sealed class FirebaseClient : IFirebaseClient
         }
     }
 
+    public async Task<FirebaseResult> SignInAnonymouslyAsync()
+    {
+        var url = $"{_authUrl}:signUp?key={_apiKey}";
+        var payload = new { returnSecureToken = true };
+        try
+        {
+            var response = await PostJsonAsync(url, payload);
+            StoreAuthData(response);
+            Logger.Information("Anonymous sign-in: {UserId}", _userId);
+            return FirebaseResult.Ok(new { uid = _userId });
+        }
+        catch (Exception ex)
+        {
+            var msg = ParseFirebaseError(ex);
+            Logger.Error(ex, "Anonymous sign-in failed");
+            return FirebaseResult.Fail(msg);
+        }
+    }
     public async Task<bool> RefreshTokenAsync()
     {
         if (string.IsNullOrEmpty(_refreshToken)) return false;

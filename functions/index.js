@@ -1132,6 +1132,15 @@ const phoneToEmail = (phone) => {
  * Allows organization admin to reset a user's password
  * Called from web admin dashboard
  */
+/**
+ * Ensures the password sent to Firebase Auth meets its hard 6-char floor.
+ * Existing 6+ char passwords pass through unchanged (backward compatible);
+ * shorter PINs get a fixed prefix. Must match AuthService.cs's version exactly.
+ */
+function toFirebasePassword(raw) {
+  return raw.length >= 6 ? raw : `px_${raw}`;
+}
+
 exports.resetUserPassword = onCall(async (request) => {
   const correlationId = generateCorrelationId();
   const log = createLogger({
@@ -1165,10 +1174,10 @@ exports.resetUserPassword = onCall(async (request) => {
     }
 
     // Validate password length
-    if (newPassword.length < 6) {
+    if (newPassword.length < 4) {
       throw new functions.https.HttpsError(
           "invalid-argument",
-          "הסיסמה חייבת להכיל לפחות 6 תווים",
+          "הסיסמה חייבת להכיל לפחות 4 תווים",
       );
     }
 
@@ -1223,7 +1232,7 @@ exports.resetUserPassword = onCall(async (request) => {
 
     // Reset the password using Firebase Admin SDK
     await admin.auth().updateUser(userId, {
-      password: newPassword,
+      password: toFirebasePassword(newPassword),
     });
 
     // Update user record with password reset timestamp

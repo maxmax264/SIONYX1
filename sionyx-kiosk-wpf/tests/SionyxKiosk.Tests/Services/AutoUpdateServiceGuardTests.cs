@@ -1,8 +1,8 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using System.Reflection;
 namespace SionyxKiosk.Tests.Services;
 /// <summary>
-/// Guard tests for AutoUpdateService — protect the auto-update mechanism from regressions.
+/// Guard tests for AutoUpdateService ג€” protect the auto-update mechanism from regressions.
 /// Safe: no HTTP calls, no registry writes, no file system side-effects.
 /// </summary>
 public class AutoUpdateServiceGuardTests
@@ -29,10 +29,10 @@ public class AutoUpdateServiceGuardTests
     public void AU1_UpdateServerUrl_PointsToCorrectHost()
     {
         var url = GetConst<string>("UpdateServerUrl");
-        url.Should().Contain("sionyx-auth-server.onrender.com",
-            "UpdateServerUrl must point to the SIONYX update server");
-        url.Should().Contain("latest-version",
-            "UpdateServerUrl must include the /latest-version endpoint");
+        url.Should().Contain("firebaseio.com",
+            "UpdateServerUrl must point to the Firebase RTDB, not the Render auth server");
+        url.Should().Contain("public/latestRelease",
+            "UpdateServerUrl must point to the public/latestRelease RTDB path");
     }
 
     // ==================== AU2: InstallCooldown is exactly 2 minutes ====================
@@ -44,7 +44,7 @@ public class AutoUpdateServiceGuardTests
             "InstallCooldown must be 2 minutes to prevent install loops");
     }
 
-    // ==================== AU3: IsNewerVersion — basic cases ====================
+    // ==================== AU3: IsNewerVersion ג€” basic cases ====================
     [Theory]
     [InlineData("3.5.0", "3.4.258", true)]
     [InlineData("3.4.259", "3.4.258", true)]
@@ -86,7 +86,7 @@ public class AutoUpdateServiceGuardTests
         content.Should().Contain("SIONYX_Update",
             "Scheduled task name must be SIONYX_Update");
         content.Should().NotContain("SIONYX_update",
-            "Scheduled task name is case-sensitive — must be SIONYX_Update not SIONYX_update");
+            "Scheduled task name is case-sensitive ג€” must be SIONYX_Update not SIONYX_update");
     }
 
     // ==================== AU6: GetInstalledVersion reads correct registry path ====================

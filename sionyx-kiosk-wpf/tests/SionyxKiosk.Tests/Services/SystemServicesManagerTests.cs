@@ -17,6 +17,7 @@ public class SystemServicesManagerTests : IDisposable
     private readonly ProcessRestrictionService _processRestriction;
     private readonly GlobalHotkeyService _globalHotkey;
     private readonly RemoteControlReportingService _remoteControl;
+    private readonly ComputerHeartbeatService _heartbeat;
     private readonly SystemServicesManager _manager;
 
     public SystemServicesManagerTests()
@@ -32,6 +33,7 @@ public class SystemServicesManagerTests : IDisposable
         _processRestriction = new ProcessRestrictionService(enabled: false);
         _globalHotkey = new GlobalHotkeyService();
         _remoteControl = new RemoteControlReportingService(_firebase);
+        _heartbeat = new ComputerHeartbeatService(TestFirebaseFactory.CreateConfig());
         _session = new SessionService(
             _firebase, "user-123", "test-org",
             new ComputerService(_firebase),
@@ -41,12 +43,12 @@ public class SystemServicesManagerTests : IDisposable
 
         _manager = new SystemServicesManager(
             _forceLogout, _chat, _printMonitor, _operatingHours,
-            _keyboard, _processRestriction, _globalHotkey, _remoteControl);
+            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat);
     }
 
     public void Dispose() => _firebase.Dispose();
 
-    // ── Start ──
+    // ג”€ג”€ Start ג”€ג”€
 
     [Fact]
     public void Start_WithEmptyUserId_ShouldReturnEarly()
@@ -85,7 +87,7 @@ public class SystemServicesManagerTests : IDisposable
         act.Should().NotThrow();
     }
 
-    // ── StopAsync ──
+    // ג”€ג”€ StopAsync ג”€ג”€
 
     [Fact]
     public async Task StopAsync_WithoutStart_ShouldNotThrow()
@@ -111,7 +113,7 @@ public class SystemServicesManagerTests : IDisposable
         await act.Should().NotThrowAsync();
     }
 
-    // ── StopAll ──
+    // ג”€ג”€ StopAll ג”€ג”€
 
     [Fact]
     public void StopAll_WithoutStart_ShouldNotThrow()
@@ -128,7 +130,7 @@ public class SystemServicesManagerTests : IDisposable
         act.Should().NotThrow();
     }
 
-    // ── StartGlobalHotkey ──
+    // ג”€ג”€ StartGlobalHotkey ג”€ג”€
 
     [Fact]
     public void StartGlobalHotkey_ShouldNotThrow()
@@ -145,7 +147,7 @@ public class SystemServicesManagerTests : IDisposable
         act.Should().NotThrow();
     }
 
-    // ── Events ──
+    // ג”€ג”€ Events ג”€ג”€
 
     [Fact]
     public void ForceLogoutReceived_CanSubscribe()
@@ -163,7 +165,7 @@ public class SystemServicesManagerTests : IDisposable
         fired.Should().BeFalse();
     }
 
-    // ── Full lifecycle ──
+    // ג”€ג”€ Full lifecycle ג”€ג”€
 
     [Fact]
     public async Task FullLifecycle_StartStopAll_ShouldWork()

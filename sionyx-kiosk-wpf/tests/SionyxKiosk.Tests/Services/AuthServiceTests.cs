@@ -120,9 +120,9 @@ public class AuthServiceTests : IDisposable
     [Fact]
     public async Task RegisterAsync_WithShortPassword_ShouldFail()
     {
-        var result = await _service.RegisterAsync("0501234567", "12345", "David", "Cohen");
+        var result = await _service.RegisterAsync("0501234567", "ab", "David", "Cohen");
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("6");
+        result.Error.Should().Contain("4");
     }
 
     [Fact]

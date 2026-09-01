@@ -1,8 +1,9 @@
-﻿import sys
+import sys
 import os
 import requests
 import datetime
 import json
+import re
 
 def main():
     if len(sys.argv) < 4:
@@ -87,11 +88,24 @@ def main():
         "releasedAt": datetime.datetime.utcnow().isoformat() + "Z"
     }
 
-    admin_secret = os.environ.get("SIONYX_ADMIN_SECRET", "sionyx-admin-2026")
-    db_resp = requests.post(
-        "https://sionyx-auth-server.onrender.com/set-latest-version",
-        json=update_data,
-        headers={"x-sionyx-secret": admin_secret}
+    admin_phone = os.environ.get("FIREBASE_ADMIN_EMAIL", "")
+    admin_password = os.environ.get("FIREBASE_ADMIN_PASSWORD", "")
+    firebase_api_key = os.environ.get("FIREBASE_API_KEY", "")
+    if not admin_phone or not admin_password or not firebase_api_key:
+        print("ERROR: Missing FIREBASE_ADMIN_EMAIL/FIREBASE_ADMIN_PASSWORD/FIREBASE_API_KEY env vars")
+        sys.exit(1)
+    admin_email = re.sub(r"\D", "", admin_phone) + "@sionyx.app"
+    signin_resp = requests.post(
+        f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={firebase_api_key}",
+        json={"email": admin_email, "password": admin_password, "returnSecureToken": True}
+    )
+    if signin_resp.status_code != 200:
+        print(f"ERROR: Admin sign-in failed ({signin_resp.status_code}): {signin_resp.text[:200]}")
+        sys.exit(1)
+    id_token = signin_resp.json()["idToken"]
+    db_resp = requests.put(
+        f"{db_url.rstrip(chr(47))}/public/latestRelease.json?auth={id_token}",
+        json=update_data
     )
 
     if db_resp.status_code != 200:

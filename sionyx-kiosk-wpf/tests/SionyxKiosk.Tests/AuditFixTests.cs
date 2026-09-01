@@ -203,13 +203,13 @@ public class AuditFixTests : IDisposable
         var vm = new AuthViewModel(auth);
         vm.IsLoginMode = false;
         vm.Phone = "0501234567";
-        vm.Password = "12345";
+        vm.Password = "ab";
         vm.FirstName = "Test";
         vm.LastName = "User";
 
         await vm.RegisterCommand.ExecuteAsync(null);
 
-        vm.ErrorMessage.Should().Contain("6");
+        vm.ErrorMessage.Should().Contain("4");
     }
 
     [Fact]

@@ -136,7 +136,7 @@ public class AuthViewModelTests
         _vm.FirstName = "David";
         _vm.LastName = "Cohen";
         await _vm.RegisterCommand.ExecuteAsync(null);
-        _vm.ErrorMessage.Should().Be("הסיסמה חייבת להכיל לפחות 6 תווים");
+        _vm.ErrorMessage.Should().Be("הסיסמה חייבת להכיל לפחות 4 תווים");
     }
 
     [Fact]

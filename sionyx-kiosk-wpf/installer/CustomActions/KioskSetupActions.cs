@@ -190,10 +190,22 @@ if exist ""{triggerFile}"" (
                 session.Log("[OK] SIONYX_Update scheduled task created");
                 try { File.Delete(xmlPath); } catch { }
 
-                var query = new System.Management.ObjectQuery("SELECT UserName FROM Win32_ComputerSystem");
-                var searcher = new System.Management.ManagementObjectSearcher(query);
-                string currentUser = Environment.UserName;
-                foreach (System.Management.ManagementObject mo in searcher.Get()) { currentUser = mo["UserName"]?.ToString() ?? currentUser; break; }
+                string currentUser = Environment.UserName; // fallback only - unreliable inside a SYSTEM-context deferred custom action
+                try
+                {
+                    var explorerSearcher = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_Process WHERE Name='explorer.exe'");
+                    foreach (System.Management.ManagementObject proc in explorerSearcher.Get())
+                    {
+                        string[] argList = new string[] { string.Empty, string.Empty };
+                        int ret = Convert.ToInt32(proc.InvokeMethod("GetOwner", argList));
+                        if (ret == 0 && !string.IsNullOrWhiteSpace(argList[0]))
+                        {
+                            currentUser = $"{argList[1]}\\{argList[0]}";
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex) { session.Log($"[WARN] Could not resolve interactive user via explorer.exe owner: {ex.Message}"); }
                 session.Log($"[LaunchOnce] Running as user: {currentUser}");
 
                 string launchTaskXml = $@"<?xml version=""1.0"" encoding=""UTF-16""?>

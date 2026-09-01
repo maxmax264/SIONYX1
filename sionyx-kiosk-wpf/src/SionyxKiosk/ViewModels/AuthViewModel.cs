@@ -342,9 +342,9 @@ public partial class AuthViewModel : ObservableObject
             return;
         }
 
-        if (Password.Length < 6)
+        if (Password.Length < 4)
         {
-            ErrorMessage = "הסיסמה חייבת להכיל לפחות 6 תווים";
+            ErrorMessage = "הסיסמה חייבת להכיל לפחות 4 תווים";
             return;
         }
 
