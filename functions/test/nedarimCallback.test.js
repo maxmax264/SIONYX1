@@ -12,7 +12,7 @@ jest.mock("firebase-functions", () => {
   class MockHttpsError extends Error {
     constructor(code, message) { super(message); this.code = code; }
   }
-  return { setGlobalOptions: jest.fn(), https: { HttpsError: MockHttpsError } };
+  return { setGlobalOptions: jest.fn(), https: { HttpsError: MockHttpsError, onCall: (fn) => fn } };
 });
 jest.mock("firebase-functions/https", () => ({
   onRequest: (fn) => fn, onCall: (fn) => fn,

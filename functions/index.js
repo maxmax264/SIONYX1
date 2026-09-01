@@ -1136,12 +1136,14 @@ const phoneToEmail = (phone) => {
  * Ensures the password sent to Firebase Auth meets its hard 6-char floor.
  * Existing 6+ char passwords pass through unchanged (backward compatible);
  * shorter PINs get a fixed prefix. Must match AuthService.cs's version exactly.
+ * @param {string} raw - The raw password/PIN entered by the user.
+ * @return {string} The password to send to Firebase Auth.
  */
 function toFirebasePassword(raw) {
   return raw.length >= 6 ? raw : `px_${raw}`;
 }
 
-exports.resetUserPassword = onCall(async (request) => {
+exports.resetUserPassword = functions.https.onCall(async (data, context) => {
   const correlationId = generateCorrelationId();
   const log = createLogger({
     correlationId,
@@ -1149,21 +1151,21 @@ exports.resetUserPassword = onCall(async (request) => {
   });
 
   log.info("Password reset request received", {
-    hasData: !!request.data,
-    hasAuth: !!request.auth,
+    hasData: !!data,
+    hasAuth: !!context.auth,
   });
 
   try {
     // Verify caller is authenticated
-    if (!request.auth) {
+    if (!context.auth) {
       throw new functions.https.HttpsError(
           "unauthenticated",
           "Must be authenticated to reset passwords",
       );
     }
 
-    const callerUid = request.auth.uid;
-    const {orgId, userId, newPassword} = request.data;
+    const callerUid = context.auth.uid;
+    const {orgId, userId, newPassword} = data;
 
     // Validate required fields
     if (!orgId || !userId || !newPassword) {
@@ -1310,7 +1312,8 @@ exports.registerOrganization = onCall(async (request) => {
     } = request.data;
 
     // Minimal safety check - UI handles detailed validation
-    // Nedarim credentials are optional at registration and can be configured later
+    // Nedarim credentials are optional at registration and can be
+    // configured later
     if (!organizationName ||
         !adminPhone || !adminPassword || !adminFirstName || !adminLastName) {
       throw new functions.https.HttpsError(

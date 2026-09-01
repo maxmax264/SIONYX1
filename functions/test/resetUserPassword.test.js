@@ -10,7 +10,10 @@ jest.mock("firebase-functions", () => {
   class MockHttpsError extends Error {
     constructor(code, message) { super(message); this.code = code; }
   }
-  return { setGlobalOptions: jest.fn(), https: { HttpsError: MockHttpsError } };
+  return {
+    setGlobalOptions: jest.fn(),
+    https: {HttpsError: MockHttpsError, onCall: (fn) => fn},
+  };
 });
 jest.mock("firebase-functions/https", () => ({
   onRequest: (fn) => fn, onCall: (fn) => fn,
@@ -42,7 +45,7 @@ describe("resetUserPassword", () => {
   const targetUid = "user_uid_1";
   const orgId = "testorg";
 
-  const makeRequest = (data, auth) => ({data, auth});
+  const makeRequest = (data, auth) => [data, {auth}];
 
   beforeEach(() => {
     seedDb(`organizations/${orgId}/users/${callerUid}`, {
@@ -61,7 +64,7 @@ describe("resetUserPassword", () => {
         {orgId, userId: targetUid, newPassword: "newpass123"},
         {uid: callerUid},
     );
-    const result = await resetUserPassword(req);
+    const result = await resetUserPassword(...req);
     expect(result.success).toBe(true);
     expect(mockAuth.updateUser).toHaveBeenCalledWith(
         targetUid, {password: "newpass123"},
@@ -73,12 +76,12 @@ describe("resetUserPassword", () => {
         {orgId, userId: targetUid, newPassword: "newpass123"},
         null,
     );
-    await expect(resetUserPassword(req)).rejects.toThrow("Must be authenticated");
+    await expect(resetUserPassword(...req)).rejects.toThrow("Must be authenticated");
   });
 
   test("rejects missing fields", async () => {
     const req = makeRequest({orgId}, {uid: callerUid});
-    await expect(resetUserPassword(req)).rejects.toThrow("Missing required");
+    await expect(resetUserPassword(...req)).rejects.toThrow("Missing required");
   });
 
   test("rejects short password", async () => {
@@ -86,7 +89,7 @@ describe("resetUserPassword", () => {
         {orgId, userId: targetUid, newPassword: "123"},
         {uid: callerUid},
     );
-    await expect(resetUserPassword(req)).rejects.toThrow();
+    await expect(resetUserPassword(...req)).rejects.toThrow();
   });
 
   test("rejects non-admin caller", async () => {
@@ -97,7 +100,7 @@ describe("resetUserPassword", () => {
         {orgId, userId: targetUid, newPassword: "newpass123"},
         {uid: callerUid},
     );
-    await expect(resetUserPassword(req)).rejects.toThrow("רק מנהלים יכולים לאפס סיסמאות");
+    await expect(resetUserPassword(...req)).rejects.toThrow("רק מנהלים יכולים לאפס סיסמאות");
   });
 
   test("rejects caller not in org", async () => {
@@ -105,7 +108,7 @@ describe("resetUserPassword", () => {
         {orgId: "other_org", userId: targetUid, newPassword: "newpass123"},
         {uid: callerUid},
     );
-    await expect(resetUserPassword(req)).rejects.toThrow();
+    await expect(resetUserPassword(...req)).rejects.toThrow();
   });
 
   test("rejects non-existent target user", async () => {
@@ -113,6 +116,6 @@ describe("resetUserPassword", () => {
         {orgId, userId: "nonexistent", newPassword: "newpass123"},
         {uid: callerUid},
     );
-    await expect(resetUserPassword(req)).rejects.toThrow();
+    await expect(resetUserPassword(...req)).rejects.toThrow();
   });
 });
