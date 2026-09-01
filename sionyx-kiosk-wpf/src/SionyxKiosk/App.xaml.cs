@@ -436,9 +436,9 @@ public partial class App : Application
                     var waitWin = new Views.Windows.VerificationWaitingWindow(firebase, userId, phone);
                     waitWin.VerificationCompleted += () =>
                     {
+                        ShowMainWindow();
                         waitWin.AllowClose();
                         waitWin.Close();
-                        ShowMainWindow();
                     };
                     waitWin.BackToLogin += async () =>
                     {
@@ -452,14 +452,13 @@ public partial class App : Application
                     return;
                 }
 
-                Log.Information("Phone OK - closing auth window, opening main window");
+                Log.Information("Phone OK - opening main window, then closing auth window");
 
-                if (MainWindow is AuthWindow aw)
-                {
-                    aw.AllowClose();
-                    aw.Close();
-                }
-                ShowMainWindow();
+                // Show MainWindow (Topmost) FIRST and close AuthWindow only after -
+                // otherwise there's a real gap (RestoreSnapshot disk I/O + DI
+                // resolution inside ShowMainWindow) where nothing topmost is on
+                // screen and the real Windows desktop flashes through.
+                ShowMainWindow(MainWindow as AuthWindow);
             }
             catch (Exception ex)
             {
@@ -489,7 +488,7 @@ public partial class App : Application
         }
     }
 
-    private void ShowMainWindow()
+    private void ShowMainWindow(AuthWindow? previousAuthWindow = null)
     {
         // Restore desktop snapshot for new client session
         try { new Services.DesktopSnapshotService().RestoreSnapshot(); }
@@ -514,6 +513,16 @@ public partial class App : Application
         mainWindow.Show();
         MainWindow = mainWindow;
         Log.Information("MainWindow shown and set as Application.MainWindow");
+
+        // Only now close the previous AuthWindow (if any). MainWindow is already
+        // Topmost and on screen, so there's no gap where the real desktop is
+        // exposed between the two windows.
+        if (previousAuthWindow != null)
+        {
+            previousAuthWindow.AllowClose();
+            previousAuthWindow.Close();
+        }
+
         // Navigate to Home explicitly (Loaded fires only on first Show)
         mainWindow.NavigateHome();
 
