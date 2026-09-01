@@ -1,7 +1,18 @@
 import { ref, get, update, remove, getDatabase, push, set } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
-import { database, functions } from '../config/firebase';
+import { database, functions, auth } from '../config/firebase';
 import { logger } from '../utils/logger';
+
+/**
+ * Base URL of the Render bridge server that now hosts resetUserPassword
+ * (moved off Firebase Cloud Functions, which require the Blaze plan -
+ * same reasoning as registerOrganization in organizationService.js).
+ * This is the same server chargeWithSavedCard/confirmPayment/
+ * nedarimCallback/registerOrganization already use.
+ */
+const BRIDGE_BASE_URL = (
+  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com'
+).replace(/\/$/, '');
 
 /**
  * Get all users in an organization
@@ -237,22 +248,40 @@ export const revokeAdminPermission = async (orgId, userId) => {
  */
 export const resetUserPassword = async (orgId, userId, newPassword) => {
   try {
-    const resetPasswordFn = httpsCallable(functions, 'resetUserPassword');
-    const result = await resetPasswordFn({ orgId, userId, newPassword });
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { success: false, error: 'Must be authenticated to reset passwords' };
+    }
+    const idToken = await currentUser.getIdToken();
 
+    const response = await fetch(`${BRIDGE_BASE_URL}/resetUserPassword`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ data: { orgId, userId, newPassword } }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message =
+        (payload && payload.error && payload.error.message) || 'שגיאה באיפוס הסיסמה';
+      logger.error('Error resetting user password:', { status: response.status, message });
+      return { success: false, error: message };
+    }
+
+    const result = (payload && payload.result) || {};
     return {
       success: true,
-      message: result.data.message || 'הסיסמה אופסה בהצלחה',
+      message: result.message || 'הסיסמה אופסה בהצלחה',
     };
   } catch (error) {
     logger.error('Error resetting user password:', error);
-
-    // Extract error message from Firebase function error
-    const errorMessage = error.message || 'שגיאה באיפוס הסיסמה';
-
     return {
       success: false,
-      error: errorMessage,
+      error: error.message || 'שגיאה באיפוס הסיסמה',
     };
   }
 };
