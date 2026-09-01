@@ -1,17 +1,8 @@
 {
-<<<<<<< Updated upstream
   "version": "3.11.26",
   "major": 3,
   "minor": 11,
   "patch": 26,
   "buildNumber": 476,
   "lastBuildDate": "2026-09-01T22:39:21.8037328+00:00"
-=======
-    "version":  "3.11.25",
-    "major":  3,
-    "minor":  11,
-    "patch":  25,
-    "buildNumber":  473,
-    "lastBuildDate":  "2026-09-01T23:00:03.2313041+03:00"
->>>>>>> Stashed changes
 }
