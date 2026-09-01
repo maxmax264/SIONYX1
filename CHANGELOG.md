@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [3.11.26] - 2026-09-01
+
+### Other
+- v3.11.25 (5add2953)
+- route resetUserPassword to Render bridge instead of Firebase Function (Blaze plan requirement) (f21599f3)
+
+
 ## [3.11.25] - 2026-09-01
 
 ### Other
