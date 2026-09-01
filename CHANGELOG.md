@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.24] - 2026-09-01
+
+### Bug Fixes
+- lower password minimum to 4 chars (client+server), fix Hebrew encoding corruption in AuthService/functions (2680518c)
+
+
 ## [3.11.11] - 2026-08-28
 
 
