@@ -30,8 +30,20 @@ public static class KioskPolicyService
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(PolicyKey, writable: true);
+
+            // Killing and restarting explorer.exe is what makes the real desktop
+            // briefly flash on screen (even under a Topmost window) - it's the
+            // shell process being torn down and rebuilt. Only worth doing when
+            // the policy is actually changing; every login was calling Apply()
+            // unconditionally and restarting explorer even when NoControlPanel
+            // was already set from a previous session on the same Windows user.
+            var alreadyApplied = key.GetValue("NoControlPanel") is int existing && existing == 1;
+
             key.SetValue("NoControlPanel", 1, RegistryValueKind.DWord);
-            RestartExplorer();
+
+            if (!alreadyApplied)
+                RestartExplorer();
+
             Logger.Information("[KioskPolicy] NoControlPanel applied");
         }
         catch (Exception ex)
