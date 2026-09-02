@@ -30,6 +30,7 @@ public partial class App : Application
     private bool _hasFrozenSession = false; // true when admin exits while client is logged in
     private Views.Windows.MainWindow? _frozenMainWindow; // the actual minimized window instance, so restore reuses it instead of creating a new one
     private Views.Windows.MainWindow? _prewarmedMainWindow; // built ahead of time while AuthWindow is showing, so the login-time transition is just Show() with no DI/construction work on the critical path
+    private Views.Windows.ShieldWindow? _shieldWindow; // permanent branded background, created once and never closed - see ShieldWindow.xaml for why
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -45,6 +46,15 @@ public partial class App : Application
             Shutdown();
             return;
         }
+
+        // ================================================================
+        // Permanent branded background (see ShieldWindow.xaml) - shown first,
+        // before any other startup work, so the whole boot sequence (and
+        // every later window transition) always has a branded screen behind
+        // it instead of the real desktop.
+        // ================================================================
+        _shieldWindow = new Views.Windows.ShieldWindow();
+        _shieldWindow.Show();
 
         // ================================================================
         // Serilog
