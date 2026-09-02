@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.32] - 2026-09-02
+
+### Bug Fixes
+- ShieldWindow creation crashed app silently before logging was initialized (ca240681)
+
+
 ## [3.11.31] - 2026-09-02
 
 
