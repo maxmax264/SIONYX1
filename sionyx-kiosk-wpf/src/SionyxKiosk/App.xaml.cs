@@ -48,15 +48,6 @@ public partial class App : Application
         }
 
         // ================================================================
-        // Permanent branded background (see ShieldWindow.xaml) - shown first,
-        // before any other startup work, so the whole boot sequence (and
-        // every later window transition) always has a branded screen behind
-        // it instead of the real desktop.
-        // ================================================================
-        _shieldWindow = new Views.Windows.ShieldWindow();
-        _shieldWindow.Show();
-
-        // ================================================================
         // Serilog
         // ================================================================
         var logDir = e.Args.Contains("--kiosk")
@@ -103,6 +94,27 @@ public partial class App : Application
             Log.Error(ex.Exception, "Unobserved task exception");
             ex.SetObserved();
         };
+
+        // ================================================================
+        // Permanent branded background (see ShieldWindow.xaml) - shown as
+        // early as possible (now that logging/exception handlers are wired,
+        // so any failure here is visible instead of crashing silently), so
+        // the whole boot sequence and every later window transition always
+        // has a branded screen behind it instead of the real desktop.
+        // Deliberately non-fatal: this is a cosmetic safety net, never a
+        // reason to block the kiosk from starting.
+        // ================================================================
+        try
+        {
+            _shieldWindow = new Views.Windows.ShieldWindow();
+            _shieldWindow.Show();
+            Log.Information("[Shield] ShieldWindow shown");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[Shield] Failed to create/show ShieldWindow - continuing without it");
+            _shieldWindow = null;
+        }
 
         // ================================================================
         // Host + DI Container
