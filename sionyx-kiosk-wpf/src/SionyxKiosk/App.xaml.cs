@@ -30,7 +30,6 @@ public partial class App : Application
     private bool _hasFrozenSession = false; // true when admin exits while client is logged in
     private Views.Windows.MainWindow? _frozenMainWindow; // the actual minimized window instance, so restore reuses it instead of creating a new one
     private Views.Windows.MainWindow? _prewarmedMainWindow; // built ahead of time while AuthWindow is showing, so the login-time transition is just Show() with no DI/construction work on the critical path
-    private Views.Windows.ShieldWindow? _shieldWindow; // permanent branded background, created once and never closed - see ShieldWindow.xaml for why
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -94,27 +93,6 @@ public partial class App : Application
             Log.Error(ex.Exception, "Unobserved task exception");
             ex.SetObserved();
         };
-
-        // ================================================================
-        // Permanent branded background (see ShieldWindow.xaml) - shown as
-        // early as possible (now that logging/exception handlers are wired,
-        // so any failure here is visible instead of crashing silently), so
-        // the whole boot sequence and every later window transition always
-        // has a branded screen behind it instead of the real desktop.
-        // Deliberately non-fatal: this is a cosmetic safety net, never a
-        // reason to block the kiosk from starting.
-        // ================================================================
-        try
-        {
-            _shieldWindow = new Views.Windows.ShieldWindow();
-            _shieldWindow.Show();
-            Log.Information("[Shield] ShieldWindow shown");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "[Shield] Failed to create/show ShieldWindow - continuing without it");
-            _shieldWindow = null;
-        }
 
         // ================================================================
         // Host + DI Container
