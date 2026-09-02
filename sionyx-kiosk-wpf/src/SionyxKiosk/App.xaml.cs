@@ -29,6 +29,7 @@ public partial class App : Application
     private TrayIconService? _trayIcon;
     private bool _hasFrozenSession = false; // true when admin exits while client is logged in
     private Views.Windows.MainWindow? _frozenMainWindow; // the actual minimized window instance, so restore reuses it instead of creating a new one
+    private Views.Windows.MainWindow? _prewarmedMainWindow; // built ahead of time while AuthWindow is showing, so the login-time transition is just Show() with no DI/construction work on the critical path
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -411,6 +412,14 @@ public partial class App : Application
 
         _systemServices.StartGlobalHotkey();
 
+        // Build the next MainWindow instance ahead of time, during idle time
+        // while the user is looking at/typing into AuthWindow, so the actual
+        // login transition is just Show() on an already-built window with no
+        // DI resolution / constructor work on the critical path.
+        Current.Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            new Action(PrewarmMainWindow));
+
         _ = TryAutoLoginAsync(authVm);
     }
 
@@ -488,6 +497,28 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Builds a MainWindow instance ahead of time and stashes it in
+    /// _prewarmedMainWindow, without showing it. Called at Background dispatcher
+    /// priority while AuthWindow is up, so the real login-time transition can
+    /// just Show() an already-built window instead of paying DI/constructor
+    /// cost on the critical path.
+    /// </summary>
+    private void PrewarmMainWindow()
+    {
+        if (_prewarmedMainWindow != null || _host == null) return;
+        try
+        {
+            _prewarmedMainWindow = _host.Services.GetRequiredService<MainWindow>();
+            Log.Debug("[Prewarm] MainWindow prebuilt and ready");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[Prewarm] Failed to prebuild MainWindow - will build synchronously at login time");
+            _prewarmedMainWindow = null;
+        }
+    }
+
     private void ShowMainWindow(AuthWindow? previousAuthWindow = null)
     {
         // Restore desktop snapshot for new client session
@@ -502,7 +533,18 @@ public partial class App : Application
         if (auth.CurrentUser != null)
             homeVm.Reinitialize(auth.CurrentUser);
 
-        var mainWindow = _host!.Services.GetRequiredService<MainWindow>();
+        // Use the prewarmed instance if it's ready (built ahead of time while
+        // AuthWindow was showing) - this avoids DI resolution / constructor
+        // work on the critical path between the previous window closing and
+        // this one appearing. Falls back to building it now if prewarming
+        // hasn't finished yet (e.g. a very fast login).
+        var mainWindow = _prewarmedMainWindow;
+        _prewarmedMainWindow = null;
+        if (mainWindow == null)
+        {
+            Log.Debug("Prewarmed MainWindow not ready - building synchronously");
+            mainWindow = _host!.Services.GetRequiredService<MainWindow>();
+        }
         var mainVm = (MainViewModel)mainWindow.DataContext;
 
         mainVm.LogoutRequested += OnLogoutRequested;
