@@ -132,7 +132,13 @@ public class SystemServicesManager
             _operatingHours.StopMonitoring();
             _processRestriction.Stop();
             _keyboard.Stop();
-            KioskPolicyService.Remove();
+            // NOTE: Do NOT call KioskPolicyService.Remove() here. This used to run
+            // on every ordinary logout, which removed the NoControlPanel policy and
+            // restarted explorer.exe (visible desktop flash), only for the next
+            // login's KioskPolicyService.Apply() to restart explorer.exe *again* to
+            // re-apply it. The policy should stay applied continuously between
+            // customer sessions; it's only meant to be lifted temporarily via the
+            // dedicated admin flow (KioskPolicyService.RunWithControlPanelAsync).
             _printMonitor.StopMonitoring();
             _remoteControl.StopListening();
 
