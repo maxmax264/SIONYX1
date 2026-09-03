@@ -1,10 +1,11 @@
-<Window x:Class="SionyxKiosk.Views.Windows.MainWindow"
+﻿<Window x:Class="SionyxKiosk.Views.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:SionyxKiosk.Views.Controls"
         Title="SIONYX"
         WindowState="Maximized" Topmost="True"
         WindowStyle="None" ResizeMode="NoResize"
+        Background="{StaticResource BgPrimaryBrush}"
         FlowDirection="RightToLeft" ShowInTaskbar="False">
     <Grid>
         <Grid.ColumnDefinitions>
