@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -265,6 +265,21 @@ public partial class App : Application
         // ================================================================
         _isKiosk = e.Args.Contains("--kiosk");
         var isVerbose = e.Args.Contains("--verbose");
+
+        // Apply the kiosk explorer policy as early as possible in startup,
+        // before any window is shown. On a brand-new machine/Windows user
+        // profile this is the first time NoControlPanel gets set, so
+        // KioskPolicyService.Apply() has to kill+restart explorer.exe -
+        // doing that here (before AuthWindow even appears) keeps the
+        // resulting flash off the login->desktop transition instead of it
+        // showing up right after the user logs in. Safe to call again
+        // later (SystemServicesManager.Start) - Apply() no-ops the
+        // explorer restart once NoControlPanel is already set.
+        if (_isKiosk)
+        {
+            try { KioskPolicyService.Apply(); }
+            catch (Exception ex) { Log.Warning(ex, "[Startup] Early KioskPolicyService.Apply failed"); }
+        }
 
         if (isVerbose)
             Log.Logger = new LoggerConfiguration()
