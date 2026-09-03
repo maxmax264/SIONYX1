@@ -567,21 +567,31 @@ public partial class App : Application
         mainWindow.WindowState = WindowState.Maximized;
         mainWindow.Topmost = true;
 
+        // Navigate to Home before Show(), not after - so the very first
+        // frame Windows composites already has the real page in it instead
+        // of an empty Frame that gets filled in a moment later.
+        mainWindow.NavigateHome();
+
+        if (previousAuthWindow != null)
+        {
+            // Don't close AuthWindow the instant Show() returns - Show()
+            // can return before Windows/DWM has actually painted real
+            // pixels for the new window, and closing AuthWindow in that
+            // gap is what let the real desktop flash through briefly.
+            // ContentRendered only fires once the window's content has
+            // actually been rendered, so wait for that instead.
+            void OnMainWindowContentRendered(object? sender, EventArgs e)
+            {
+                mainWindow.ContentRendered -= OnMainWindowContentRendered;
+                previousAuthWindow.AllowClose();
+                previousAuthWindow.Close();
+            }
+            mainWindow.ContentRendered += OnMainWindowContentRendered;
+        }
+
         mainWindow.Show();
         MainWindow = mainWindow;
         Log.Information("MainWindow shown and set as Application.MainWindow");
-
-        // Only now close the previous AuthWindow (if any). MainWindow is already
-        // Topmost and on screen, so there's no gap where the real desktop is
-        // exposed between the two windows.
-        if (previousAuthWindow != null)
-        {
-            previousAuthWindow.AllowClose();
-            previousAuthWindow.Close();
-        }
-
-        // Navigate to Home explicitly (Loaded fires only on first Show)
-        mainWindow.NavigateHome();
 
         // Start system services
         StartSystemServices();
