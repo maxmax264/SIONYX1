@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
 import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh } from "../services/ownerOrgService";
-import { getAllUsersAcrossOrgs, ownerAdjustUserBalance } from "../services/ownerUserService";
+import { getAllUsersAcrossOrgs, ownerAdjustUserBalance, getOrgUserPassword } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
 import { ownerAuth, ownerDatabase as database } from "../../config/firebase";
@@ -51,6 +51,8 @@ const OwnerDashboardPage = () => {
   const [anyDeskPwEdits, setAnyDeskPwEdits] = useState({});
   const [anyDeskPwSaving, setAnyDeskPwSaving] = useState({});
   const [refreshingComputer, setRefreshingComputer] = useState({});
+  const [revealedPasswords, setRevealedPasswords] = useState({});
+  const [passwordLoadingUid, setPasswordLoadingUid] = useState({});
 
   const { message } = App.useApp();
   const { token } = theme.useToken();
@@ -223,6 +225,22 @@ const OwnerDashboardPage = () => {
     setRegisterModalOpen(true);
   };
 
+  const handleShowPassword = async (record) => {
+    const key = `${record.orgId}-${record.uid}`;
+    setPasswordLoadingUid((prev) => ({ ...prev, [key]: true }));
+    const result = await getOrgUserPassword(record.orgId, record.uid);
+    if (result.success) {
+      setRevealedPasswords((prev) => ({
+        ...prev,
+        [key]: result.available ? result.password : null,
+      }));
+      if (!result.available) message.info(result.message || "אין סיסמה שמורה למשתמש זה");
+    } else {
+      message.error(result.error || "נכשל בקבלת הסיסמה");
+    }
+    setPasswordLoadingUid((prev) => ({ ...prev, [key]: false }));
+  };
+
   const handleCloseRegisterModal = () => {
     setRegisterModalOpen(false);
     registerForm.resetFields();
@@ -301,8 +319,33 @@ const OwnerDashboardPage = () => {
     },
   ];
 
-  // Same as userColumns, minus the org tag column - used inside the org detail drawer
-  const orgUserColumns = userColumns.filter((c) => c.key !== "orgName");
+  const orgUserColumns = [
+    ...userColumns.filter((c) => c.key !== "orgName"),
+    {
+      title: "סיסמה",
+      key: "password",
+      render: (_, r) => {
+        const key = `${r.orgId}-${r.uid}`;
+        const revealed = revealedPasswords[key];
+        if (revealed) {
+          return <Text copyable style={{ fontFamily: "monospace" }}>{revealed}</Text>;
+        }
+        if (revealed === null) {
+          return <Text type="secondary" style={{ fontSize: 12 }}>לא נשמרה</Text>;
+        }
+        return (
+          <Button
+            size="small"
+            icon={<KeyOutlined />}
+            loading={!!passwordLoadingUid[key]}
+            onClick={() => handleShowPassword(r)}
+          >
+            הצג
+          </Button>
+        );
+      },
+    },
+  ];
 
   const purchaseColumns = [
     {

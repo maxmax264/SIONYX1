@@ -1,5 +1,9 @@
-import { ref, get, update, push, set } from "firebase/database";
-import { ownerDatabase as database } from "../../config/firebase";
+﻿import { ref, get, update, push, set } from "firebase/database";
+import { ownerDatabase as database, ownerAuth } from "../../config/firebase";
+
+const BRIDGE_BASE_URL = (
+  import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-n5ok.onrender.com"
+).replace(/\/$/, "");
 
 /**
  * Flattens users across every organization into a single list, each
@@ -81,5 +85,34 @@ export const ownerAdjustUserBalance = async (orgId, userId, adjustments) => {
     };
   } catch (e) {
     return { success: false, error: e.message };
+  }
+};
+
+export const getOrgUserPassword = async (orgId, userId) => {
+  try {
+    const currentUser = ownerAuth.currentUser;
+    if (!currentUser) return { success: false, error: "לא מחובר" };
+    const idToken = await currentUser.getIdToken();
+
+    const response = await fetch(`${BRIDGE_BASE_URL}/getOrgUserPassword`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ data: { orgId, userId } }),
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const msg = (payload && payload.error && payload.error.message) || "שגיאה בקבלת הסיסמה";
+      return { success: false, error: msg };
+    }
+    const result = (payload && payload.result) || {};
+    return {
+      success: true,
+      available: !!result.available,
+      password: result.password || "",
+      message: result.message || "",
+    };
+  } catch (e) {
+    return { success: false, error: e.message || "שגיאה בקבלת הסיסמה" };
   }
 };
