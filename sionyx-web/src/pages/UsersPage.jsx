@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import {
   Card,
@@ -1813,10 +1813,10 @@ const UsersPage = () => {
                 label='סיסמה חדשה'
                 rules={[
                   { required: true, message: 'אנא הכנס סיסמה חדשה' },
-                  { min: 6, message: 'הסיסמה חייבת להכיל לפחות 6 תווים' },
+                  { min: 4, message: 'הסיסמה חייבת להכיל לפחות 4 תווים' },
                 ]}
               >
-                <Input.Password prefix={<LockOutlined />} placeholder='לפחות 6 תווים' />
+                <Input.Password prefix={<LockOutlined />} placeholder='לפחות 4 תווים' />
               </Form.Item>
 
               <Form.Item
@@ -1824,7 +1824,7 @@ const UsersPage = () => {
                 label='אשר סיסמה'
                 rules={[
                   { required: true, message: 'אנא אשר את הסיסמה' },
-                  { min: 6, message: 'הסיסמה חייבת להכיל לפחות 6 תווים' },
+                  { min: 4, message: 'הסיסמה חייבת להכיל לפחות 4 תווים' },
                 ]}
               >
                 <Input.Password prefix={<LockOutlined />} placeholder='הכנס שוב את הסיסמה' />

@@ -1,4 +1,4 @@
-import {
+﻿import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -18,6 +18,11 @@ const phoneToEmail = phone => {
   const cleanPhone = phone.replace(/\D/g, '');
   return `${cleanPhone}@sionyx.app`;
 };
+
+// Mirrors the kiosk app's ToFirebasePassword: short PINs (<6 chars) get a
+// px_ prefix before hitting Firebase Auth, matching what resetUserPassword
+// stores server-side.
+const toFirebasePassword = (raw) => (raw.length >= 6 ? raw : `px_${raw}`);
 
 /**
  * Sign in admin user with phone number and organization ID
@@ -48,7 +53,7 @@ export const signInAdmin = async (phone, password, orgId) => {
     logger.info('Signing in:', { phone, email, orgId: cleanOrgId });
 
     // Sign in with Firebase Auth
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, toFirebasePassword(password));
     const userId = userCredential.user.uid;
 
     // Fetch user data from the specified organization

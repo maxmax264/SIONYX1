@@ -1,4 +1,4 @@
-import { signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
+﻿import { signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 import { ref, get } from 'firebase/database';
 import { supervisorAuth as auth, supervisorDatabase as database } from '../../config/firebase';
 
@@ -7,6 +7,8 @@ const phoneToEmail = phone => {
   return `${cleanPhone}@sionyx.app`;
 };
 
+const toFirebasePassword = (raw) => (raw.length >= 6 ? raw : `px_${raw}`);
+
 export const signInSupervisor = async (phone, password) => {
   try {
     if (!phone || !password) {
@@ -14,7 +16,7 @@ export const signInSupervisor = async (phone, password) => {
     }
 
     const email = phoneToEmail(phone);
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, toFirebasePassword(password));
     const uid = userCredential.user.uid;
 
     await userCredential.user.getIdToken(true);

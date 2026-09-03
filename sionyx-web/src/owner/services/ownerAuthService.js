@@ -4,6 +4,8 @@ import { ownerAuth as auth, ownerDatabase as database } from "../../config/fireb
 
 const phoneToEmail = (phone) => `${phone.replace(/\D/g, "")}@sionyx.app`;
 
+const toFirebasePassword = (raw) => (raw.length >= 6 ? raw : `px_${raw}`);
+
 const waitForAuth = () =>
   new Promise((resolve) => {
     if (auth.currentUser) return resolve(auth.currentUser);
@@ -13,7 +15,7 @@ const waitForAuth = () =>
 export const signInOwner = async (phone, password) => {
   try {
     const email = phoneToEmail(phone);
-    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const cred = await signInWithEmailAndPassword(auth, email, toFirebasePassword(password));
     const snap = await get(ref(database, `owners/${cred.user.uid}`));
     if (!snap.exists()) {
       await firebaseSignOut(auth);
