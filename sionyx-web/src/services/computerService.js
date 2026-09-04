@@ -3,7 +3,7 @@
  * Handles computer/PC tracking and management
  */
 
-import { ref, get, update, remove } from 'firebase/database';
+import { ref, get, set, update, remove } from 'firebase/database';
 import { database } from '../config/firebase';
 import { getOrgId } from '../hooks/useOrgId';
 import { logger } from '../utils/logger';
@@ -328,6 +328,23 @@ export const requestRemoteControlRefresh = async computerId => {
   } catch (error) {
     logger.error('Error requesting remote-control refresh:', error);
     return { success: false, error: 'Failed to request refresh' };
+  }
+};
+
+/** Push a new AnyDesk password for a specific kiosk. Written to the `setPassword`
+ * command channel (separate from `password`, which the kiosk itself uses to
+ * self-report its currently-installed password). The kiosk's
+ * RemoteControlReportingService picks this up in real time (SseListener) and
+ * applies it via `AnyDesk.exe --set-password` - no reboot needed.
+ * Requires org-admin role (enforced by database.rules.json on this path). */
+export const setAnyDeskPassword = async (computerId, password) => {
+  try {
+    const orgId = getOrgId();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/setPassword`), password);
+    return { success: true };
+  } catch (error) {
+    logger.error('Error setting AnyDesk password:', error);
+    return { success: false, error: 'Failed to set AnyDesk password' };
   }
 };
 
