@@ -38,6 +38,7 @@ import {
   updateComputer,
   deriveFromComputersAndUsers,
   requestRemoteControlRefresh,
+  setAnyDeskPassword,
 } from '../services/computerService';
 import { subscribeToComputers, subscribeToUsers } from '../services/realtimeService';
 import { getUserStatus, getStatusLabel, getStatusColor } from '../constants/userStatus';
@@ -432,8 +433,11 @@ const ComputersPage = () => {
     const isActive = !!computer.currentUserId;
     const computerId = computer.id;
     const rustdesk = computer.remoteControl?.rustdesk;
+    const anydesk = computer.remoteControl?.anydesk;
     const [showRemote, setShowRemote] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [newAnyDeskPassword, setNewAnyDeskPassword] = useState('');
+    const [settingAnyDeskPassword, setSettingAnyDeskPassword] = useState(false);
 
     const handleRefresh = async () => {
       setRefreshing(true);
@@ -444,6 +448,19 @@ const ComputersPage = () => {
         message.error(result.error || 'נכשל בשליחת בקשת הרענון');
       }
       setRefreshing(false);
+    };
+
+    const handleSetAnyDeskPassword = async () => {
+      if (!newAnyDeskPassword.trim()) return;
+      setSettingAnyDeskPassword(true);
+      const result = await setAnyDeskPassword(computerId, newAnyDeskPassword.trim());
+      if (result.success) {
+        message.success('הסיסמה נשלחה לקיוסק ותוחל תוך שניות');
+        setNewAnyDeskPassword('');
+      } else {
+        message.error(result.error || 'נכשל בשליחת הסיסמה');
+      }
+      setSettingAnyDeskPassword(false);
     };
 
     return (
@@ -485,7 +502,7 @@ const ComputersPage = () => {
                 size='small'
                 icon={<DesktopOutlined />}
                 onClick={() => setShowRemote(v => !v)}
-                title='שליטה מרחוק (RustDesk)'
+                title='שליטה מרחוק (RustDesk / AnyDesk)'
               >
                 שליטה מרחוק
               </Button>
@@ -503,17 +520,50 @@ const ComputersPage = () => {
         {showRemote && (
           <Row style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
             <Col span={24}>
-              {rustdesk?.id ? (
-                <Space direction='vertical' size={4}>
-                  <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.id}</Text></Text>
-                  <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.password || '—'}</Text></Text>
-                </Space>
-              ) : (
-                <Text type='secondary'>עדיין לא דווח מהקיוסק (ידווח אחרי login ראשון על גרסת ה-MSI החדשה)</Text>
-              )}
-              <div style={{ marginTop: 8 }}>
+              <Text strong style={{ fontSize: 12 }}>RustDesk</Text>
+              <div style={{ marginTop: 4, marginBottom: 12 }}>
+                {rustdesk?.id ? (
+                  <Space direction='vertical' size={4}>
+                    <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.id}</Text></Text>
+                    <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.password || '—'}</Text></Text>
+                  </Space>
+                ) : (
+                  <Text type='secondary'>עדיין לא דווח מהקיוסק</Text>
+                )}
+              </div>
+
+              <Text strong style={{ fontSize: 12 }}>AnyDesk</Text>
+              <div style={{ marginTop: 4 }}>
+                {anydesk?.id ? (
+                  <Space direction='vertical' size={4}>
+                    <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{anydesk.id}</Text></Text>
+                    <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{anydesk.password || '—'}</Text></Text>
+                  </Space>
+                ) : (
+                  <Text type='secondary'>עדיין לא דווח מהקיוסק</Text>
+                )}
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  <Input.Password
+                    size='small'
+                    placeholder='סיסמת AnyDesk חדשה'
+                    value={newAnyDeskPassword}
+                    onChange={e => setNewAnyDeskPassword(e.target.value)}
+                    style={{ maxWidth: 220 }}
+                  />
+                  <Button
+                    size='small'
+                    loading={settingAnyDeskPassword}
+                    disabled={!newAnyDeskPassword.trim()}
+                    onClick={handleSetAnyDeskPassword}
+                  >
+                    הגדר סיסמה
+                  </Button>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
                 <Button size='small' icon={<ReloadOutlined />} loading={refreshing} onClick={handleRefresh}>
-                  רענן סוכן
+                  רענן סוכנים (RustDesk + AnyDesk)
                 </Button>
               </div>
             </Col>
