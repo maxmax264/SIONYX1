@@ -52,10 +52,14 @@ export const getBillingSettings = async (orgId) => {
     let nedarimApiValid = '';
     try {
       nedarimMosadId = JSON.parse(atob(data.nedarim_mosad_id || '')) || '';
-    } catch {}
+    } catch {
+      // Missing/invalid stored value - leave nedarimMosadId as default ''
+    }
     try {
       nedarimApiValid = JSON.parse(atob(data.nedarim_api_valid || '')) || '';
-    } catch {}
+    } catch {
+      // Missing/invalid stored value - leave nedarimApiValid as default ''
+    }
     return {
       success: true,
       billing: {
