@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.42] - 2026-09-04
+
+### Bug Fixes
+- **lint**: resolve no-empty errors in paymentSettingsService (pre-existing, unrelated to remote-control work) (de806a69)
+
+
 ## [3.11.41] - 2026-09-03
 
 
