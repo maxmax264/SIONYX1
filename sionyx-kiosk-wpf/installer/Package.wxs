@@ -79,6 +79,11 @@
               Source="$(var.SourceDir)\installer\remote-control\install-anydesk.ps1"
               KeyPath="yes" />
       </Component>
+      <Component Id="DwServiceInstallScript" Guid="*">
+        <File Id="InstallDwServicePs1"
+              Source="$(var.SourceDir)\installer\remote-control\install-dwservice.ps1"
+              KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <ComponentGroup Id="TemplateFiles" Directory="TemplatesDir">
@@ -209,6 +214,18 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- Third/backup remote-control agent - free, open-source, no commercial-use
+         restriction. Account-based (not local ID+password like RustDesk/AnyDesk) -
+         the kiosk joins the SIONYX DWService account directly, no Firebase reporting
+         needed. Credentials come from build.ps1 env vars (DWSERVICE_USER /
+         DWSERVICE_INSTALL_PASSWORD), never committed to git - see build.ps1's
+         -p:DwServiceUser / -p:DwServiceInstallPassword dotnet-build properties. -->
+    <CustomAction Id="CA_InstallDwService"
+                  Directory="RemoteControlDir"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-dwservice.ps1&quot; -User &quot;$(var.DwServiceUser)&quot; -InstallPassword &quot;$(var.DwServiceInstallPassword)&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
 
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
@@ -230,7 +247,8 @@
       <Custom Action="CA_InstallVCRedist"    After="InstallFiles"         Condition="NOT VCREDIST64 AND NOT REMOVE" />
       <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE AND NOT Installed" />
       <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE AND NOT Installed" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallDwService"   After="CA_InstallAnyDesk"    Condition="NOT REMOVE AND NOT Installed" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallDwService"  Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
