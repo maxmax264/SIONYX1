@@ -202,9 +202,7 @@ function Test-InstallerSecrets {
         "FIREBASE_APP_ID",
         "FIREBASE_MEASUREMENT_ID",
         "NEDARIM_CALLBACK_URL",
-        "ADMIN_EXIT_PASSWORD",
-        "DWSERVICE_USER",
-        "DWSERVICE_INSTALL_PASSWORD"
+        "ADMIN_EXIT_PASSWORD"
     )
 
     $missing = $required | Where-Object { -not [Environment]::GetEnvironmentVariable($_) }
@@ -308,8 +306,6 @@ function New-Installer([string]$ver) {
         -p:ProductVersion=$ver `
         -p:PublishDir=$publishDir `
         -p:SourceDir=$sourceDir `
-        -p:DwServiceUser=$env:DWSERVICE_USER `
-        -p:DwServiceInstallPassword=$env:DWSERVICE_INSTALL_PASSWORD `
         2>&1
     $wixExit = $LASTEXITCODE
     $wixOutput | ForEach-Object { Write-Host $_ }

@@ -8,7 +8,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$InstallDir  = "$env:ProgramFiles(x86)\AnyDesk"
+$InstallDir  = "${env:ProgramFiles(x86)}\AnyDesk"
 $TempDir     = "C:\Temp"
 $InfoDir     = "C:\ProgramData\SIONYX"
 $InfoFile    = "$InfoDir\anydesk-info.txt"
@@ -46,7 +46,21 @@ if (-Not $alreadyInstalled) {
 }
 
 Push-Location $InstallDir
-$AnyDeskId = (.\AnyDesk.exe --get-id | Out-String).Trim()
+
+# --get-id יכול להחזיר ריק אם AnyDesk עדיין לא סיים לייצר את המפתחות שלו מיד
+# אחרי עליית השירות (race condition) - מנסים כמה פעמים לפני שמוותרים.
+$AnyDeskId = ''
+$idTries = 0
+while ([string]::IsNullOrWhiteSpace($AnyDeskId) -and $idTries -lt 10) {
+    $AnyDeskId = (.\AnyDesk.exe --get-id | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($AnyDeskId)) {
+        Start-Sleep -Seconds 3
+        $idTries++
+    }
+}
+if ([string]::IsNullOrWhiteSpace($AnyDeskId)) {
+    Write-Warning "[SIONYX] AnyDesk --get-id still empty after $idTries retries - will retry again on next app start via RemoteControlReportingService."
+}
 
 if (Test-Path $InfoFile) {
     Write-Host "[SIONYX] anydesk-info.txt already exists - keeping existing password (update, not first install)."
