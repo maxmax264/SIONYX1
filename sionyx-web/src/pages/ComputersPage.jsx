@@ -61,6 +61,9 @@ const itemVariants = {
   },
 };
 
+// Heartbeat every 60s (ComputerHeartbeatService.cs) - 2min tolerates one missed beat
+const HEARTBEAT_ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
 const ComputersPage = () => {
   const [computers, setComputers] = useState([]);
   const [users, setUsers] = useState([]);
@@ -74,8 +77,17 @@ const ComputersPage = () => {
   const [renameComputer, setRenameComputer] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameLoading, setRenameLoading] = useState(false);
+  const [, forceOnlineTick] = useState(0);
 
   const orgId = useOrgId();
+
+  // Heartbeat-based online/offline badges depend on wall-clock time passing,
+  // not just on new Firebase data - re-render periodically so a kiosk that
+  // stops sending heartbeats flips to "offline" without needing any other update.
+  useEffect(() => {
+    const tick = setInterval(() => forceOnlineTick(n => n + 1), 30 * 1000);
+    return () => clearInterval(tick);
+  }, []);
 
   useEffect(() => {
     if (!orgId) return;
@@ -360,6 +372,7 @@ const ComputersPage = () => {
     const hasUser = !!computer.currentUserName;
     // Derive isActive from currentUserId (if user is associated, it's active)
     const isActive = !!computer.currentUserId;
+    const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
 
     return (
       <Card
@@ -381,6 +394,17 @@ const ComputersPage = () => {
               </Text>
               <Tag color={isActive ? 'success' : 'default'} style={{ marginRight: 0 }}>
                 {isActive ? 'פעיל' : 'לא פעיל'}
+              </Tag>
+              <Tag
+                icon={<Badge status={isOnline ? 'success' : 'error'} />}
+                style={{ marginRight: 0 }}
+                title={
+                  computer.heartbeatAt
+                    ? `דופק אחרון: ${new Date(computer.heartbeatAt).toLocaleTimeString('he-IL')}`
+                    : 'לא התקבל דופק מעולם'
+                }
+              >
+                {isOnline ? 'מקוון' : 'לא מקוון'}
               </Tag>
             </Space>
           </Col>
@@ -432,6 +456,9 @@ const ComputersPage = () => {
   const AllComputerCard = ({ computer }) => {
     // Derive isActive from currentUserId (if user is associated, it's active)
     const isActive = !!computer.currentUserId;
+    // Machine-level online/offline, independent of whether a user is logged in -
+    // based on ComputerHeartbeatService.cs writing heartbeatAt every 60s
+    const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
     const computerId = computer.id;
     const rustdesk = computer.remoteControl?.rustdesk;
     const anydesk = computer.remoteControl?.anydesk;
@@ -498,6 +525,17 @@ const ComputersPage = () => {
               </Text>
               <Tag color={isActive ? 'success' : 'default'} style={{ marginRight: 0 }}>
                 {isActive ? 'פעיל' : 'לא פעיל'}
+              </Tag>
+              <Tag
+                icon={<Badge status={isOnline ? 'success' : 'error'} />}
+                style={{ marginRight: 0 }}
+                title={
+                  computer.heartbeatAt
+                    ? `דופק אחרון: ${new Date(computer.heartbeatAt).toLocaleTimeString('he-IL')}`
+                    : 'לא התקבל דופק מעולם'
+                }
+              >
+                {isOnline ? 'מחשב מקוון' : 'מחשב לא מקוון'}
               </Tag>
             </Space>
           </Col>

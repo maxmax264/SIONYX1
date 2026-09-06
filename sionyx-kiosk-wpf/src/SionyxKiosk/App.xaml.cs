@@ -56,6 +56,16 @@ public partial class App : Application
         var publicLogDir = Path.Combine(@"C:\Users\Public\Documents\SIONYX", "logs");
         Directory.CreateDirectory(publicLogDir);
 
+        // Stage 3 of the log-shipping feature: ships every log line (by
+        // default) to the entertainment-channel site so logs scattered
+        // across kiosks are visible in one place. Level is registry-
+        // overridable (LogShipMinLevel) - default Information matches "ship
+        // everything the app normally logs", not just warnings/errors.
+        var logShipLevel = Enum.TryParse<Serilog.Events.LogEventLevel>(
+            Infrastructure.RegistryConfig.ReadValue("LogShipMinLevel", "Information"), ignoreCase: true, out var lvl)
+            ? lvl
+            : Serilog.Events.LogEventLevel.Information;
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
@@ -69,6 +79,7 @@ public partial class App : Application
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 7,
                 fileSizeLimitBytes: 10_000_000)
+            .WriteTo.Sink(new Infrastructure.Logging.ChannelLogSink(), restrictedToMinimumLevel: logShipLevel)
             .CreateLogger();
 
         Log.Information("SIONYX Kiosk WPF starting, version {Version}", GetVersion());
@@ -289,6 +300,7 @@ public partial class App : Application
                 .MinimumLevel.Verbose()
                 .WriteTo.Console()
                 .WriteTo.File("logs/sionyx-.log", rollingInterval: RollingInterval.Day)
+                .WriteTo.Sink(new Infrastructure.Logging.ChannelLogSink(), restrictedToMinimumLevel: logShipLevel)
                 .CreateLogger();
 
         // Subscribe to update progress events (single registration)
