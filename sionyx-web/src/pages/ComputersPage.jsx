@@ -614,7 +614,7 @@ const ComputersPage = () => {
 
               <div style={{ marginTop: 12 }}>
                 <Button size='small' icon={<ReloadOutlined />} loading={refreshing} onClick={handleRefresh}>
-                  רענן סוכנים (RustDesk + AnyDesk)
+                  רענן סוכני שליטה מרחוק
                 </Button>
               </div>
             </Col>
