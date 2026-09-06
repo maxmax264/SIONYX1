@@ -24,6 +24,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- UI Automation for AeroAdminSetupService.cs (System.Windows.Automation) -
+         part of the .NET desktop runtime under net8.0-windows/UseWPF, no NuGet
+         package needed, but the assemblies must be referenced explicitly. -->
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="FirebaseAuthentication.net" Version="4.1.0" />
     <PackageReference Include="FirebaseDatabase.net" Version="5.0.0" />

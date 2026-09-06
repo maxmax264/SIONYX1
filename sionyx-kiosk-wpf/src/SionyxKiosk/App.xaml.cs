@@ -119,7 +119,10 @@ public partial class App : Application
                 services.AddSingleton(sp => new OperatingHoursService(sp.GetRequiredService<FirebaseClient>()));
                 services.AddSingleton(sp => new ForceLogoutService(sp.GetRequiredService<FirebaseClient>()));
                 services.AddSingleton(sp => new AnnouncementService(sp.GetRequiredService<FirebaseClient>()));
-                services.AddSingleton(sp => new RemoteControlReportingService(sp.GetRequiredService<FirebaseClient>()));
+                services.AddSingleton(_ => new AeroAdminSetupService());
+                services.AddSingleton(sp => new RemoteControlReportingService(
+                    sp.GetRequiredService<FirebaseClient>(),
+                    sp.GetRequiredService<AeroAdminSetupService>()));
                 services.AddSingleton(sp => new ComputerHeartbeatService(sp.GetRequiredService<FirebaseConfig>()));
 
                 // System Services

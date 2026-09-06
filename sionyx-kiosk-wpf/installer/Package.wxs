@@ -85,6 +85,16 @@
            OS trust store, so it isn't affected the same way). Stages QuickSupport
            for on-demand launch from the dashboard - see install-teamviewer.ps1
            header for why this isn't an always-on Host install. -->
+      <!-- AeroAdmin: 4th tool, staged but NOT installed/configured by this script -
+           unlike the others, AeroAdmin has no silent/CLI mode at all, so the
+           one-time Access-rights setup + ID readout happens inside the app itself
+           (AeroAdminSetupService.cs, UI Automation) on first startup after this
+           file lands, not here. -->
+      <Component Id="AeroAdminInstallScript" Guid="*">
+        <File Id="InstallAeroAdminPs1"
+              Source="$(var.SourceDir)\installer\remote-control\install-aeroadmin.ps1"
+              KeyPath="yes" />
+      </Component>
       <Component Id="TeamViewerInstallScript" Guid="*">
         <File Id="InstallTeamViewerPs1"
               Source="$(var.SourceDir)\installer\remote-control\install-teamviewer.ps1"
@@ -229,6 +239,14 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- Just stages AeroAdmin.exe - no config happens here, see comment on
+         AeroAdminInstallScript component above. -->
+    <CustomAction Id="CA_InstallAeroAdmin"
+                  Directory="RemoteControlDir"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-aeroadmin.ps1&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
 
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
@@ -255,7 +273,14 @@
       <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE AND NOT Installed AND 0" />
       <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE AND NOT Installed" />
       <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE AND NOT Installed" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
+      <!-- Same "NOT Installed" condition as AnyDesk/TeamViewer above - note this
+           means none of the three only run on a genuinely fresh install, not on
+           an upgrade of an existing kiosk (Installed becomes true once the
+           product is already present). That's a pre-existing limitation of this
+           whole block, not something new to AeroAdmin - flagging it here since
+           it directly affects whether an *update* actually re-stages anything. -->
+      <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE AND NOT Installed" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />

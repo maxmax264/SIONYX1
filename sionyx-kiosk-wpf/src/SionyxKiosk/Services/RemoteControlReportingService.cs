@@ -31,21 +31,28 @@ public class RemoteControlReportingService
     private const string TeamViewerQsExe = @"C:\ProgramData\SIONYX\TeamViewerQS.exe";
 
     private readonly FirebaseClient _firebase;
+    private readonly AeroAdminSetupService _aeroAdminSetup;
     private SseListener? _rustDeskListener;
     private SseListener? _anyDeskListener;
     private SseListener? _refreshListener;
     private SseListener? _teamViewerLaunchListener;
     private string? _computerId;
 
-    public RemoteControlReportingService(FirebaseClient firebase)
+    public RemoteControlReportingService(FirebaseClient firebase, AeroAdminSetupService aeroAdminSetup)
     {
         _firebase = firebase;
+        _aeroAdminSetup = aeroAdminSetup;
     }
 
     /// <summary>קריאה חד-פעמית באתחול האפליקציה, אחרי שהמשתמש/הקיוסק מאומת מול Firebase.</summary>
     public async Task InitializeAsync()
     {
         _computerId = DeviceInfo.GetDeviceId();
+
+        // מנסה להגדיר את AeroAdmin פעם אחת אם עוד לא הוגדר (ראה AeroAdminSetupService -
+        // לא עושה כלום אם aeroadmin-info.txt כבר קיים או שהכלי לא מותקן על המכונה).
+        try { await _aeroAdminSetup.EnsureConfiguredAsync(); }
+        catch (Exception ex) { Logger.Warning(ex, "AeroAdmin one-time setup failed at startup"); }
 
         await ReportCurrentInfoAsync();
 
@@ -65,6 +72,12 @@ public class RemoteControlReportingService
         // only exist after a launchRequest triggers StartTeamViewerQuickSupport
         // below (see the listener in StartListening). Left the old file constant
         // in case a future version does stage a persistent info file.
+        //
+        // AeroAdmin: unlike RustDesk/AnyDesk, this file is written by
+        // AeroAdminSetupService via UI Automation (no CLI exists for AeroAdmin -
+        // see that class's comment), triggered once from InitializeAsync/refresh
+        // above. By the time we get here it should already exist if setup
+        // succeeded; this call just reports whatever is currently on disk.
         await ReportInitialInfoAsync("aeroadmin", AeroAdminInfoFile, "AeroAdmin", _computerId);
     }
 
@@ -141,7 +154,13 @@ public class RemoteControlReportingService
         Logger.Information("Remote-control refresh requested from dashboard - re-reporting current info");
         _ = Task.Run(async () =>
         {
-            try { await ReportCurrentInfoAsync(); }
+            try
+            {
+                // אם AeroAdmin עוד לא הוגדר (לדוגמה install-aeroadmin.ps1 סיים אחרי
+                // שהאפליקציה כבר עלתה), כפתור "רענן" נותן הזדמנות שנייה להגדיר אותו.
+                await _aeroAdminSetup.EnsureConfiguredAsync();
+                await ReportCurrentInfoAsync();
+            }
             catch (Exception ex) { Logger.Warning(ex, "Refresh-triggered re-report failed"); }
         });
     }
