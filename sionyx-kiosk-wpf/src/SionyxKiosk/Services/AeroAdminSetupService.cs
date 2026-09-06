@@ -32,8 +32,13 @@ public class AeroAdminSetupService
 {
     private static readonly ILogger Logger = Log.ForContext<AeroAdminSetupService>();
 
-    private const string ExePath = @"C:\ProgramData\SIONYX\AeroAdmin.exe";
+    // public: RemoteControlReportingService uses this to self-heal (re-run
+    // install-aeroadmin.ps1 if the exe is missing, e.g. on a kiosk that was
+    // installed before this feature existed and only ever got an in-place
+    // app update, not a full reinstall).
+    public const string ExePath = @"C:\ProgramData\SIONYX\AeroAdmin.exe";
     private const string InfoFile = @"C:\ProgramData\SIONYX\aeroadmin-info.txt";
+    private const string UiDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-ui-debug.txt";
 
     // TODO: לאמת מול האפליקציה האמיתית עם Accessibility Insights ולעדכן -
     // אלה ניחושים סבירים בהתבסס על screenshots רשמיים, לא ערכים מאומתים.
@@ -91,6 +96,7 @@ public class AeroAdminSetupService
             if (!configured)
             {
                 Logger.Warning("Could not automate Connection > Access rights - AutomationId/Name constants in AeroAdminSetupService.cs likely need updating against the real UI (see class comment)");
+                UiAutomationDebug.DumpTree(mainWindow, UiDebugFile, "AeroAdmin - Connection > Access rights automation");
                 return;
             }
 
@@ -98,6 +104,7 @@ public class AeroAdminSetupService
             if (string.IsNullOrWhiteSpace(id))
             {
                 Logger.Warning("Could not read AeroAdmin's own ID from the main window - see class comment");
+                UiAutomationDebug.DumpTree(mainWindow, UiDebugFile, "AeroAdmin - reading own ID");
                 return;
             }
 

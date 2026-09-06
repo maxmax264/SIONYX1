@@ -549,11 +549,13 @@ const ComputersPage = () => {
 
               <Text strong style={{ fontSize: 12 }}>AnyDesk</Text>
               <div style={{ marginTop: 4 }}>
-                {anydesk?.id ? (
+                {anydesk?.id && anydesk.id !== '0' ? (
                   <Space direction='vertical' size={4}>
                     <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{anydesk.id}</Text></Text>
                     <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{anydesk.password || '—'}</Text></Text>
                   </Space>
+                ) : anydesk?.id === '0' ? (
+                  <Text type='warning'>AnyDesk מותקן אך חסום ע&quot;י פילטר רשת (NetFree וכדומה) - לא מקבל ID. הקיוסק ממשיך לנסות אוטומטית ברקע.</Text>
                 ) : (
                   <Text type='secondary'>עדיין לא דווח מהקיוסק</Text>
                 )}

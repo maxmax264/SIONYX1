@@ -49,17 +49,22 @@ Push-Location $InstallDir
 
 # --get-id יכול להחזיר ריק אם AnyDesk עדיין לא סיים לייצר את המפתחות שלו מיד
 # אחרי עליית השירות (race condition) - מנסים כמה פעמים לפני שמוותרים.
+# חשוב: כשAnyDesk לא מצליח להירשם ל-relay שלו (למשל חסימת TLS ע"י פילטר רשת
+# כמו NetFree - ראו הערה בזיכרון הפרויקט), --get-id מחזיר את המחרוזת "0" ולא
+# ריק - זו לא הייתה מטופלת פה, אז הלולאה יצאה מיד בניסיון הראשון עם "0" כאילו
+# זה ID תקין. עכשיו "0" נחשב לא-תקין בדיוק כמו ריק, וממשיך לנסות.
 $AnyDeskId = ''
 $idTries = 0
-while ([string]::IsNullOrWhiteSpace($AnyDeskId) -and $idTries -lt 10) {
+while (([string]::IsNullOrWhiteSpace($AnyDeskId) -or $AnyDeskId -eq '0') -and $idTries -lt 10) {
     $AnyDeskId = (.\AnyDesk.exe --get-id | Out-String).Trim()
-    if ([string]::IsNullOrWhiteSpace($AnyDeskId)) {
+    if ([string]::IsNullOrWhiteSpace($AnyDeskId) -or $AnyDeskId -eq '0') {
         Start-Sleep -Seconds 3
         $idTries++
     }
 }
-if ([string]::IsNullOrWhiteSpace($AnyDeskId)) {
-    Write-Warning "[SIONYX] AnyDesk --get-id still empty after $idTries retries - will retry again on next app start via RemoteControlReportingService."
+if ([string]::IsNullOrWhiteSpace($AnyDeskId) -or $AnyDeskId -eq '0') {
+    Write-Warning "[SIONYX] AnyDesk --get-id still 0/empty after $idTries retries - likely blocked by a network TLS filter (see project notes on NetFree). RemoteControlReportingService will keep retrying periodically at runtime."
+    $AnyDeskId = '0'
 }
 
 if (Test-Path $InfoFile) {

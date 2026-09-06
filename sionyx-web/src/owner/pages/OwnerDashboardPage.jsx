@@ -570,7 +570,7 @@ const OwnerDashboardPage = () => {
                           </Col>
                           <Col span={12}>
                             <Text type="secondary">AnyDesk (המסטר בלבד)</Text>
-                            <div>ID: <Text copyable>{c.anydesk?.id || "—"}</Text></div>
+                            <div>ID: {c.anydesk?.id && c.anydesk.id !== '0' ? <Text copyable>{c.anydesk.id}</Text> : (c.anydesk?.id === '0' ? <Text type="warning">חסום ע"י פילטר רשת</Text> : "—")}</div>
                             <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.anydesk?.password || "—"}</Text></div>
                           </Col>
                           <Col span={12}>

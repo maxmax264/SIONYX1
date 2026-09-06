@@ -271,15 +271,18 @@
            once AnyDesk is solid on both dashboards. Existing kiosks that already
            have RustDesk installed are unaffected (their service keeps running). -->
       <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE AND NOT Installed AND 0" />
-      <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE AND NOT Installed" />
-      <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE AND NOT Installed" />
-      <!-- Same "NOT Installed" condition as AnyDesk/TeamViewer above - note this
-           means none of the three only run on a genuinely fresh install, not on
-           an upgrade of an existing kiosk (Installed becomes true once the
-           product is already present). That's a pre-existing limitation of this
-           whole block, not something new to AeroAdmin - flagging it here since
-           it directly affects whether an *update* actually re-stages anything. -->
-      <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE AND NOT Installed" />
+      <!-- AnyDesk/TeamViewer/AeroAdmin run on BOTH a fresh install and an
+           upgrade of an already-installed kiosk (no "NOT Installed" guard).
+           This used to be "NOT Installed"-only, which meant an upgrade never
+           re-ran these scripts at all - a kiosk that was installed before this
+           code existed would never get AeroAdmin/TeamViewer staged just by
+           receiving an auto-update, only by a full uninstall+reinstall. Each
+           script is idempotent (checks Test-Path / Get-Service before doing
+           any work), so running them again on every upgrade is safe and just
+           a few no-op checks when nothing changed. -->
+      <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupAutoStart"     After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />

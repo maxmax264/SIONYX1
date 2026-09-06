@@ -1,7 +1,11 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Windows.Automation;
 using Serilog;
 using SionyxKiosk.Infrastructure;
 
@@ -29,6 +33,14 @@ public class RemoteControlReportingService
     // Staged by install-teamviewer.ps1, NOT run continuously - see StartTeamViewerQuickSupport
     // for why this is launched on-demand instead of installed as an always-on Host service.
     private const string TeamViewerQsExe = @"C:\ProgramData\SIONYX\TeamViewerQS.exe";
+    private const string TeamViewerUiDebugFile = @"C:\ProgramData\SIONYX\teamviewer-ui-debug.txt";
+
+    // תיקיית ההתקנה (RemoteControlDir ב-Package.wxs) - הסקריפטים האלה נשארים
+    // על הדיסק לצמיתות אחרי ההתקנה, ליד קובץ ה-exe של האפליקציה עצמה, אז
+    // אפשר להריץ אותם שוב מתוך האפליקציה בזמן ריצה (לא רק מה-MSI) לצורך
+    // ריפוי-עצמי - ראו EnsureAgentsStagedAsync.
+    private static readonly string RemoteControlScriptsDir = Path.Combine(AppContext.BaseDirectory, "RemoteControl");
+    private const int AnyDeskIdRetryIntervalMinutes = 5;
 
     private readonly FirebaseClient _firebase;
     private readonly AeroAdminSetupService _aeroAdminSetup;
@@ -36,6 +48,7 @@ public class RemoteControlReportingService
     private SseListener? _anyDeskListener;
     private SseListener? _refreshListener;
     private SseListener? _teamViewerLaunchListener;
+    private Timer? _anyDeskIdRetryTimer;
     private string? _computerId;
 
     public RemoteControlReportingService(FirebaseClient firebase, AeroAdminSetupService aeroAdminSetup)
@@ -49,6 +62,12 @@ public class RemoteControlReportingService
     {
         _computerId = DeviceInfo.GetDeviceId();
 
+        // מנגנון ריפוי-עצמי: קיוסקים שהותקנו לפני שהתמיכה בכלי מסוים נוספה
+        // (או שהותקנו לפני שהוסר "NOT Installed" ב-Package.wxs) לא יקבלו אותו
+        // רק מעדכון רגיל - בודק מה חסר בפועל ומריץ את הסקריפט המתאים.
+        try { await EnsureAgentsStagedAsync(); }
+        catch (Exception ex) { Logger.Warning(ex, "Remote-control agent self-heal failed at startup"); }
+
         // מנסה להגדיר את AeroAdmin פעם אחת אם עוד לא הוגדר (ראה AeroAdminSetupService -
         // לא עושה כלום אם aeroadmin-info.txt כבר קיים או שהכלי לא מותקן על המכונה).
         try { await _aeroAdminSetup.EnsureConfiguredAsync(); }
@@ -57,6 +76,126 @@ public class RemoteControlReportingService
         await ReportCurrentInfoAsync();
 
         StartListening(_computerId);
+
+        // AnyDesk ID יכול להיתקע על "0" (פילטר רשת חוסם TLS ל-relay שלו) -
+        // בודקים כל כמה דקות אם המצב השתנה (למשל אחרי שמנהל הרשת פתח חריגה),
+        // בלי לחכות להפעלה מחדש של הקיוסק.
+        _anyDeskIdRetryTimer = new Timer(
+            _ => _ = RetryAnyDeskIdIfStuckAsync(),
+            null,
+            TimeSpan.FromMinutes(AnyDeskIdRetryIntervalMinutes),
+            TimeSpan.FromMinutes(AnyDeskIdRetryIntervalMinutes));
+    }
+
+    /// <summary>בודק אילו מכלי השליטה מרחוק חסרים בפועל על המכונה (exe לא קיים)
+    /// ומריץ מחדש את סקריפט ההתקנה שלהם מתוך התיקייה שהותקנה עם האפליקציה
+    /// (RemoteControlDir) - בלי לחכות ל-MSI חדש/reinstall מלא. כל סקריפט
+    /// אידמפוטנטי (בודק Test-Path/Get-Service בעצמו), אז הרצה חוזרת בטוחה.
+    /// הערה: מניח שתהליך האפליקציה רץ בהרשאות מספיקות להתקנת שירותים/תוכנה
+    /// (כמו KioskPolicyService שכבר עושה פעולות ברמת-מערכת) - אם זה לא המצב
+    /// בפועל, ההרצה תיכשל בשקט ותתועד ב-Warning; יש לוודא ידנית בבדיקה ראשונה.
+    /// RustDesk לא נכלל בכוונה - מושבת גלובלית להתקנות חדשות (ראו Package.wxs).</summary>
+    private async Task EnsureAgentsStagedAsync()
+    {
+        await RunInstallScriptIfMissingAsync("install-anydesk.ps1", AnyDeskExe, "AnyDesk");
+        await RunInstallScriptIfMissingAsync("install-teamviewer.ps1", TeamViewerQsExe, "TeamViewer QuickSupport");
+        await RunInstallScriptIfMissingAsync("install-aeroadmin.ps1", AeroAdminSetupService.ExePath, "AeroAdmin");
+    }
+
+    private async Task RunInstallScriptIfMissingAsync(string scriptFileName, string expectedExePath, string label)
+    {
+        if (File.Exists(expectedExePath))
+        {
+            return; // כבר מותקן - שום דבר לעשות
+        }
+
+        var scriptPath = Path.Combine(RemoteControlScriptsDir, scriptFileName);
+        if (!File.Exists(scriptPath))
+        {
+            Logger.Debug("{Label} self-heal: script not found at {Path} (older build without this file?)", label, scriptPath);
+            return;
+        }
+
+        Logger.Information("{Label} not found on this machine ({ExePath}) - running {Script} to self-heal", label, expectedExePath, scriptFileName);
+        try
+        {
+            var psi = new ProcessStartInfo("powershell.exe",
+                $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            using var process = Process.Start(psi);
+            if (process == null)
+            {
+                Logger.Warning("{Label} self-heal: failed to start powershell.exe for {Script}", label, scriptFileName);
+                return;
+            }
+
+            var stdout = await process.StandardOutput.ReadToEndAsync();
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0 || !File.Exists(expectedExePath))
+            {
+                Logger.Warning("{Label} self-heal via {Script} did not result in {ExePath} existing (exit code {Code}). This usually means the app process lacks the rights this script needs (installing a service / writing to Program Files). Output: {Stdout} {Stderr}",
+                    label, scriptFileName, expectedExePath, process.ExitCode, stdout, stderr);
+                return;
+            }
+
+            Logger.Information("{Label} self-heal via {Script} succeeded", label, scriptFileName);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "{Label} self-heal via {Script} threw an exception", label, scriptFileName);
+        }
+    }
+
+    /// <summary>קורא ל-RemoteControlReportingService פעם בכמה דקות אם ה-ID האחרון
+    /// שדווח ל-Firebase הוא "0" (חסימת רשת) - ומנסה שוב ישירות מול ה-exe בלי
+    /// להריץ מחדש את כל סקריפט ההתקנה. אם התקבל ID אמיתי (למשל אחרי שמנהל
+    /// הרשת פתח חריגה ל-AnyDesk), מעדכן את קובץ ה-info המקומי ומדווח ל-Firebase.</summary>
+    private async Task RetryAnyDeskIdIfStuckAsync()
+    {
+        try
+        {
+            if (_computerId == null || !File.Exists(AnyDeskInfoFile) || !File.Exists(AnyDeskExe)) return;
+
+            var content = await File.ReadAllTextAsync(AnyDeskInfoFile);
+            var idMatch = Regex.Match(content, @"AnyDesk ID:\s*(\S+)");
+            if (!idMatch.Success) return;
+            var currentId = idMatch.Groups[1].Value;
+            if (currentId != "0" && !string.IsNullOrWhiteSpace(currentId)) return; // כבר יש ID תקין - אין מה לעשות
+
+            var psi = new ProcessStartInfo(AnyDeskExe, "--get-id")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+            };
+            using var process = Process.Start(psi);
+            if (process == null) return;
+            var newId = (await process.StandardOutput.ReadToEndAsync()).Trim();
+            await process.WaitForExitAsync();
+
+            if (string.IsNullOrWhiteSpace(newId) || newId == "0" || newId == currentId) return; // עדיין תקוע/לא השתנה
+
+            Logger.Information("AnyDesk ID resolved on retry (was stuck at '0') - now {NewId}", newId);
+            var updatedContent = Regex.Replace(content, @"AnyDesk ID:\s*\S+", $"AnyDesk ID:       {newId}");
+            await File.WriteAllTextAsync(AnyDeskInfoFile, updatedContent);
+
+            await _firebase.DbUpdateAsync($"computers/{_computerId}/remoteControl/anydesk", new Dictionary<string, object>
+            {
+                ["id"] = newId,
+                ["reportedAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "Periodic AnyDesk ID retry failed (non-fatal, will try again next interval)");
+        }
     }
 
     /// <summary>קורא מחדש את קבצי ה-info של שני הכלים ומדווח ל-Firebase. נקרא גם
@@ -156,6 +295,10 @@ public class RemoteControlReportingService
         {
             try
             {
+                // כפתור "רענן" הוא גם הזדמנות שנייה לריפוי-עצמי - אם קיוסק
+                // ישן מתקין עדכון בלי אחד מהכלים (למשל אחרי שהם נוספו לאחר
+                // שהמכונה כבר הותקנה), הרענון מזהה ומתקין את מה שחסר.
+                await EnsureAgentsStagedAsync();
                 // אם AeroAdmin עוד לא הוגדר (לדוגמה install-aeroadmin.ps1 סיים אחרי
                 // שהאפליקציה כבר עלתה), כפתור "רענן" נותן הזדמנות שנייה להגדיר אותו.
                 await _aeroAdminSetup.EnsureConfiguredAsync();
@@ -241,7 +384,9 @@ public class RemoteControlReportingService
             return;
         }
 
-        dynamic? info;
+        string? id = null;
+        string? password = null;
+
         try
         {
             var automator = new TeamViewer.QuickSupport.Integration.Automator
@@ -251,19 +396,27 @@ public class RemoteControlReportingService
             // ריצה על thread נפרד: TestStack.White חוסם (סינכרוני) עד שהחלון מוכן
             // dynamic בכוונה - לא מאמת את שם המחלקה המדויק שמוחזר (לא מתועד
             // בבירור מעבר ל-"info.ID and info.Password" בדוגמת הספרייה)
-            info = await Task.Run(() => (dynamic)automator.GetInfo());
+            dynamic info = await Task.Run(() => (dynamic)automator.GetInfo());
+            id = info?.ID;
+            password = info?.Password;
         }
         catch (Exception ex)
         {
-            Logger.Warning(ex, "TeamViewer.QuickSupport.Integration failed to read ID/password - library may be incompatible with the current QuickSupport UI (see comment above), needs a native UI Automation fallback");
-            return;
+            Logger.Warning(ex, "TeamViewer.QuickSupport.Integration threw - library may be incompatible with the current QuickSupport UI, falling back to native UI Automation");
         }
 
-        string? id = info?.ID;
-        string? password = info?.Password;
+        // נופל חזרה לקריאה ישירה מהחלון (System.Windows.Automation, כבר זמין
+        // תחת net8.0-windows) אם הספרייה החיצונית נכשלה או החזירה ריק -
+        // אותה גישה בדיוק כמו AeroAdminSetupService, כי אין שום ערובה שהספרייה
+        // (לא עודכנה מ-2018) תואמת לגרסת QuickSupport הנוכחית.
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(password))
         {
-            Logger.Warning("TeamViewer QuickSupport returned empty ID/password");
+            (id, password) = TryReadTeamViewerInfoNatively();
+        }
+
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(password))
+        {
+            Logger.Warning("TeamViewer QuickSupport ID/password could not be read by either method");
             return;
         }
 
@@ -281,6 +434,100 @@ public class RemoteControlReportingService
             return;
         }
         Logger.Information("TeamViewer QuickSupport ID+password reported to Firebase for computer {ComputerId}", _computerId);
+    }
+
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    private static IntPtr FindTopLevelWindowForProcess(uint processId)
+    {
+        var found = IntPtr.Zero;
+        EnumWindows((hWnd, _) =>
+        {
+            GetWindowThreadProcessId(hWnd, out var pid);
+            if (pid == processId)
+            {
+                found = hWnd;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    /// <summary>גיבוי ל-TeamViewer.QuickSupport.Integration (ראה הערה מעל
+    /// StartTeamViewerQuickSupportAsync) - קורא ישירות מחלון ה-GUI של
+    /// QuickSupport באמצעות System.Windows.Automation, אותה גישה בדיוק כמו
+    /// AeroAdminSetupService. אזהרה: התבניות (regex) ל-ID/סיסמה כאן הן ניחוש
+    /// סביר (ID: כ-9 ספרות, סיסמה: 4-6 ספרות) שלא אומת מול ה-UI האמיתי של
+    /// QuickSupport - אם זה נכשל, ה-dump ב-teamviewer-ui-debug.txt נותן את
+    /// הטקסטים האמיתיים בחלון כדי לתקן את התבניות בלי ניחוש נוסף.</summary>
+    private (string? id, string? password) TryReadTeamViewerInfoNatively()
+    {
+        try
+        {
+            var process = Process.GetProcessesByName("TeamViewerQS").FirstOrDefault();
+            if (process == null)
+            {
+                if (!File.Exists(TeamViewerQsExe)) return (null, null);
+                process = Process.Start(new ProcessStartInfo(TeamViewerQsExe) { UseShellExecute = true });
+                if (process == null) return (null, null);
+                Thread.Sleep(3000); // זמן עלייה לפני שהחלון קיים
+            }
+
+            IntPtr handle;
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+            do
+            {
+                handle = FindTopLevelWindowForProcess((uint)process.Id);
+                if (handle != IntPtr.Zero) break;
+                Thread.Sleep(300);
+            } while (DateTime.UtcNow < deadline);
+
+            if (handle == IntPtr.Zero)
+            {
+                Logger.Warning("Native TeamViewer QuickSupport fallback: no top-level window found for process {Pid}", process.Id);
+                return (null, null);
+            }
+
+            AutomationElement window;
+            try { window = AutomationElement.FromHandle(handle); }
+            catch { return (null, null); }
+
+            var elements = window.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+            string? id = null, password = null;
+            foreach (AutomationElement el in elements)
+            {
+                string value;
+                try { value = el.Current.Name ?? string.Empty; }
+                catch { continue; }
+                if (string.IsNullOrWhiteSpace(value)) continue;
+
+                if (id == null)
+                {
+                    var idMatch = Regex.Match(value, @"\b(\d[\d ]{7,10}\d)\b");
+                    if (idMatch.Success) id = idMatch.Groups[1].Value.Replace(" ", "");
+                }
+                if (password == null && value.Trim() != id)
+                {
+                    var pwMatch = Regex.Match(value.Trim(), @"^\d{4,6}$");
+                    if (pwMatch.Success) password = pwMatch.Value;
+                }
+            }
+
+            if (id == null || password == null)
+            {
+                UiAutomationDebug.DumpTree(window, TeamViewerUiDebugFile, "TeamViewer QuickSupport - native fallback ID/password read");
+            }
+
+            return (id, password);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Native TeamViewer QuickSupport fallback threw");
+            return (null, null);
+        }
     }
 
     private static void SetRustDeskPassword(string exePath, string password)
@@ -320,5 +567,6 @@ public class RemoteControlReportingService
         _anyDeskListener?.Stop();
         _refreshListener?.Stop();
         _teamViewerLaunchListener?.Stop();
+        _anyDeskIdRetryTimer?.Dispose();
     }
 }
