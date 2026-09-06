@@ -22,6 +22,7 @@ public class RemoteControlReportingService
 
     private const string RustDeskInfoFile = @"C:\ProgramData\SIONYX\rustdesk-info.txt";
     private const string AnyDeskInfoFile = @"C:\ProgramData\SIONYX\anydesk-info.txt";
+    private const string TeamViewerInfoFile = @"C:\ProgramData\SIONYX\teamviewer-info.txt";
     private const string RustDeskExe = @"C:\Program Files\RustDesk\rustdesk.exe";
     private const string AnyDeskExe = @"C:\Program Files (x86)\AnyDesk\AnyDesk.exe";
 
@@ -54,6 +55,11 @@ public class RemoteControlReportingService
         if (_computerId == null) return;
         await ReportInitialInfoAsync("rustdesk", RustDeskInfoFile, "RustDesk", _computerId);
         await ReportInitialInfoAsync("anydesk", AnyDeskInfoFile, "AnyDesk", _computerId);
+        // TeamViewer: no remote password-set listener wired below (unlike RustDesk/
+        // AnyDesk) - the password is fixed fleet-wide via IMPORTREGFILE at install
+        // time (see install-teamviewer.ps1), not changeable per-machine from the
+        // dashboard without a paid TeamViewer Corporate/Tensor license.
+        await ReportInitialInfoAsync("teamviewer", TeamViewerInfoFile, "TeamViewer", _computerId);
     }
 
     private async Task ReportInitialInfoAsync(string tool, string infoFilePath, string idLabel, string computerId)

@@ -79,6 +79,22 @@
               Source="$(var.SourceDir)\installer\remote-control\install-anydesk.ps1"
               KeyPath="yes" />
       </Component>
+      <!-- TeamViewer: fallback for sites where a NetFree-style content filter does
+           full TLS interception and rejects AnyDesk's pinned certificate (AnyDesk
+           validates against its own bundled root, TeamViewer validates against the
+           OS trust store, so it isn't affected the same way). Fixed fleet-wide
+           password via IMPORTREGFILE, not a per-machine random one - see
+           install-teamviewer.ps1 header. -->
+      <Component Id="TeamViewerInstallScript" Guid="*">
+        <File Id="InstallTeamViewerPs1"
+              Source="$(var.SourceDir)\installer\remote-control\install-teamviewer.ps1"
+              KeyPath="yes" />
+      </Component>
+      <Component Id="TeamViewerRegFile" Guid="*">
+        <File Id="TeamViewerUnattendedReg"
+              Source="$(var.SourceDir)\installer\remote-control\teamviewer-unattended.reg"
+              KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <ComponentGroup Id="TemplateFiles" Directory="TemplatesDir">
@@ -209,6 +225,15 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- Fallback agent for NetFree-filtered sites where AnyDesk can never get an ID
+         (see install-teamviewer.ps1). Runs unconditionally alongside AnyDesk on every
+         install - harmless on regular networks, just gives a second reporting row. -->
+    <CustomAction Id="CA_InstallTeamViewer"
+                  Directory="RemoteControlDir"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-teamviewer.ps1&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
 
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
@@ -234,7 +259,8 @@
            have RustDesk installed are unaffected (their service keeps running). -->
       <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE AND NOT Installed AND 0" />
       <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE AND NOT Installed" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE AND NOT Installed" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
