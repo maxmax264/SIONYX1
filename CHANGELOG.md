@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.45] - 2026-09-06
+
+### Other
+- stage exe + one-time UI-Automation setup to report ID/password to dashboard (2e3e72a1)
+
+
 ## [3.11.44] - 2026-09-06
 
 
