@@ -23,16 +23,23 @@ namespace SionyxKiosk.Infrastructure.Logging;
 /// back to the machine's hostname) - this is how a reader tells which kiosk
 /// a given line came from.
 ///
-/// Frequency control (Stage 3 scope - a Firebase-driven live toggle is a
-/// later stage): reads registry values so an installer/admin can dial this
-/// down without a rebuild.
-///   - LogShipEnabled     ("0"/"1", default "1")
+/// Frequency control:
+///   - LogShipEnabled     ("0"/"1", default "1") - read at startup
 ///   - LogShipIntervalMs  (minimum ms between two posts; default "0" = no
 ///                          throttle, ship every line immediately - this
-///                          matches "as fast as possible" for active dev)
+///                          matches "as fast as possible" for active dev) -
+///                          read at startup, and live-updatable afterwards
+///                          from the dashboard via LogShippingControlService
+///                          (writes to Firebase "logShipping/intervalMs")
 /// Minimum log level to ship is set where the sink is attached (App.xaml.cs),
 /// via Serilog's own restrictedToMinimumLevel - also registry-overridable
 /// there (LogShipMinLevel).
+///
+/// Also exposes SendRaw/SendRawAsync so LogShippingControlService can post an
+/// ad-hoc dump (e.g. "send the whole log file now") through the same
+/// channel/credentials, bypassing the per-line throttle above - an on-demand
+/// dump is a deliberate one-off action, not part of the steady-state stream
+/// the throttle is meant to control.
 /// </summary>
 public sealed class ChannelLogSink : ILogEventSink
 {
@@ -45,11 +52,17 @@ public sealed class ChannelLogSink : ILogEventSink
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
     private static readonly Serilog.ILogger SelfLogger = Serilog.Log.ForContext<ChannelLogSink>();
 
+    /// <summary>The sink instance currently attached to Log.Logger, if any -
+    /// lets LogShippingControlService reach it to apply a live interval
+    /// change or trigger an ad-hoc send without needing its own copy of the
+    /// channel URL/API key/author.</summary>
+    public static ChannelLogSink? Current { get; private set; }
+
     private readonly string _channelUrl;
     private readonly string _apiKey;
     private readonly string _author;
-    private readonly TimeSpan _minInterval;
     private readonly object _gate = new();
+    private TimeSpan _minInterval;
     private DateTime _lastSentAt = DateTime.MinValue;
 
     static ChannelLogSink()
@@ -70,9 +83,21 @@ public sealed class ChannelLogSink : ILogEventSink
         // channel's "author" matches what's already familiar from the
         // computers list - falls back to the raw hostname if that's unset.
         _author = RegistryConfig.ReadValue("ComputerName", null) ?? DeviceInfo.GetComputerName();
+
+        Current = this;
     }
 
     public bool Enabled => (RegistryConfig.ReadValue("LogShipEnabled", "1") ?? "1") != "0";
+
+    /// <summary>Live-updates the throttle interval (Stage 6 - dashboard control),
+    /// without needing to restart the kiosk app.</summary>
+    public void SetIntervalMs(int ms)
+    {
+        lock (_gate)
+        {
+            _minInterval = TimeSpan.FromMilliseconds(Math.Max(0, ms));
+        }
+    }
 
     public void Emit(LogEvent logEvent)
     {
@@ -81,9 +106,9 @@ public sealed class ChannelLogSink : ILogEventSink
         // Throttle: if an interval is configured, drop events that arrive
         // faster than it rather than queuing them - this is a live tail of
         // "what's happening now", not an audit log that needs every line.
-        if (_minInterval > TimeSpan.Zero)
+        lock (_gate)
         {
-            lock (_gate)
+            if (_minInterval > TimeSpan.Zero)
             {
                 var now = DateTime.UtcNow;
                 if (now - _lastSentAt < _minInterval) return;
@@ -91,15 +116,20 @@ public sealed class ChannelLogSink : ILogEventSink
             }
         }
 
+        SendRaw(FormatText(logEvent), logEvent.Timestamp.UtcDateTime);
+    }
+
+    /// <summary>Posts arbitrary text to the channel under this kiosk's name,
+    /// bypassing the throttle - used for on-demand dumps (Stage 4/5).</summary>
+    public void SendRaw(string text, DateTime? timestampUtc = null)
+    {
         try
         {
-            var text = FormatText(logEvent);
-
             var body = JsonSerializer.Serialize(new
             {
                 author = _author,
                 text,
-                timestamp = logEvent.Timestamp.UtcDateTime,
+                timestamp = timestampUtc ?? DateTime.UtcNow,
                 is_ads = false,
             });
 

@@ -367,6 +367,50 @@ export const requestTeamViewerLaunch = async computerId => {
   }
 };
 
+/** Master-dashboard "send logs from every kiosk now" button (Stage 4). Writes
+ * to an org-wide (not per-computer) path - every kiosk's LogShippingControlService
+ * listens on the same path, so this one write fans out to the whole fleet.
+ * Each kiosk posts its current log file to the entertainment-channel site,
+ * tagged with its own name, independent of the always-on live stream. */
+export const requestLogShipTriggerAll = async () => {
+  try {
+    const orgId = getOrgId();
+    await set(ref(database, `organizations/${orgId}/logShipping/triggerAllRequested`), Date.now());
+    return { success: true };
+  } catch (error) {
+    logger.error('Error requesting fleet-wide log ship:', error);
+    return { success: false, error: 'Failed to trigger log shipping' };
+  }
+};
+
+/** Per-kiosk "send log" button (Stage 5) - same idea as requestLogShipTriggerAll
+ * but scoped to a single computer, via `computers/{id}/logShipping/triggerRequested`. */
+export const requestLogShipTrigger = async computerId => {
+  try {
+    const orgId = getOrgId();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/logShipping/triggerRequested`), Date.now());
+    return { success: true };
+  } catch (error) {
+    logger.error('Error requesting per-kiosk log ship:', error);
+    return { success: false, error: 'Failed to trigger log shipping' };
+  }
+};
+
+/** Stage 6 - dashboard's live control over how often each kiosk ships a log
+ * line to the channel (ChannelLogSink's throttle). Applied by every kiosk
+ * immediately via a real-time listener - no restart needed. `ms = 0` means
+ * "ship every line immediately" (the current default for active development). */
+export const setLogShipIntervalMs = async ms => {
+  try {
+    const orgId = getOrgId();
+    await set(ref(database, `organizations/${orgId}/logShipping/intervalMs`), ms);
+    return { success: true };
+  } catch (error) {
+    logger.error('Error setting log-shipping interval:', error);
+    return { success: false, error: 'Failed to set log-shipping interval' };
+  }
+};
+
 /**
  * Get users currently using computers
  */

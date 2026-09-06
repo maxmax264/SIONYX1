@@ -135,6 +135,7 @@ public partial class App : Application
                     sp.GetRequiredService<FirebaseClient>(),
                     sp.GetRequiredService<AeroAdminSetupService>()));
                 services.AddSingleton(sp => new ComputerHeartbeatService(sp.GetRequiredService<FirebaseConfig>()));
+                services.AddSingleton(sp => new LogShippingControlService(sp.GetRequiredService<FirebaseClient>(), logDir));
 
                 // System Services
                 services.AddSingleton(_ => new ProcessCleanupService());
@@ -185,7 +186,8 @@ public partial class App : Application
                     sp.GetRequiredService<ProcessRestrictionService>(),
                     sp.GetRequiredService<GlobalHotkeyService>(),
                     sp.GetRequiredService<RemoteControlReportingService>(),
-                    sp.GetRequiredService<ComputerHeartbeatService>()));
+                    sp.GetRequiredService<ComputerHeartbeatService>(),
+                    sp.GetRequiredService<LogShippingControlService>()));
                 services.AddSingleton<IdleTimeoutService>();
                 services.AddSingleton(sp => new SessionCoordinator(
                     sp.GetRequiredService<SessionService>(),

@@ -23,6 +23,7 @@ public class SystemServicesManager
     private readonly GlobalHotkeyService _globalHotkey;
     private readonly RemoteControlReportingService _remoteControl;
     private readonly ComputerHeartbeatService _heartbeat;
+    private readonly LogShippingControlService _logShipping;
 
     private Action<string>? _forceLogoutHandler;
     private Action? _adminExitHandler;
@@ -36,7 +37,8 @@ public class SystemServicesManager
         ProcessRestrictionService processRestriction,
         GlobalHotkeyService globalHotkey,
         RemoteControlReportingService remoteControl,
-        ComputerHeartbeatService heartbeat)
+        ComputerHeartbeatService heartbeat,
+        LogShippingControlService logShipping)
     {
         _forceLogout = forceLogout;
         _chat = chat;
@@ -47,6 +49,7 @@ public class SystemServicesManager
         _globalHotkey = globalHotkey;
         _remoteControl = remoteControl;
         _heartbeat = heartbeat;
+        _logShipping = logShipping;
     }
 
     /// <summary>Raised when a force-logout is received from the server.</summary>
@@ -112,6 +115,9 @@ public class SystemServicesManager
         _globalHotkey.AdminExitRequested += _adminExitHandler;
         _globalHotkey.Start();
         _heartbeat.Start();
+
+        try { _logShipping.Start(); }
+        catch (Exception ex) { Logger.Warning(ex, "Log-shipping control listeners failed to start (non-fatal - live ChannelLogSink streaming still works)"); }
     }
 
     /// <summary>Stop all system services and unsubscribe event handlers.</summary>
