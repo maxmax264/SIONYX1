@@ -32,7 +32,7 @@ public class SystemServicesManagerTests : IDisposable
         _keyboard = new KeyboardRestrictionService(enabled: false);
         _processRestriction = new ProcessRestrictionService(enabled: false);
         _globalHotkey = new GlobalHotkeyService();
-        _remoteControl = new RemoteControlReportingService(_firebase);
+        _remoteControl = new RemoteControlReportingService(_firebase, new AeroAdminSetupService());
         _heartbeat = new ComputerHeartbeatService(TestFirebaseFactory.CreateConfig());
         _session = new SessionService(
             _firebase, "user-123", "test-org",
