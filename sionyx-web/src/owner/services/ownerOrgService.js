@@ -74,6 +74,8 @@ export const getOrgComputers = async (orgId) => {
       lastSeen: c.lastSeen || null,
       rustdesk: c.remoteControl?.rustdesk || null,
       anydesk: c.remoteControl?.anydesk || null,
+      teamviewer: c.remoteControl?.teamviewer || null,
+      aeroadmin: c.remoteControl?.aeroadmin || null,
     }));
     return { success: true, computers };
   } catch (e) {
@@ -92,6 +94,20 @@ export const setAnyDeskPassword = async (orgId, computerId, password) => {
   try {
     await waitForAuth();
     await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/setPassword`), password);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+};
+
+/** Owner-only: ask a kiosk to launch TeamViewer QuickSupport on demand and report
+ * back the freshly-generated ID+password. See computerService.js's
+ * requestTeamViewerLaunch for why this is on-demand rather than an always-on
+ * unattended Host install. */
+export const requestTeamViewerLaunch = async (orgId, computerId) => {
+  try {
+    await waitForAuth();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/teamviewer/launchRequest`), Date.now());
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };

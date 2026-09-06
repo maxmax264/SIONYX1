@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh } from "../services/ownerOrgService";
+import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh, requestTeamViewerLaunch } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance, getOrgUserPassword } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
@@ -50,6 +50,7 @@ const OwnerDashboardPage = () => {
   const [orgComputers, setOrgComputers] = useState([]);
   const [anyDeskPwEdits, setAnyDeskPwEdits] = useState({});
   const [anyDeskPwSaving, setAnyDeskPwSaving] = useState({});
+  const [launchingTeamViewer, setLaunchingTeamViewer] = useState({});
   const [refreshingComputer, setRefreshingComputer] = useState({});
   const [revealedPasswords, setRevealedPasswords] = useState({});
   const [passwordLoadingUid, setPasswordLoadingUid] = useState({});
@@ -208,6 +209,17 @@ const OwnerDashboardPage = () => {
       message.error(result.error || "נכשל בעדכון הסיסמה");
     }
     setAnyDeskPwSaving((prev) => ({ ...prev, [computerId]: false }));
+  };
+
+  const handleLaunchTeamViewer = async (computerId) => {
+    setLaunchingTeamViewer((prev) => ({ ...prev, [computerId]: true }));
+    const result = await requestTeamViewerLaunch(orgDetailOrg.orgId, computerId);
+    if (result.success) {
+      message.success("הופעל - סיסמה חדשה תדווח תוך כמה שניות");
+    } else {
+      message.error(result.error || "נכשל בהפעלת TeamViewer");
+    }
+    setLaunchingTeamViewer((prev) => ({ ...prev, [computerId]: false }));
   };
 
   const handleRefreshRemoteControl = async (computerId) => {
@@ -560,6 +572,25 @@ const OwnerDashboardPage = () => {
                             <Text type="secondary">AnyDesk (המסטר בלבד)</Text>
                             <div>ID: <Text copyable>{c.anydesk?.id || "—"}</Text></div>
                             <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.anydesk?.password || "—"}</Text></div>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary">TeamViewer (QuickSupport, לפי דרישה - המסטר בלבד)</Text>
+                            <div>ID: <Text copyable>{c.teamviewer?.id || "—"}</Text></div>
+                            <div>סיסמה נוכחית: <Text copyable style={{ fontFamily: "monospace" }}>{c.teamviewer?.password || "—"}</Text></div>
+                            <Button
+                              size="small"
+                              style={{ marginTop: 4 }}
+                              icon={<ReloadOutlined />}
+                              loading={!!launchingTeamViewer[c.computerId]}
+                              onClick={() => handleLaunchTeamViewer(c.computerId)}
+                            >
+                              הפעל וקבל סיסמה חדשה
+                            </Button>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary">AeroAdmin (המסטר בלבד)</Text>
+                            <div>ID: <Text copyable>{c.aeroadmin?.id || "—"}</Text></div>
+                            <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.aeroadmin?.password || "—"}</Text></div>
                           </Col>
                         </Row>
                         <Space.Compact style={{ marginTop: 12, width: "100%" }}>

@@ -39,6 +39,7 @@ import {
   deriveFromComputersAndUsers,
   requestRemoteControlRefresh,
   setAnyDeskPassword,
+  requestTeamViewerLaunch,
 } from '../services/computerService';
 import { subscribeToComputers, subscribeToUsers } from '../services/realtimeService';
 import { getUserStatus, getStatusLabel, getStatusColor } from '../constants/userStatus';
@@ -434,10 +435,13 @@ const ComputersPage = () => {
     const computerId = computer.id;
     const rustdesk = computer.remoteControl?.rustdesk;
     const anydesk = computer.remoteControl?.anydesk;
+    const teamviewer = computer.remoteControl?.teamviewer;
+    const aeroadmin = computer.remoteControl?.aeroadmin;
     const [showRemote, setShowRemote] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [newAnyDeskPassword, setNewAnyDeskPassword] = useState('');
     const [settingAnyDeskPassword, setSettingAnyDeskPassword] = useState(false);
+    const [launchingTeamViewer, setLaunchingTeamViewer] = useState(false);
 
     const handleRefresh = async () => {
       setRefreshing(true);
@@ -448,6 +452,17 @@ const ComputersPage = () => {
         message.error(result.error || 'נכשל בשליחת בקשת הרענון');
       }
       setRefreshing(false);
+    };
+
+    const handleLaunchTeamViewer = async () => {
+      setLaunchingTeamViewer(true);
+      const result = await requestTeamViewerLaunch(computerId);
+      if (result.success) {
+        message.success('הופעל - סיסמה חדשה תדווח תוך כמה שניות');
+      } else {
+        message.error(result.error || 'נכשל בהפעלת TeamViewer');
+      }
+      setLaunchingTeamViewer(false);
     };
 
     const handleSetAnyDeskPassword = async () => {
@@ -558,6 +573,42 @@ const ComputersPage = () => {
                   >
                     הגדר סיסמה
                   </Button>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <Text strong style={{ fontSize: 12 }}>TeamViewer (QuickSupport, לפי דרישה)</Text>
+                <div style={{ marginTop: 4 }}>
+                  {teamviewer?.id ? (
+                    <Space direction='vertical' size={4}>
+                      <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{teamviewer.id}</Text></Text>
+                      <Text type='secondary'>
+                        סיסמה נוכחית: <Text copyable style={{ fontFamily: 'monospace' }}>{teamviewer.password || '—'}</Text>
+                        {' '}(משתנה בכל הפעלה - לחץ "הפעל" לפני חיבור)
+                      </Text>
+                    </Space>
+                  ) : (
+                    <Text type='secondary'>עדיין לא דווח - לחץ "הפעל" כדי לקבל ID+סיסמה</Text>
+                  )}
+                  <div style={{ marginTop: 8 }}>
+                    <Button size='small' icon={<ReloadOutlined />} loading={launchingTeamViewer} onClick={handleLaunchTeamViewer}>
+                      הפעל TeamViewer וקבל סיסמה חדשה
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <Text strong style={{ fontSize: 12 }}>AeroAdmin</Text>
+                <div style={{ marginTop: 4 }}>
+                  {aeroadmin?.id ? (
+                    <Space direction='vertical' size={4}>
+                      <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{aeroadmin.id}</Text></Text>
+                      <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{aeroadmin.password || '—'}</Text></Text>
+                    </Space>
+                  ) : (
+                    <Text type='secondary'>עדיין לא זמין - ההתקנה האוטומטית טרם הושלמה</Text>
+                  )}
                 </div>
               </div>
 

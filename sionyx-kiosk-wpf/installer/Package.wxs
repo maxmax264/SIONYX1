@@ -82,17 +82,12 @@
       <!-- TeamViewer: fallback for sites where a NetFree-style content filter does
            full TLS interception and rejects AnyDesk's pinned certificate (AnyDesk
            validates against its own bundled root, TeamViewer validates against the
-           OS trust store, so it isn't affected the same way). Fixed fleet-wide
-           password via IMPORTREGFILE, not a per-machine random one - see
-           install-teamviewer.ps1 header. -->
+           OS trust store, so it isn't affected the same way). Stages QuickSupport
+           for on-demand launch from the dashboard - see install-teamviewer.ps1
+           header for why this isn't an always-on Host install. -->
       <Component Id="TeamViewerInstallScript" Guid="*">
         <File Id="InstallTeamViewerPs1"
               Source="$(var.SourceDir)\installer\remote-control\install-teamviewer.ps1"
-              KeyPath="yes" />
-      </Component>
-      <Component Id="TeamViewerRegFile" Guid="*">
-        <File Id="TeamViewerUnattendedReg"
-              Source="$(var.SourceDir)\installer\remote-control\teamviewer-unattended.reg"
               KeyPath="yes" />
       </Component>
     </ComponentGroup>

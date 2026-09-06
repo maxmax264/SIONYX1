@@ -348,6 +348,25 @@ export const setAnyDeskPassword = async (computerId, password) => {
   }
 };
 
+/** Ask a kiosk to launch TeamViewer QuickSupport on demand (not installed as an
+ * always-on unattended service - this is intentional, see install-teamviewer.ps1
+ * header: a permanently-listening Host is what TeamViewer's free-tier commercial-use
+ * detection flags across a fleet). The kiosk's RemoteControlReportingService listens
+ * for this flag, launches the staged TeamViewerQS.exe, reads the freshly-generated
+ * ID+password from tvinfo.ini, reports them back, and clears the flag. The ID is
+ * normally stable per machine; the password is randomized by TeamViewer on every
+ * launch, so this must be called again each time before connecting. */
+export const requestTeamViewerLaunch = async computerId => {
+  try {
+    const orgId = getOrgId();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/teamviewer/launchRequest`), Date.now());
+    return { success: true };
+  } catch (error) {
+    logger.error('Error requesting TeamViewer launch:', error);
+    return { success: false, error: 'Failed to request TeamViewer launch' };
+  }
+};
+
 /**
  * Get users currently using computers
  */
