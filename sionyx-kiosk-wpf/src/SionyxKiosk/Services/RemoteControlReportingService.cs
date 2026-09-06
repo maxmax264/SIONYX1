@@ -29,7 +29,6 @@ public class RemoteControlReportingService
     // Staged by install-teamviewer.ps1, NOT run continuously - see StartTeamViewerQuickSupport
     // for why this is launched on-demand instead of installed as an always-on Host service.
     private const string TeamViewerQsExe = @"C:\ProgramData\SIONYX\TeamViewerQS.exe";
-    private const string TeamViewerQsInfoIni = @"C:\ProgramData\SIONYX\TeamViewerQS\tvinfo.ini";
 
     private readonly FirebaseClient _firebase;
     private SseListener? _rustDeskListener;
@@ -205,10 +204,15 @@ public class RemoteControlReportingService
     /// בזיכרון הפרויקט. הפעלה זמנית לפי בקשה, session בודד בכל פעם, נראית הרבה
     /// יותר כמו תמיכה מזדמנת לגיטימית.
     ///
-    /// TODO לא סופי: פורמט tvinfo.ini עדיין לא אושר בפועל (המשתמש עדיין לא שלח
-    /// את התוכן שלו) - ה-regex למטה הוא ניחוש סביר על סמך תיעוד קהילתי, לא
-    /// מאומת. אם ה-parse נכשל, זה יירשם ב-log עם תוכן הקובץ המלא כדי שנוכל
-    /// לתקן את ה-regex בלי לגשת שוב למחשב.
+    /// tvinfo.ini (שנוסה תחילה) הוכח כמכיל רק מטא-דאטה של התקנה, לא ID/סיסמה -
+    /// אלה קיימים רק בזיכרון התהליך ומוצגים על המסך לקריאה אנושית, אין קובץ
+    /// לקרוא. במקום זה משתמשים בספריית UI-automation ייעודית
+    /// (TeamViewer.QuickSupport.Integration, NuGet) שקוראת את הטקסט מתוך חלון
+    /// ה-GUI. אזהרה: הספרייה הזו לא עודכנה מאז 2018 ובנויה ל-.NET Framework
+    /// 4.5 - היא נבדקה שהיא נטענת (NuGet reference), אבל טרם אומתה בפועל מול
+    /// הגרסה הנוכחית של QuickSupport. אם ה-Automator.GetInfo() זורק/נכשל,
+    /// ייתכן שצריך להחליף אותה במימוש UI Automation עצמאי (System.Windows.Automation,
+    /// כבר זמין תחת net8.0-windows) שקורא את אותם TextBox-ים ישירות.
     /// </summary>
     private async Task StartTeamViewerQuickSupportAsync()
     {
@@ -218,44 +222,29 @@ public class RemoteControlReportingService
             return;
         }
 
-        // מוחקים קובץ מידע קודם כדי לא להזדהם ID/סיסמה ישנים אם ה-launch הנוכחי ייכשל
-        try { if (File.Exists(TeamViewerQsInfoIni)) File.Delete(TeamViewerQsInfoIni); } catch { /* לא קריטי */ }
-
-        var psi = new ProcessStartInfo(TeamViewerQsExe)
+        dynamic? info;
+        try
         {
-            UseShellExecute = true, // QuickSupport צריך חלון גרפי גלוי על הקיוסק
-            WorkingDirectory = Path.GetDirectoryName(TeamViewerQsExe),
-        };
-        Process.Start(psi);
-
-        // ממתינים ל-handshake מול שרתי TeamViewer וליצירת tvinfo.ini - יכול לקחת
-        // כמה שניות, מנסים כמו בתבנית של AnyDesk/RustDesk
-        string? content = null;
-        for (var i = 0; i < 10 && content == null; i++)
-        {
-            await Task.Delay(2000);
-            try
+            var automator = new TeamViewer.QuickSupport.Integration.Automator
             {
-                if (File.Exists(TeamViewerQsInfoIni))
-                {
-                    content = await File.ReadAllTextAsync(TeamViewerQsInfoIni);
-                }
-            }
-            catch { /* ה-קובץ עוד נכתב, ננסה שוב */ }
+                AlternativePathToTeamViewer = TeamViewerQsExe,
+            };
+            // ריצה על thread נפרד: TestStack.White חוסם (סינכרוני) עד שהחלון מוכן
+            // dynamic בכוונה - לא מאמת את שם המחלקה המדויק שמוחזר (לא מתועד
+            // בבירור מעבר ל-"info.ID and info.Password" בדוגמת הספרייה)
+            info = await Task.Run(() => (dynamic)automator.GetInfo());
         }
-
-        if (content == null)
+        catch (Exception ex)
         {
-            Logger.Warning("tvinfo.ini never appeared after launching TeamViewerQS - giving up for this request");
+            Logger.Warning(ex, "TeamViewer.QuickSupport.Integration failed to read ID/password - library may be incompatible with the current QuickSupport UI (see comment above), needs a native UI Automation fallback");
             return;
         }
 
-        // TODO: לאמת מול תוכן אמיתי - ניחוש נוכחי: "ID=123456789" ו-"Password=xxxxxxxx" בשורות נפרדות
-        var idMatch = Regex.Match(content, @"ID\s*=\s*(\S+)", RegexOptions.IgnoreCase);
-        var pwMatch = Regex.Match(content, @"Password\s*=\s*(\S+)", RegexOptions.IgnoreCase);
-        if (!idMatch.Success || !pwMatch.Success)
+        string? id = info?.ID;
+        string? password = info?.Password;
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(password))
         {
-            Logger.Warning("tvinfo.ini format did not match expected pattern - raw content: {Content}", content);
+            Logger.Warning("TeamViewer QuickSupport returned empty ID/password");
             return;
         }
 
@@ -263,8 +252,8 @@ public class RemoteControlReportingService
         var path = $"computers/{_computerId}/remoteControl/teamviewer";
         var result = await _firebase.DbUpdateAsync(path, new Dictionary<string, object>
         {
-            ["id"] = idMatch.Groups[1].Value,
-            ["password"] = pwMatch.Groups[1].Value,
+            ["id"] = id,
+            ["password"] = password,
             ["reportedAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         });
         if (!result.Success)

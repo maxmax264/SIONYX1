@@ -38,6 +38,12 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
+    <!-- Last updated 2018, targets .NET Framework 4.5, depends on the unmaintained
+         TestStack.White UI-automation library - unverified against the current
+         TeamViewer QuickSupport UI. See StartTeamViewerQuickSupportAsync in
+         RemoteControlReportingService.cs: this MUST be tested on a real machine
+         before being trusted, not assumed to work. -->
+    <PackageReference Include="TeamViewer.QuickSupport.Integration" Version="1805.24.1" />
   </ItemGroup>
 
 </Project>
