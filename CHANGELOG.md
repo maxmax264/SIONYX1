@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [3.11.51] - 2026-09-07
+
+### Bug Fixes
+- SessionCoordinator used FirebaseResult-style .Success instead of ServiceResult's .IsSuccess (build error CS1061/CS0165) (7fe21c01)
+- AeroAdmin setup had no retry mechanism (unlike AnyDesk) - add periodic retry so a failed first attempt self-heals (269b4f9b)
+- preserve active session/timer on admin-exit freeze instead of ending session (ae40f67a)
+
+
 ## [3.11.50] - 2026-09-07
 
 
