@@ -21,9 +21,38 @@ if (-Not (Test-Path $InfoDir)) { New-Item -ItemType Directory -Force -Path $Info
 
 $alreadyInstalled = $false
 $existingService = Get-Service -Name "AnyDesk" -ErrorAction SilentlyContinue
-if ($existingService -ne $null -and $existingService.Status -eq 'Running') {
-    Write-Host "[SIONYX] AnyDesk already installed and running - skipping binary install."
-    $alreadyInstalled = $true
+if ($existingService -ne $null) {
+    # שלב 4: זיהוי התקנה שבורה/בנתיב שגוי לפני שממשיכים - קרה בעבר בפועל
+    # (נתיב "$env:ProgramFiles(x86)" בלי הסוגריים המתקנים -> AnyDesk הותקן
+    # ורץ בנתיב שגוי, ולא ניתן היה לתקן ע"י הרצה חוזרת של הסקריפט המתוקן
+    # בלבד - השירות הישן חסם את זה). בודקים את הנתיב האמיתי של השירות מול
+    # ה-InstallDir הצפוי, ואם הוא לא תואם - מוחקים את ההתקנה הישנה לפני
+    # שממשיכים, כדי שהתקנה חדשה ונקייה תוכל לעלות בלי הפרעה.
+    $svcPathInfo = Get-CimInstance Win32_Service -Filter "Name='AnyDesk'" -ErrorAction SilentlyContinue
+    $svcExePath = $null
+    if ($svcPathInfo -ne $null -and $svcPathInfo.PathName) {
+        $svcExePath = ($svcPathInfo.PathName -replace '^"?([^"]+\.exe)"?.*$', '$1')
+    }
+    $pathMismatch = $svcExePath -and ($svcExePath -notlike "$InstallDir\*")
+
+    if ($pathMismatch) {
+        Write-Warning "[SIONYX] Existing AnyDesk service points to unexpected path '$svcExePath' (expected under '$InstallDir') - removing broken/conflicting install before reinstalling."
+        try {
+            if ($existingService.Status -eq 'Running') { Stop-Service -Name "AnyDesk" -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $svcExePath) { Start-Process -FilePath $svcExePath -ArgumentList "--remove" -Wait -ErrorAction SilentlyContinue }
+            Start-Sleep -Seconds 3
+            $svcParentDir = Split-Path $svcExePath -Parent
+            if ($svcParentDir -and (Test-Path $svcParentDir)) {
+                Remove-Item -Path $svcParentDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        } catch {
+            Write-Warning "[SIONYX] Cleanup of broken AnyDesk install hit an error (continuing anyway): $_"
+        }
+        # לא alreadyInstalled - נמשיך להתקנה נקייה למטה
+    } elseif ($existingService.Status -eq 'Running') {
+        Write-Host "[SIONYX] AnyDesk already installed (correct path) and running - skipping binary install."
+        $alreadyInstalled = $true
+    }
 }
 
 if (-Not $alreadyInstalled) {
