@@ -157,7 +157,7 @@ public class SessionCoordinator
         try
         {
             var result = await _orgMetadata.GetIdleTimeoutMinutesAsync();
-            var minutes = result.Success && result.Data is double m ? m : 5.0;
+            var minutes = result.IsSuccess && result.Data is double m ? m : 5.0;
             if (minutes > 0)
             {
                 var maxSeconds = (int)Math.Max(30, minutes * 60);
