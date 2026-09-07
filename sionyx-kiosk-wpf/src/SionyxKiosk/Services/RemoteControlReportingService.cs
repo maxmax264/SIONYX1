@@ -299,9 +299,10 @@ public class RemoteControlReportingService
                 // ישן מתקין עדכון בלי אחד מהכלים (למשל אחרי שהם נוספו לאחר
                 // שהמכונה כבר הותקנה), הרענון מזהה ומתקין את מה שחסר.
                 await EnsureAgentsStagedAsync();
-                // אם AeroAdmin עוד לא הוגדר (לדוגמה install-aeroadmin.ps1 סיים אחרי
-                // שהאפליקציה כבר עלתה), כפתור "רענן" נותן הזדמנות שנייה להגדיר אותו.
-                await _aeroAdminSetup.EnsureConfiguredAsync();
+                // אם AeroAdmin עוד לא הוגדר, או שה-PIN שלו התחדש מאז הדיווח
+                // האחרון (נפוץ בכלים כאלה) - "רענן" קורא תמיד מחדש, בניגוד
+                // ל-EnsureConfiguredAsync שמדלג אם aeroadmin-info.txt כבר קיים.
+                await _aeroAdminSetup.RefreshAsync();
                 await ReportCurrentInfoAsync();
             }
             catch (Exception ex) { Logger.Warning(ex, "Refresh-triggered re-report failed"); }
