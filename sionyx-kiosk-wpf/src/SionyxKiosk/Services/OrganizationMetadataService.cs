@@ -174,6 +174,40 @@ public class OrganizationMetadataService : BaseService
         }
     }
 
+    /// <summary>
+    /// Idle-auto-logout duration in minutes, controlled from the org dashboard.
+    /// 0 (or explicitly disabled) means "never disconnect". Falls back to the
+    /// previous hardcoded default (5 min) if unset or Firebase is unreachable,
+    /// so behavior doesn't change for orgs that haven't touched the setting.
+    /// </summary>
+    public async Task<ServiceResult> GetIdleTimeoutMinutesAsync()
+    {
+        try
+        {
+            var config = SionyxKiosk.Infrastructure.FirebaseConfig.Load();
+            using var http = new System.Net.Http.HttpClient();
+            http.Timeout = TimeSpan.FromSeconds(5);
+            var enabledUrl = $"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/settings/idleTimeoutEnabled.json";
+            var enabledJson = await http.GetStringAsync(enabledUrl);
+            var enabledTrimmed = enabledJson.Trim();
+            // Explicitly disabled -> "never disconnect"
+            if (enabledTrimmed == "false") return Success(0.0);
+
+            var minutesUrl = $"{config.DatabaseUrl}/organizations/{config.OrgId}/metadata/settings/idleTimeoutMinutes.json";
+            var minutesJson = await http.GetStringAsync(minutesUrl);
+            var minutesTrimmed = minutesJson.Trim();
+            if (minutesTrimmed == "null" || string.IsNullOrEmpty(minutesTrimmed))
+                return Success(5.0);
+            if (double.TryParse(minutesTrimmed, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var minutes))
+                return Success(minutes);
+            return Success(5.0);
+        }
+        catch (Exception)
+        {
+            return Success(5.0); // fail-safe: preserve prior default if unreachable
+        }
+    }
+
     public async Task<ServiceResult> GetAdminContactAsync()
     {
         try

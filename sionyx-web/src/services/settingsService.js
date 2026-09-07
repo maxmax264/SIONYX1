@@ -255,3 +255,46 @@ export const updateKioskExitPassword = async (orgId, password) => {
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Get idle auto-disconnect setting (kiosk-side). enabled=false or minutes<=0
+ * means "never disconnect". Defaults match the kiosk's own fallback (5 min,
+ * enabled) so a fresh org sees the same behavior it always had.
+ */
+export const getIdleTimeoutSetting = async (orgId) => {
+  try {
+    const settingsRef = ref(database, `organizations/${orgId}/metadata/settings`);
+    const snapshot = await get(settingsRef);
+    const data = snapshot.exists() ? snapshot.val() : {};
+    return {
+      success: true,
+      enabled: data.idleTimeoutEnabled !== false,
+      minutes: typeof data.idleTimeoutMinutes === 'number' ? data.idleTimeoutMinutes : 5,
+    };
+  } catch (error) {
+    logger.error('Error getting idle timeout setting:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Update idle auto-disconnect setting. Pass enabled=false to turn off
+ * auto-disconnect entirely ("never"), regardless of minutes.
+ */
+export const updateIdleTimeoutSetting = async (orgId, enabled, minutes) => {
+  try {
+    const minutesValue = Number(minutes);
+    if (enabled && (!Number.isFinite(minutesValue) || minutesValue < 1)) {
+      return { success: false, error: 'זמן הניתוק חייב להיות לפחות דקה אחת' };
+    }
+    await update(ref(database, `organizations/${orgId}/metadata/settings`), {
+      idleTimeoutEnabled: !!enabled,
+      idleTimeoutMinutes: enabled ? minutesValue : 0,
+    });
+    logger.info('Idle timeout setting updated:', { enabled, minutes: minutesValue });
+    return { success: true };
+  } catch (error) {
+    logger.error('Error updating idle timeout setting:', error);
+    return { success: false, error: error.message };
+  }
+};

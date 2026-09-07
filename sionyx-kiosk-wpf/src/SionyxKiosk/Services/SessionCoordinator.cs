@@ -18,6 +18,7 @@ public class SessionCoordinator
     private readonly AuthService _auth;
     private readonly PrintHistoryService _printHistory;
     private readonly IdleTimeoutService _idleTimeout;
+    private readonly OrganizationMetadataService _orgMetadata;
 
     private Action? _sessionStartedHandler;
     private Action<int>? _sessionTimeUpdatedHandler;
@@ -39,13 +40,15 @@ public class SessionCoordinator
     public event Action? RestoreMainWindow;
 
     public SessionCoordinator(SessionService session, PrintMonitorService printMonitor,
-        AuthService auth, PrintHistoryService printHistory, IdleTimeoutService idleTimeout)
+        AuthService auth, PrintHistoryService printHistory, IdleTimeoutService idleTimeout,
+        OrganizationMetadataService orgMetadata)
     {
         _session = session;
         _printMonitor = printMonitor;
         _auth = auth;
         _printHistory = printHistory;
         _idleTimeout = idleTimeout;
+        _orgMetadata = orgMetadata;
     }
 
     /// <summary>Subscribe to all session and print monitor events.</summary>
@@ -145,10 +148,34 @@ public class SessionCoordinator
         });
     }
 
-    private void OnSessionStarted()
+    private async void OnSessionStarted()
     {
         _printMonitor.StartMonitoring();
-        _idleTimeout.StartMonitoring();
+
+        // Idle-auto-logout duration is controlled from the org dashboard.
+        // 0 = "never disconnect" -> skip idle monitoring entirely.
+        try
+        {
+            var result = await _orgMetadata.GetIdleTimeoutMinutesAsync();
+            var minutes = result.Success && result.Data is double m ? m : 5.0;
+            if (minutes > 0)
+            {
+                var maxSeconds = (int)Math.Max(30, minutes * 60);
+                _idleTimeout.MaxIdleSeconds = maxSeconds;
+                _idleTimeout.WarningIdleSeconds = Math.Max(15, maxSeconds - 60);
+                _idleTimeout.StartMonitoring();
+            }
+            else
+            {
+                Logger.Information("Idle timeout disabled by org dashboard setting");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to load idle-timeout config, using default");
+            _idleTimeout.StartMonitoring();
+        }
+
         Application.Current?.Dispatcher.InvokeAsync(() =>
         {
             _floatingTimer = new Views.Controls.FloatingTimer();

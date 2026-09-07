@@ -164,7 +164,9 @@
           ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'",
           "settings": {
             ".write": "root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists()",
-            "adminExitPassword": { ".read": true }
+            "adminExitPassword": { ".read": true },
+            "idleTimeoutEnabled": { ".read": true },
+            "idleTimeoutMinutes": { ".read": true }
           },
           "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100" },
           "nedarim_mosad_id": { ".validate": "newData.isString() && newData.val().length > 0" },

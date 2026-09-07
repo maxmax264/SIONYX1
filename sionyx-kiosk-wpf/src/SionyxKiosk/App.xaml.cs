@@ -194,7 +194,8 @@ public partial class App : Application
                     sp.GetRequiredService<PrintMonitorService>(),
                     sp.GetRequiredService<AuthService>(),
                     sp.GetRequiredService<PrintHistoryService>(),
-                    sp.GetRequiredService<IdleTimeoutService>()));
+                    sp.GetRequiredService<IdleTimeoutService>(),
+                    sp.GetRequiredService<OrganizationMetadataService>()));
 
                 // ViewModels
                 services.AddSingleton<AuthViewModel>(sp => new AuthViewModel(

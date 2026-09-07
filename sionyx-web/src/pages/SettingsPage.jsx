@@ -1,12 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import { Card, Typography, Tabs, Space } from 'antd';
-import { SettingOutlined, DollarOutlined, DownloadOutlined, PhoneOutlined, LockOutlined, MessageOutlined, CreditCardOutlined } from '@ant-design/icons';
+import { SettingOutlined, DollarOutlined, DownloadOutlined, PhoneOutlined, LockOutlined, MessageOutlined, CreditCardOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import PricingSettings from '../components/settings/PricingSettings';
 import PhoneVerificationSettings from '../components/settings/PhoneVerificationSettings';
 import KioskDesignSettings from '../components/settings/KioskDesignSettings';
 import DownloadsSettings from '../components/settings/DownloadsSettings';
 import KioskPasswordSettings from '../components/settings/KioskPasswordSettings';
 import PaymentSettings from '../components/settings/PaymentSettings';
+import IdleTimeoutSettings from '../components/settings/IdleTimeoutSettings';
 import { App, Input, Button, Form } from 'antd';
 import { getDisplayName, updateDisplayName } from '../services/settingsService';
 import { useOrgId } from '../hooks/useOrgId';
@@ -123,6 +124,16 @@ const SettingsPage = () => {
         </span>
       ),
       children: <KioskPasswordSettings />,
+    },
+    {
+      key: 'idletimeout',
+      label: (
+        <span>
+          <ClockCircleOutlined />
+          {' '}ניתוק אוטומטי
+        </span>
+      ),
+      children: <IdleTimeoutSettings />,
     },
     {
       key: 'messages',
