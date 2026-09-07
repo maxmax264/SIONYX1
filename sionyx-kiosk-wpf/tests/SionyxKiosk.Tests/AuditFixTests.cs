@@ -460,7 +460,7 @@ public class AuditFixTests : IDisposable
         var dbPath = Path.Combine(Path.GetTempPath(), $"audit_{Guid.NewGuid():N}.db");
         var localDb = new LocalDatabase(dbPath);
         var auth = new AuthService(_firebase, localDb, new ComputerService(_firebase));
-        var coordinator = new SessionCoordinator(session, printMonitor, auth, new PrintHistoryService(), new IdleTimeoutService());
+        var coordinator = new SessionCoordinator(session, printMonitor, auth, new PrintHistoryService(), new IdleTimeoutService(), new OrganizationMetadataService(_firebase));
 
         // Full lifecycle
         for (int i = 0; i < 3; i++)
