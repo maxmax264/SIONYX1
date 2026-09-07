@@ -1,3 +1,4 @@
+using System.IO;
 using FluentAssertions;
 using SionyxKiosk.Infrastructure;
 using SionyxKiosk.Services;
@@ -18,6 +19,7 @@ public class SystemServicesManagerTests : IDisposable
     private readonly GlobalHotkeyService _globalHotkey;
     private readonly RemoteControlReportingService _remoteControl;
     private readonly ComputerHeartbeatService _heartbeat;
+    private readonly LogShippingControlService _logShipping;
     private readonly SystemServicesManager _manager;
 
     public SystemServicesManagerTests()
@@ -34,6 +36,7 @@ public class SystemServicesManagerTests : IDisposable
         _globalHotkey = new GlobalHotkeyService();
         _remoteControl = new RemoteControlReportingService(_firebase, new AeroAdminSetupService());
         _heartbeat = new ComputerHeartbeatService(TestFirebaseFactory.CreateConfig());
+        _logShipping = new LogShippingControlService(_firebase, Path.GetTempPath());
         _session = new SessionService(
             _firebase, "user-123", "test-org",
             new ComputerService(_firebase),
@@ -43,7 +46,7 @@ public class SystemServicesManagerTests : IDisposable
 
         _manager = new SystemServicesManager(
             _forceLogout, _chat, _printMonitor, _operatingHours,
-            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat);
+            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat, _logShipping);
     }
 
     public void Dispose() => _firebase.Dispose();
