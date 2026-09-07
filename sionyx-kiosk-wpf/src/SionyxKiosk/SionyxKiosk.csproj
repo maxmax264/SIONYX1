@@ -12,6 +12,14 @@
     <Product>SIONYX</Product>
     <Company>SIONYX Technologies</Company>
     <Description>SIONYX Kiosk Management System</Description>
+    <!-- NU1701: TeamViewer.QuickSupport.Integration and its transitive deps
+         (TestStack.White, NLog, Castle.Core) only ship .NET Framework builds -
+         there is no net8 alternative for this SDK, and .NET's Framework
+         compat shim resolves them fine at runtime. Suppressing the warning
+         here (not restoring a fake fix) since it's expected and unavoidable
+         given this dependency - see the TeamViewer.QuickSupport.Integration
+         PackageReference comment below for the risk this already carries. -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
