@@ -140,6 +140,12 @@
           "intervalMs": {
             ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists())",
             ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "destinations": {
+            ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists())",
+            "$destinationId": {
+              "url": { ".validate": "newData.isString() && newData.val().length > 0" }
+            }
           }
         },
         "sessionLogs": {
