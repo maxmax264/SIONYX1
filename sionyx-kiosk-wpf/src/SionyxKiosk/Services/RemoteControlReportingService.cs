@@ -41,6 +41,7 @@ public class RemoteControlReportingService
     // ריפוי-עצמי - ראו EnsureAgentsStagedAsync.
     private static readonly string RemoteControlScriptsDir = Path.Combine(AppContext.BaseDirectory, "RemoteControl");
     private const int AnyDeskIdRetryIntervalMinutes = 5;
+    private const int AeroAdminSetupRetryIntervalMinutes = 5;
 
     private readonly FirebaseClient _firebase;
     private readonly AeroAdminSetupService _aeroAdminSetup;
@@ -49,6 +50,7 @@ public class RemoteControlReportingService
     private SseListener? _refreshListener;
     private SseListener? _teamViewerLaunchListener;
     private Timer? _anyDeskIdRetryTimer;
+    private Timer? _aeroAdminSetupRetryTimer;
     private string? _computerId;
 
     public RemoteControlReportingService(FirebaseClient firebase, AeroAdminSetupService aeroAdminSetup)
@@ -70,6 +72,18 @@ public class RemoteControlReportingService
 
         // מנסה להגדיר את AeroAdmin פעם אחת אם עוד לא הוגדר (ראה AeroAdminSetupService -
         // לא עושה כלום אם aeroadmin-info.txt כבר קיים או שהכלי לא מותקן על המכונה).
+        // BUG שנמצא ותוקן: הניסיון הזה היה *חד-פעמי בלבד* - בניגוד ל-AnyDesk
+        // שיש לו טיימר ניסיון-חוזר (_anyDeskIdRetryTimer, מטה), ל-AeroAdmin לא
+        // היה שום ריפוי-עצמי נוסף. אם הניסיון הראשון נכשל מכל סיבה חולפת (חלון
+        // ה-EULA/רישוי בהפעלה ראשונה שעדיין לא אושר, ה-exe עדיין לא סיים להתקין
+        // ע"י EnsureAgentsStagedAsync שרץ ממש לפני זה, timing של עליית החלון וכו') -
+        // ה-InfoFile לעולם לא נכתב, אז ReportCurrentInfoAsync רואה "קובץ לא קיים"
+        // ומדווח לדשבורד "לא הותקן" לצמיתות, עד הפעלה מחדש של האפליקציה או
+        // לחיצה ידנית על "רענן" בדשבורד. זו הסיבה המרכזית שAeroAdmin (וגם
+        // TeamViewer בדפוס אחר - ראו ההערה שם) נראים "קיימים בקוד" אבל בפועל
+        // אף פעם לא שולחים נתונים על קיוסקים מסוימים. התיקון: טיימר ניסיון-חוזר
+        // תקופתי (_aeroAdminSetupRetryTimer, מטה) - EnsureConfiguredAsync כבר
+        // אידמפוטנטי (מדלג אם aeroadmin-info.txt קיים), אז קריאה חוזרת בטוחה.
         try { await _aeroAdminSetup.EnsureConfiguredAsync(); }
         catch (Exception ex) { Logger.Warning(ex, "AeroAdmin one-time setup failed at startup"); }
 
@@ -85,6 +99,35 @@ public class RemoteControlReportingService
             null,
             TimeSpan.FromMinutes(AnyDeskIdRetryIntervalMinutes),
             TimeSpan.FromMinutes(AnyDeskIdRetryIntervalMinutes));
+
+        // תיקון הבאג שנמצא: ניסיון חוזר תקופתי ל-AeroAdmin, אותה תבנית בדיוק
+        // כמו AnyDesk מעלה. EnsureConfiguredAsync מחזיר מיידית בלי לעשות כלום
+        // אם aeroadmin-info.txt כבר קיים (ראה AeroAdminSetupService) - אז ברגע
+        // שניסיון אחד מצליח, כל שאר הטיקים הם no-op זול. אם עדיין לא הצליח,
+        // מנסים שוב ומדווחים לפיירבייס במקום לחכות להפעלה מחדש/לחיצת "רענן".
+        _aeroAdminSetupRetryTimer = new Timer(
+            _ => _ = RetryAeroAdminSetupIfNotConfiguredAsync(),
+            null,
+            TimeSpan.FromMinutes(AeroAdminSetupRetryIntervalMinutes),
+            TimeSpan.FromMinutes(AeroAdminSetupRetryIntervalMinutes));
+    }
+
+    private async Task RetryAeroAdminSetupIfNotConfiguredAsync()
+    {
+        try
+        {
+            if (File.Exists(AeroAdminInfoFile)) return; // כבר הוגדר בהצלחה - אין מה לעשות
+            Logger.Information("AeroAdmin still not configured - periodic retry attempt");
+            await _aeroAdminSetup.EnsureConfiguredAsync();
+            if (File.Exists(AeroAdminInfoFile) && _computerId != null)
+            {
+                await ReportInitialInfoAsync("aeroadmin", AeroAdminInfoFile, "AeroAdmin", _computerId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "Periodic AeroAdmin setup retry failed (non-fatal, will try again next interval)");
+        }
     }
 
     /// <summary>בודק אילו מכלי השליטה מרחוק חסרים בפועל על המכונה (exe לא קיים)
@@ -569,5 +612,6 @@ public class RemoteControlReportingService
         _refreshListener?.Stop();
         _teamViewerLaunchListener?.Stop();
         _anyDeskIdRetryTimer?.Dispose();
+        _aeroAdminSetupRetryTimer?.Dispose();
     }
 }
