@@ -789,12 +789,22 @@ public partial class App : Application
                     Log.Information("Admin exit: correct password, showing tray");
                     _ = Task.Run(async () =>
                     {
-                        // Check if a client session is active before stopping services
+                        // Check if a client session is active before stopping services.
+                        // IMPORTANT: when a client session is active we are only freezing
+                        // (hiding the window) to let the admin step away - the session,
+                        // idle-timeout, print monitor and floating timer must keep running
+                        // untouched so Restore brings back the exact same live session.
+                        // Previously StopSystemServicesAsync() ran unconditionally here,
+                        // which unsubscribed the SessionCoordinator, closed the floating
+                        // timer, AND (via SystemServicesManager.StopAsync) called
+                        // session.EndSessionAsync("logout") whenever session.IsActive was
+                        // true - silently ending the paid session while "frozen". Restore
+                        // then had no active session/timer left to bring back.
                         var auth2 = _host?.Services.GetService<AuthService>();
                         bool clientWasActive = auth2?.CurrentUser != null;
-                        await StopSystemServicesAsync();
                         if (!clientWasActive)
                         {
+                            await StopSystemServicesAsync();
                             _host!.Services.GetRequiredService<PrintHistoryService>().Clear();
                             await auth.LogoutAsync();
                         }
