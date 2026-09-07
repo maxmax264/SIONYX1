@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.51] - 2026-09-07
+
+### Bug Fixes
+- preserve active session/timer on admin-exit freeze instead of ending session (ae40f67a)
+
+
 ## [3.11.50] - 2026-09-07
 
 
