@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.12.0] - 2026-09-08
+
+### Features
+- **aeroadmin**: safe one-time capture of the incoming-connection dialog (d3682a69)
+
+
 ## [3.11.55] - 2026-09-08
 
 ### Bug Fixes
