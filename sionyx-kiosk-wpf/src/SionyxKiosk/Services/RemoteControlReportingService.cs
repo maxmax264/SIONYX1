@@ -42,6 +42,10 @@ public class RemoteControlReportingService
     private static readonly string RemoteControlScriptsDir = Path.Combine(AppContext.BaseDirectory, "RemoteControl");
     private const int AnyDeskIdRetryIntervalMinutes = 5;
     private const int AeroAdminSetupRetryIntervalMinutes = 5;
+    // 08/09: קצר בהרבה מהטיימר לעיל בכוונה - זה לא מנסה להגדיר/לקרוא ID/PIN,
+    // רק אוכף שהחלון נשאר מוסתר. אם AeroAdmin קופץ מול הקופאי מכל סיבה
+    // (קליק בטעות, דיאלוג עדכון וכו') לא רוצים לחכות 5 דקות עד שהוא נעלם.
+    private const int AeroAdminHideEnforceIntervalSeconds = 20;
 
     private readonly FirebaseClient _firebase;
     private readonly AeroAdminSetupService _aeroAdminSetup;
@@ -51,6 +55,7 @@ public class RemoteControlReportingService
     private SseListener? _teamViewerLaunchListener;
     private Timer? _anyDeskIdRetryTimer;
     private Timer? _aeroAdminSetupRetryTimer;
+    private Timer? _aeroAdminHideEnforceTimer;
     private string? _computerId;
 
     public RemoteControlReportingService(FirebaseClient firebase, AeroAdminSetupService aeroAdminSetup)
@@ -84,6 +89,10 @@ public class RemoteControlReportingService
         // אף פעם לא שולחים נתונים על קיוסקים מסוימים. התיקון: טיימר ניסיון-חוזר
         // תקופתי (_aeroAdminSetupRetryTimer, מטה) - EnsureConfiguredAsync כבר
         // אידמפוטנטי (מדלג אם aeroadmin-info.txt קיים), אז קריאה חוזרת בטוחה.
+        // הסתרה מיידית לפני הכל - אם AeroAdmin כבר רץ מהפעלה קודמת ומקרה כלשהו
+        // השאיר אותו גלוי, לא מחכים ל-20 שניות הראשונות של הטיימר התקופתי.
+        _aeroAdminSetup.EnsureHidden();
+
         try { await _aeroAdminSetup.EnsureConfiguredAsync(); }
         catch (Exception ex) { Logger.Warning(ex, "AeroAdmin one-time setup failed at startup"); }
 
@@ -110,6 +119,16 @@ public class RemoteControlReportingService
             null,
             TimeSpan.FromMinutes(AeroAdminSetupRetryIntervalMinutes),
             TimeSpan.FromMinutes(AeroAdminSetupRetryIntervalMinutes));
+
+        // 08/09: אכיפת הסתרה תקופתית ותכופה - רץ תמיד (לא רק כשעוד לא הוגדר),
+        // כי החלון עלול לקפוץ מול הקופאי גם הרבה אחרי שההגדרה הראשונית כבר
+        // הצליחה. EnsureHidden אצל AeroAdminSetupService אידמפוטנטי וזול
+        // (Process.GetProcessesByName בלבד אם אין חלון גלוי).
+        _aeroAdminHideEnforceTimer = new Timer(
+            _ => _aeroAdminSetup.EnsureHidden(),
+            null,
+            TimeSpan.FromSeconds(AeroAdminHideEnforceIntervalSeconds),
+            TimeSpan.FromSeconds(AeroAdminHideEnforceIntervalSeconds));
     }
 
     private async Task RetryAeroAdminSetupIfNotConfiguredAsync()
@@ -613,5 +632,6 @@ public class RemoteControlReportingService
         _teamViewerLaunchListener?.Stop();
         _anyDeskIdRetryTimer?.Dispose();
         _aeroAdminSetupRetryTimer?.Dispose();
+        _aeroAdminHideEnforceTimer?.Dispose();
     }
 }

@@ -102,6 +102,12 @@ public class AeroAdminSetupService
             var startedNewProcess = false;
             if (process == null)
             {
+                // הערה חשובה (08/09, אומת בשטח): WindowStyle=Hidden כאן הוא רק
+                // "רמז" ל-CreateProcess (nCmdShow=SW_HIDE) - הרבה אפליקציות
+                // Win32 (וגם AeroAdmin, כנראה) מתעלמות ממנו וקוראות בעצמן
+                // ShowWindow(SW_SHOW) בהפעלה, ולכן החלון קפץ בפועל וקטע את
+                // סשן הקיוסק. במקום לסמוך על הרמז, מכריחים הסתרה עם
+                // ShowWindow/SW_HIDE אמיתי ברגע שהחלון נמצא, ראו HideAllWindowsForProcess.
                 var psi = new ProcessStartInfo(ExePath)
                 {
                     UseShellExecute = true,
@@ -117,12 +123,20 @@ public class AeroAdminSetupService
                 return;
             }
 
+            // מכריחים הסתרה אמיתית מיד - גם אם AeroAdmin כבר פתח לעצמו חלון
+            // גלוי (למשל דיאלוג רישוי/EULA בהפעלה ראשונה) לפני שהגענו לכאן.
+            HideAllWindowsForProcess((uint)process.Id);
+
             var mainWindow = WaitForMainWindow(process);
             if (mainWindow == null)
             {
                 Logger.Warning("AeroAdmin main window did not appear within {Timeout}s - cannot read IP/PIN", WindowTimeout.TotalSeconds);
                 return;
             }
+
+            // מסתירים שוב אחרי שנמצא (יכול להיות שהופיע רק עכשיו, או שהמסך
+            // הקודם היה חלון אחר של אותו תהליך).
+            HideAllWindowsForProcess((uint)process.Id);
 
             // אבחון חד-פעמי, בלי תופעות לוואי: פותח (רק פותח, אף פעם לא לוחץ
             // פנימה) כל תפריט עליון כדי לתעד את שמות הפריטים האמיתיים בשפה
@@ -160,9 +174,55 @@ public class AeroAdminSetupService
         finally
         {
             // משאירים את AeroAdmin רץ ברקע (מוסתר) - זה מה שמאפשר חיבור unattended
-            // מבחוץ; לא סוגרים את התהליך כאן, גם אם פתחנו אותו כרגע.
+            // מבחוץ; לא סוגרים את התהליך כאן, גם אם פתחנו אותו כרגע. מסתירים
+            // שוב פעם אחרונה ליתר ביטחון (למשל אם קריאת ה-ID/PIN גרמה לחלון
+            // חדש/דיאלוג לצוץ) לפני שמשחררים את המשתנה.
+            if (process != null)
+            {
+                try { HideAllWindowsForProcess((uint)process.Id); }
+                catch { /* לא קריטי - הטיימר התקופתי ב-EnsureHidden ינסה שוב */ }
+            }
             process?.Dispose();
         }
+    }
+
+    /// <summary>נקרא באופן תקופתי (טיימר קצר, בלתי תלוי בהגדרה חד-פעמית) כדי
+    /// להבטיח ש-AeroAdmin לעולם לא נשאר גלוי מול הקופאי - בניגוד ל-
+    /// EnsureConfiguredAsync/RefreshAsync, זה תמיד רץ, גם אחרי שההגדרה כבר
+    /// הצליחה פעם אחת, כי החלון עלול לקפוץ שוב מכל סיבה (קליק בטעות, דיאלוג
+    /// עדכון של AeroAdmin עצמו וכו').</summary>
+    public void EnsureHidden()
+    {
+        try
+        {
+            var process = Process.GetProcessesByName("AeroAdmin").FirstOrDefault();
+            if (process == null) return;
+            HideAllWindowsForProcess((uint)process.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "EnsureHidden failed (non-fatal, will retry next tick)");
+        }
+    }
+
+    private const int SW_HIDE = 0;
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    /// <summary>מסתיר בכוח (SW_HIDE אמיתי, לא רק רמז ל-CreateProcess) את *כל*
+    /// החלונות העליונים של התהליך - לא רק ה"חלון הראשי" - כי דיאלוג EULA/רישוי
+    /// בהפעלה ראשונה או חלון משנה יכולים להיות תהליך-ID תואם אבל handle שונה
+    /// מזה שנמצא לצורך קריאת ה-ID/PIN.</summary>
+    private static void HideAllWindowsForProcess(uint processId)
+    {
+        EnumWindows((hWnd, _) =>
+        {
+            GetWindowThreadProcessId(hWnd, out var pid);
+            if (pid == processId)
+            {
+                ShowWindow(hWnd, SW_HIDE);
+            }
+            return true; // ממשיכים לכל החלונות, לא עוצרים בראשון
+        }, IntPtr.Zero);
     }
 
     /// <summary>
