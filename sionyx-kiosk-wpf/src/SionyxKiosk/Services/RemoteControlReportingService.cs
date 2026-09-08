@@ -98,6 +98,11 @@ public class RemoteControlReportingService
         // השאיר אותו גלוי, לא מחכים ל-20 שניות הראשונות של הטיימר התקופתי.
         _aeroAdminSetup.EnsureHidden();
 
+        // תוקן (09/09): רץ תמיד, גם אם EnsureConfiguredAsync למטה ידלג (המקרה
+        // הרגיל - AeroAdmin כבר רץ מהפעלה קודמת) - בלעדיו QuickCheckForPinChange
+        // לא יודע איזה handle לבדוק ונשאר no-op שקט לכל אורך חיי האפליקציה.
+        _aeroAdminSetup.AttachToRunningWindowIfAny();
+
         try { await _aeroAdminSetup.EnsureConfiguredAsync(); }
         catch (Exception ex) { Logger.Warning(ex, "AeroAdmin one-time setup failed at startup"); }
 
@@ -132,6 +137,12 @@ public class RemoteControlReportingService
         _aeroAdminHideEnforceTimer = new Timer(
             _ =>
             {
+                // 09/09: לוג heartbeat זמני (INF, לא DBG - כדי שיהיה גלוי גם
+                // בפילטור ברירת מחדל) - נועד לאשר בוודאות שהטיימר בכלל מתעורר.
+                // נראה בשטח שהוא נבנה בקוד אבל שום דבר לא נרשם ללוג אף פעם,
+                // כולל אחרי הריגת AeroAdmin בכוח - צריך הוכחה חד-משמעית של
+                // מה שקורה בפועל בזמן ריצה לפני שממשיכים לנחש.
+                Logger.Information("[AeroAdminTimer] hide-enforce tick");
                 var restarted = _aeroAdminSetup.EnsureHidden();
                 if (restarted)
                 {
@@ -154,6 +165,7 @@ public class RemoteControlReportingService
         _aeroAdminPinWatchTimer = new Timer(
             _ =>
             {
+                Logger.Debug("[AeroAdminTimer] pin-watch tick"); // DBG בכוונה - זה כל 3 שניות, INF יציף את הלוג
                 if (_computerId == null) return;
                 var changed = _aeroAdminSetup.QuickCheckForPinChange();
                 if (changed != null)

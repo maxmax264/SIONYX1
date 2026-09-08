@@ -67,6 +67,38 @@ public class AeroAdminSetupService
     /// <summary>נקרא באתחול. לא עושה כלום אם כבר הוגדר פעם אחת בעבר
     /// (aeroadmin-info.txt קיים) או אם AeroAdmin לא מותקן - קריאה חד-פעמית
     /// זולה, בלי אוטומציית UI חדשה בכל עלייה של האפליקציה.</summary>
+    /// <summary>
+    /// תוקן (09/09, באג אמיתי שנמצא בשטח): EnsureConfiguredAsync מדלג לגמרי
+    /// ברגע ש-InfoFile קיים - המקרה הרגיל בקיוסק שכבר רץ מתמיד, כי AeroAdmin
+    /// כבר הוגדר בעבר ונשאר חי. הבעיה: _knownMainWindowHandle מוגדר *רק*
+    /// בתוך RunSetup, שאף פעם לא רץ במקרה הזה - כלומר QuickCheckForPinChange
+    /// (שבודק `if (_knownMainWindowHandle == IntPtr.Zero) return null`) נשאר
+    /// no-op *לכל אורך חיי האפליקציה* על קיוסק שלא הופעל מחדש, גם אם AeroAdmin
+    /// עצמו רץ בסדר גמור ו-PIN שלו משתנה כל הזמן על המסך. נקרא תמיד באתחול,
+    /// בלי תלות ב-EnsureConfiguredAsync, כדי לתפוס את ה-handle של החלון הקיים.
+    /// </summary>
+    public void AttachToRunningWindowIfAny()
+    {
+        try
+        {
+            var process = Process.GetProcessesByName("AeroAdmin").FirstOrDefault();
+            if (process == null) return; // אין תהליך רץ - EnsureHidden/EnsureConfiguredAsync יטפלו
+
+            var mainWindow = WaitForMainWindow(process);
+            if (mainWindow == null)
+            {
+                Logger.Debug("AttachToRunningWindowIfAny: AeroAdmin process exists but main window not found");
+                return;
+            }
+            _knownMainWindowHandle = new IntPtr(mainWindow.Current.NativeWindowHandle);
+            Logger.Information("AttachToRunningWindowIfAny: attached to existing AeroAdmin window (handle known - QuickCheckForPinChange can work now)");
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "AttachToRunningWindowIfAny failed (non-fatal)");
+        }
+    }
+
     public async Task EnsureConfiguredAsync()
     {
         if (File.Exists(InfoFile))
@@ -125,7 +157,14 @@ public class AeroAdminSetupService
     /// </summary>
     public string? QuickCheckForPinChange()
     {
-        if (_knownMainWindowHandle == IntPtr.Zero) return null;
+        if (_knownMainWindowHandle == IntPtr.Zero)
+        {
+            // תוקן (09/09): במקום לוותר לצמיתות, מנסים להתחבר לחלון קיים -
+            // מכסה כל מקרה שבו AttachToRunningWindowIfAny לא הצליח באתחול
+            // (למשל AeroAdmin עוד לא סיים לעלות באותו רגע).
+            AttachToRunningWindowIfAny();
+            if (_knownMainWindowHandle == IntPtr.Zero) return null;
+        }
         try
         {
             AutomationElement mainWindow;
