@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [3.14.0] - 2026-09-08
+
+### Features
+- **dashboard**: live-update org computers drawer instead of one-time fetch (d11dc96e)
+
+### Bug Fixes
+- **aeroadmin**: populate window handle on startup, not only after RunSetup (93e4036b)
+
+
 ## [3.13.0] - 2026-09-08
 
 ### Features
