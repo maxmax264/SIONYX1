@@ -114,6 +114,43 @@ public class AeroAdminSetupService
         return Process.Start(psi);
     }
 
+    /// <summary>
+    /// בדיקה קלה ומהירה (בלי להפעיל/להסתיר תהליך, בלי RunSetup מלא) - נועדה
+    /// לרוץ בתדירות גבוהה (כל כמה שניות) כדי לתפוס שינוי PIN כמעט מיידית.
+    /// PIN מתחלף בכל דחיית חיבור/timeout, וטיימר של 5 דקות (RetryAeroAdminSetup)
+    /// גורם לדשבורד להראות פרטים ישנים במשך עד 5 דקות בכל פעם. מחזיר את
+    /// ה-ID+PIN הנוכחיים אם הצליח לקרוא ואם הם שונים מהערך שכבר ב-InfoFile,
+    /// null אם אין שינוי או שהקריאה נכשלה (למשל החלון עוד לא מוכן/נסגר -
+    /// לא בעיה, ה-tick הבא ינסה שוב).
+    /// </summary>
+    public string? QuickCheckForPinChange()
+    {
+        if (_knownMainWindowHandle == IntPtr.Zero) return null;
+        try
+        {
+            AutomationElement mainWindow;
+            try { mainWindow = AutomationElement.FromHandle(_knownMainWindowHandle); }
+            catch { return null; } // החלון נסגר/התהליך מת - EnsureHidden יטפל בהפעלה מחדש
+
+            var id = ReadOwnId(mainWindow);
+            if (string.IsNullOrWhiteSpace(id)) return null;
+            var pin = ReadOwnPin(mainWindow, id);
+            if (string.IsNullOrWhiteSpace(pin)) return null;
+
+            var current = $"AeroAdmin ID: {id}\r\nAeroAdmin Password: {pin}\r\n";
+            if (File.Exists(InfoFile) && File.ReadAllText(InfoFile) == current) return null; // אין שינוי
+
+            File.WriteAllText(InfoFile, current);
+            Logger.Information("AeroAdmin PIN changed - updated {Path} immediately (ID {Id})", InfoFile, id);
+            return current;
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "QuickCheckForPinChange failed (non-fatal, next tick will retry)");
+            return null;
+        }
+    }
+
     private void RunSetup()
     {
         Process? process = null;

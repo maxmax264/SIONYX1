@@ -46,6 +46,10 @@ public class RemoteControlReportingService
     // רק אוכף שהחלון נשאר מוסתר. אם AeroAdmin קופץ מול הקופאי מכל סיבה
     // (קליק בטעות, דיאלוג עדכון וכו') לא רוצים לחכות 5 דקות עד שהוא נעלם.
     private const int AeroAdminHideEnforceIntervalSeconds = 20;
+    // 08/09: הרבה יותר תכוף מהשניים לעיל בכוונה - PIN מתחלף בכל דחיית חיבור,
+    // וחייבים לתפוס את זה תוך שניות (לא דקות) כדי שהדשבורד לא יראה פרטים
+    // מתים בזמן שמישהו מנסה להתחבר בפועל עם ה-PIN הישן.
+    private const int AeroAdminPinWatchIntervalSeconds = 3;
 
     private readonly FirebaseClient _firebase;
     private readonly AeroAdminSetupService _aeroAdminSetup;
@@ -56,6 +60,7 @@ public class RemoteControlReportingService
     private Timer? _anyDeskIdRetryTimer;
     private Timer? _aeroAdminSetupRetryTimer;
     private Timer? _aeroAdminHideEnforceTimer;
+    private Timer? _aeroAdminPinWatchTimer;
     private string? _computerId;
 
     public RemoteControlReportingService(FirebaseClient firebase, AeroAdminSetupService aeroAdminSetup)
@@ -134,11 +139,32 @@ public class RemoteControlReportingService
                     // לעדכן את הדשבורד ולא רק להסתמך על aeroadmin-info.txt הישן.
                     _ = _aeroAdminSetup.RefreshAsync();
                 }
-                _aeroAdminSetup.WatchForConnectionDialogOnce();
             },
             null,
             TimeSpan.FromSeconds(AeroAdminHideEnforceIntervalSeconds),
             TimeSpan.FromSeconds(AeroAdminHideEnforceIntervalSeconds));
+
+        // 08/09: תופס שינוי PIN כמעט מיידית (כל 3 שניות) ושולח לדשבורד ברגע
+        // שקרה - בלי זה, מישהו שמנסה להתחבר עם ה-PIN שהדשבורד מראה עלול
+        // תמיד לפגוע ב-PIN "ישן" עד 5 דקות (מרווח הטיימר האיטי יותר מעלה).
+        // גם WatchForConnectionDialogOnce עבר לכאן (היה על טיימר 20 שניות) -
+        // ניסיון בדיקה קודם החזיר קובץ דיבאג ריק, כנראה כי דיאלוג הבקשה נפתח
+        // ונדחה אוטומטית (timeout פנימי של AeroAdmin) תוך פחות מ-20 שניות,
+        // לפני שהטיימר האיטי הספיק לתפוס אותו בכלל.
+        _aeroAdminPinWatchTimer = new Timer(
+            _ =>
+            {
+                if (_computerId == null) return;
+                var changed = _aeroAdminSetup.QuickCheckForPinChange();
+                if (changed != null)
+                {
+                    _ = ReportInitialInfoAsync("aeroadmin", AeroAdminInfoFile, "AeroAdmin", _computerId);
+                }
+                _aeroAdminSetup.WatchForConnectionDialogOnce();
+            },
+            null,
+            TimeSpan.FromSeconds(AeroAdminPinWatchIntervalSeconds),
+            TimeSpan.FromSeconds(AeroAdminPinWatchIntervalSeconds));
     }
 
     private async Task RetryAeroAdminSetupIfNotConfiguredAsync()
@@ -643,5 +669,6 @@ public class RemoteControlReportingService
         _anyDeskIdRetryTimer?.Dispose();
         _aeroAdminSetupRetryTimer?.Dispose();
         _aeroAdminHideEnforceTimer?.Dispose();
+        _aeroAdminPinWatchTimer?.Dispose();
     }
 }
