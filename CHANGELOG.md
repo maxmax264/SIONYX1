@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.13.0] - 2026-09-08
+
+### Features
+- **aeroadmin**: near-instant PIN-change detection + report to dashboard (52f470cc)
+
+
 ## [3.12.1] - 2026-09-08
 
 ### Bug Fixes
