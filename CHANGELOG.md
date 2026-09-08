@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.54] - 2026-09-08
+
+### Bug Fixes
+- **aeroadmin**: read ID/PIN from Pane controls, not just Text (81500b0f)
+
+
 ## [3.11.53] - 2026-09-08
 
 ### Other
