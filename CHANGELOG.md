@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.12.1] - 2026-09-08
+
+### Bug Fixes
+- **aeroadmin**: relaunch process if it dies, instead of only ever running once (80f38034)
+
+
 ## [3.12.0] - 2026-09-08
 
 ### Features
