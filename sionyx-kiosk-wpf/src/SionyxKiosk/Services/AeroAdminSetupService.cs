@@ -292,8 +292,15 @@ public class AeroAdminSetupService
         // "832 796 561"). מחפשים בין כל ה-Text controls את הראשון שמתאים
         // לתבנית של רצף ספרות ארוך (8+) - זה עובד בכל שפת ממשק, כי לא
         // מסתמכים על טקסט התווית ("IP" וכו'), רק על תבנית הספרות.
+        //
+        // תוקן (08/09, אומת מול aeroadmin-ui-debug.txt אמיתי מקיוסק): ב-AeroAdmin
+        // v4.93 הערכים האלה לא יושבים ב-ControlType.Text בכלל אלא ב-ControlType.Pane
+        // (למשל Name='832 796 561' AutomationId='10132') - זו הייתה הסיבה
+        // האמיתית לכשל, לא בעיית שפה/regex. מחפשים גם וגם.
         var texts = mainWindow.FindAll(TreeScope.Descendants,
-            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
+            new OrCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Pane)));
         foreach (AutomationElement text in texts)
         {
             var value = text.Current.Name;
@@ -312,8 +319,12 @@ public class AeroAdminSetupService
     /// (עברית וכו').</summary>
     private static string? ReadOwnPin(AutomationElement mainWindow, string excludeId)
     {
+        // תוקן (08/09) - ראו הערה ב-ReadOwnId: גם ה-PIN יושב ב-ControlType.Pane
+        // ולא ב-Text בגרסה הזו (למשל Name='6214' AutomationId='10133').
         var texts = mainWindow.FindAll(TreeScope.Descendants,
-            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
+            new OrCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Pane)));
         foreach (AutomationElement text in texts)
         {
             var value = text.Current.Name?.Trim();
