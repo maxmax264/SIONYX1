@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Automation;
 using Serilog;
@@ -29,6 +30,18 @@ namespace SionyxKiosk.Services;
 /// אזהרה: ה-PIN של AeroAdmin עלול להתחדש בכל הפעלה של האפליקציה (נפוץ בכלים
 /// כאלה) - RefreshAsync (בניגוד ל-EnsureConfiguredAsync) קורא מחדש בכל פעם
 /// בלי להסתמך על InfoFile קיים, כדי שכפתור "רענן" בדשבורד יביא ערך עדכני.
+///
+/// ממצא חדש וחשוב (אחרי בדיקה מול התיעוד הרשמי של AeroAdmin): ה-ID+PIN
+/// שמוצגים במסך הבית (ומדווחים כרגע לדשבורד) הם קוד חיבור *חד-פעמי* בלבד -
+/// לפי AeroAdmin, חיבור איתם מציג בקשת אישור מקומית (accept/reject) בצד
+/// המחשב המרוחק. בקיוסק בלי אף אחד מול המסך זה אומר שחיבור עם הפרטים
+/// שהדשבורד מציג היום עלול פשוט להיתקע מחכה לאישור שלעולם לא יגיע. כדי
+/// לקבל unattended access אמיתי (בלי אישור ידני) צריך להגדיר סיסמה קבועה
+/// דרך "Connection > Access rights" בתפריט - זה בדיוק מה שהניסיון הקודם
+/// ניסה לעשות וכשל כי הוא הניח טקסט תפריט אנגלי קבוע על התקנה בעברית.
+/// DumpMenuStructureOnce (למטה) הוא צעד ראשון בטוח (בלי ללחוץ בתוך אף תפריט)
+/// לתעד את השמות/מבנה האמיתיים בשפה המותקנת בפועל, כדי שהאוטומציה הבאה של
+/// "Access rights" תיבנה נגד המחרוזות שבאמת קיימות ולא תנחש שוב.
 /// </summary>
 public class AeroAdminSetupService
 {
@@ -41,6 +54,7 @@ public class AeroAdminSetupService
     public const string ExePath = @"C:\ProgramData\SIONYX\AeroAdmin.exe";
     private const string InfoFile = @"C:\ProgramData\SIONYX\aeroadmin-info.txt";
     private const string UiDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-ui-debug.txt";
+    private const string MenuDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-menu-debug.txt";
     private static readonly TimeSpan WindowTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>נקרא באתחול. לא עושה כלום אם כבר הוגדר פעם אחת בעבר
@@ -110,6 +124,14 @@ public class AeroAdminSetupService
                 return;
             }
 
+            // אבחון חד-פעמי, בלי תופעות לוואי: פותח (רק פותח, אף פעם לא לוחץ
+            // פנימה) כל תפריט עליון כדי לתעד את שמות הפריטים האמיתיים בשפה
+            // המותקנת בפועל. זה קיים כי ה"תיקון" הקודם (ניווט "Connection >
+            // Access rights") הניח טקסט אנגלי קבוע וזה כשל בשקט על ממשק מקומי -
+            // הדאמפ הזה ייתן לנו את המחרוזות/מבנה האמיתיים כדי לבנות אוטומציה
+            // מדויקת בפעם הבאה, במקום לנחש שוב.
+            DumpMenuStructureOnce(mainWindow);
+
             var id = ReadOwnId(mainWindow);
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -140,6 +162,88 @@ public class AeroAdminSetupService
             // משאירים את AeroAdmin רץ ברקע (מוסתר) - זה מה שמאפשר חיבור unattended
             // מבחוץ; לא סוגרים את התהליך כאן, גם אם פתחנו אותו כרגע.
             process?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// אבחון חד-פעמי (מוגן ע"י קיום הקובץ עצמו - לא רץ שוב אחרי הפעם
+    /// הראשונה): פותח כל תפריט עליון כדי לתעד את שמות/AutomationId של
+    /// הפריטים, בלי ללחוץ לתוך אף פריט - אין כאן שום סיכון להפעיל פעולה לא
+    /// רצויה (יציאה, הסרת התקנה וכו').
+    ///
+    /// למה זה קיים: כדי להשיג unattended access אמיתי (בלי אישור ידני מקומי
+    /// בכל חיבור) ב-AeroAdmin צריך לנווט "Connection > Access rights" ולהוסיף
+    /// סיסמה קבועה - ה-PIN שמוצג במסך הבית (מה ש-ReadOwnPin קורא) הוא רק קוד
+    /// חיבור חד-פעמי, ולפי התיעוד הרשמי של AeroAdmin חיבור באמצעותו מציג
+    /// בקשת אישור מקומית (accept/reject) - בקיוסק בלי אף אחד מול המסך, זה
+    /// אומר שחיבור בפועל עם ה-ID+PIN שכבר מדווחים לדשבורד עלול פשוט להיתקע
+    /// מחכה לאישור שאף אחד לא ילחץ עליו. הניסיון הקודם לנווט את התפריט הזה
+    /// הניח טקסט אנגלי קבוע ("Connection"/"Access rights") וכשל בשקט על
+    /// התקנה עם ממשק מקומי (עברית) - הדאמפ הזה קודם כל מתעד את השמות/מבנה
+    /// האמיתיים כדי שהאוטומציה הבאה תיבנה נגד המחרוזות שבאמת מוצגות, במקום
+    /// לנחש שוב.
+    /// </summary>
+    private static void DumpMenuStructureOnce(AutomationElement mainWindow)
+    {
+        if (File.Exists(MenuDebugFile)) return;
+
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"AeroAdmin menu dump - {DateTime.Now}");
+
+            var menuBar = mainWindow.FindFirst(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuBar));
+            if (menuBar == null)
+            {
+                sb.AppendLine("No MenuBar element found in the UI tree (classic Win32 menu may not expose via UIA - see full tree in " + UiDebugFile + ").");
+                UiAutomationDebug.DumpTree(mainWindow, UiDebugFile, "AeroAdmin - no MenuBar found, full tree for manual inspection");
+                File.WriteAllText(MenuDebugFile, sb.ToString());
+                return;
+            }
+
+            var topItems = menuBar.FindAll(TreeScope.Children,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem));
+            sb.AppendLine($"Top-level menu items: {topItems.Count}");
+
+            foreach (AutomationElement topItem in topItems)
+            {
+                sb.AppendLine($"- \"{topItem.Current.Name}\" (AutomationId={topItem.Current.AutomationId})");
+                try
+                {
+                    if (topItem.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out var patternObj)
+                        && patternObj is ExpandCollapsePattern expandPattern)
+                    {
+                        expandPattern.Expand();
+                        Thread.Sleep(400);
+
+                        var subItems = topItem.FindAll(TreeScope.Descendants,
+                            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem));
+                        foreach (AutomationElement subItem in subItems)
+                        {
+                            sb.AppendLine($"    - \"{subItem.Current.Name}\" (AutomationId={subItem.Current.AutomationId})");
+                        }
+
+                        expandPattern.Collapse();
+                        Thread.Sleep(200);
+                    }
+                    else
+                    {
+                        sb.AppendLine("    (item does not support Expand/Collapse - skipped, no click attempted)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine($"    (error while expanding, no click attempted: {ex.Message})");
+                }
+            }
+
+            File.WriteAllText(MenuDebugFile, sb.ToString());
+            Logger.Information("AeroAdmin menu structure captured to {Path} for building real unattended-access automation", MenuDebugFile);
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "AeroAdmin menu dump failed (non-fatal, one-time diagnostic only)");
         }
     }
 
