@@ -55,7 +55,14 @@ public class AeroAdminSetupService
     private const string InfoFile = @"C:\ProgramData\SIONYX\aeroadmin-info.txt";
     private const string UiDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-ui-debug.txt";
     private const string MenuDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-menu-debug.txt";
+    private const string ConnectDialogDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-connect-dialog-debug.txt";
     private static readonly TimeSpan WindowTimeout = TimeSpan.FromSeconds(15);
+
+    // 08/09: נשמר בזמן RunSetup כדי ש-WatchForConnectionDialogOnce (מטה) ידע
+    // להבדיל בין "החלון הראשי הרגיל" (מותר, מוכר) לבין "חלון חדש שקפץ" (חשוד
+    // כבקשת אישור חיבור נכנס) - בלי זה כל בדיקה הייתה חושבת שהחלון הראשי עצמו
+    // הוא בקשת חיבור.
+    private static IntPtr _knownMainWindowHandle = IntPtr.Zero;
 
     /// <summary>נקרא באתחול. לא עושה כלום אם כבר הוגדר פעם אחת בעבר
     /// (aeroadmin-info.txt קיים) או אם AeroAdmin לא מותקן - קריאה חד-פעמית
@@ -134,6 +141,10 @@ public class AeroAdminSetupService
                 return;
             }
 
+            // רושמים את ה-handle כ"מוכר" כדי ש-WatchForConnectionDialogOnce לא
+            // יתבלבל ויחשוב שהחלון הראשי הרגיל הוא בקשת חיבור נכנס.
+            _knownMainWindowHandle = new IntPtr(mainWindow.Current.NativeWindowHandle);
+
             // מסתירים שוב אחרי שנמצא (יכול להיות שהופיע רק עכשיו, או שהמסך
             // הקודם היה חלון אחר של אותו תהליך).
             HideAllWindowsForProcess((uint)process.Id);
@@ -202,6 +213,58 @@ public class AeroAdminSetupService
         catch (Exception ex)
         {
             Logger.Debug(ex, "EnsureHidden failed (non-fatal, will retry next tick)");
+        }
+    }
+
+    /// <summary>
+    /// אבחון חד-פעמי ובטוח (בלי שום לחיצה), אותו רעיון בדיוק כמו
+    /// DumpMenuStructureOnce: מחפש כל חלון עליון של תהליך AeroAdmin שהוא
+    /// *לא* החלון הראשי הידוע (_knownMainWindowHandle) - חלון כזה כנראה
+    /// דיאלוג בקשת חיבור נכנס ("מישהו רוצה להתחבר, לאשר?") - ומתעד את המבנה
+    /// שלו כדי שנוכל לבנות אחר כך לחיצה אוטומטית אמיתית (InvokePattern) נגד
+    /// השמות האמיתיים, בלי לנחש. מוגן ע"י קיום הקובץ עצמו - לא רץ שוב אחרי
+    /// שכבר תיעד פעם אחת.
+    ///
+    /// למה זה חשוב: המשתמש דיווח שכל ניסיון חיבור מחדש ל-PIN הנוכחי (בקוד
+    /// חד-פעמי) גם מחדש את ה-PIN, כך שאי אפשר סתם "לנסות שוב" בלי לתעד קודם.
+    /// ברגע שיהיה לנו דאמפ אמיתי, בונים כאן Invoke על כפתור האישור במקום
+    /// לנווט לתפריט "Access rights" שהתברר כבלתי-נגיש ל-UI Automation בכלל.
+    /// </summary>
+    public void WatchForConnectionDialogOnce()
+    {
+        if (File.Exists(ConnectDialogDebugFile)) return;
+        if (_knownMainWindowHandle == IntPtr.Zero) return; // עוד לא הוגדר החלון הראשי - אין מה להשוות אליו
+
+        try
+        {
+            var process = Process.GetProcessesByName("AeroAdmin").FirstOrDefault();
+            if (process == null) return;
+
+            var candidate = IntPtr.Zero;
+            EnumWindows((hWnd, _) =>
+            {
+                GetWindowThreadProcessId(hWnd, out var pid);
+                if (pid == (uint)process.Id && hWnd != _knownMainWindowHandle)
+                {
+                    candidate = hWnd;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            if (candidate == IntPtr.Zero) return; // אין כרגע שום חלון חדש - זה תקין, רוב הזמן
+
+            AutomationElement? element;
+            try { element = AutomationElement.FromHandle(candidate); }
+            catch { return; }
+            if (element == null) return;
+
+            UiAutomationDebug.DumpTree(element, ConnectDialogDebugFile, "AeroAdmin - unexpected extra window (possibly incoming-connection prompt)");
+            Logger.Information("AeroAdmin showed an extra window beyond the main one - dumped to {Path} for building auto-approve automation", ConnectDialogDebugFile);
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "WatchForConnectionDialogOnce failed (non-fatal, one-time diagnostic only)");
         }
     }
 

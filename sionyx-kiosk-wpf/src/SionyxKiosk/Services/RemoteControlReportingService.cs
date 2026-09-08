@@ -125,7 +125,11 @@ public class RemoteControlReportingService
         // הצליחה. EnsureHidden אצל AeroAdminSetupService אידמפוטנטי וזול
         // (Process.GetProcessesByName בלבד אם אין חלון גלוי).
         _aeroAdminHideEnforceTimer = new Timer(
-            _ => _aeroAdminSetup.EnsureHidden(),
+            _ =>
+            {
+                _aeroAdminSetup.EnsureHidden();
+                _aeroAdminSetup.WatchForConnectionDialogOnce();
+            },
             null,
             TimeSpan.FromSeconds(AeroAdminHideEnforceIntervalSeconds),
             TimeSpan.FromSeconds(AeroAdminHideEnforceIntervalSeconds));
