@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.53] - 2026-09-08
+
+### Other
+- diagnose why previous unattended-access fixes never worked (session PIN != unattended access) + safe one-time menu-structure dump (0bf1870e)
+
+
 ## [3.11.52] - 2026-09-07
 
 ### Bug Fixes
