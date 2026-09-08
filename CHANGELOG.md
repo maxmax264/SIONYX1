@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.11.55] - 2026-09-08
+
+### Bug Fixes
+- **aeroadmin**: force-hide window with real ShowWindow, not just the launch hint (6a19acc5)
+
+
 ## [3.11.54] - 2026-09-08
 
 ### Bug Fixes
