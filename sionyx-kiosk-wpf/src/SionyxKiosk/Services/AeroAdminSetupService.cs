@@ -98,6 +98,22 @@ public class AeroAdminSetupService
         await Task.Run(RunSetup);
     }
 
+    private static Process? StartHiddenProcess()
+    {
+        // הערה חשובה (08/09, אומת בשטח): WindowStyle=Hidden כאן הוא רק
+        // "רמז" ל-CreateProcess (nCmdShow=SW_HIDE) - הרבה אפליקציות
+        // Win32 (וגם AeroAdmin, כנראה) מתעלמות ממנו וקוראות בעצמן
+        // ShowWindow(SW_SHOW) בהפעלה, ולכן החלון קפץ בפועל וקטע את
+        // סשן הקיוסק. במקום לסמוך על הרמז, מכריחים הסתרה עם
+        // ShowWindow/SW_HIDE אמיתי ברגע שהחלון נמצא, ראו HideAllWindowsForProcess.
+        var psi = new ProcessStartInfo(ExePath)
+        {
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
+        };
+        return Process.Start(psi);
+    }
+
     private void RunSetup()
     {
         Process? process = null;
@@ -109,18 +125,7 @@ public class AeroAdminSetupService
             var startedNewProcess = false;
             if (process == null)
             {
-                // הערה חשובה (08/09, אומת בשטח): WindowStyle=Hidden כאן הוא רק
-                // "רמז" ל-CreateProcess (nCmdShow=SW_HIDE) - הרבה אפליקציות
-                // Win32 (וגם AeroAdmin, כנראה) מתעלמות ממנו וקוראות בעצמן
-                // ShowWindow(SW_SHOW) בהפעלה, ולכן החלון קפץ בפועל וקטע את
-                // סשן הקיוסק. במקום לסמוך על הרמז, מכריחים הסתרה עם
-                // ShowWindow/SW_HIDE אמיתי ברגע שהחלון נמצא, ראו HideAllWindowsForProcess.
-                var psi = new ProcessStartInfo(ExePath)
-                {
-                    UseShellExecute = true,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                };
-                process = Process.Start(psi);
+                process = StartHiddenProcess();
                 startedNewProcess = true;
             }
 
@@ -202,17 +207,51 @@ public class AeroAdminSetupService
     /// EnsureConfiguredAsync/RefreshAsync, זה תמיד רץ, גם אחרי שההגדרה כבר
     /// הצליחה פעם אחת, כי החלון עלול לקפוץ שוב מכל סיבה (קליק בטעות, דיאלוג
     /// עדכון של AeroAdmin עצמו וכו').</summary>
-    public void EnsureHidden()
+    /// <summary>
+    /// רץ ללא תלות ב-EnsureConfiguredAsync/InfoFile - זה קריטי, כי
+    /// EnsureConfiguredAsync מדלג לגמרי ברגע ש-aeroadmin-info.txt קיים, בלי
+    /// לבדוק אם התהליך בפועל עדיין חי. תוקן (08/09, נמצא בשטח): בלי זה,
+    /// ברגע ש-AeroAdmin נסגר/קורס מכל סיבה (restart של הקיוסק, לדוגמה) אחרי
+    /// שכבר נקרא פעם אחת ה-ID/PIN - שום דבר לא מפעיל אותו מחדש לנצח, והדשבורד
+    /// ממשיך להראות פרטים ישנים בזמן שהקיוסק בפועל "לא מקוון" (offline) מבחינת
+    /// שרתי AeroAdmin. עכשיו: אם התהליך לא רץ - מפעילים אותו מחדש ומסתירים.
+    /// </summary>
+    /// <summary>
+    /// רץ ללא תלות ב-EnsureConfiguredAsync/InfoFile - זה קריטי, כי
+    /// EnsureConfiguredAsync מדלג לגמרי ברגע ש-aeroadmin-info.txt קיים, בלי
+    /// לבדוק אם התהליך בפועל עדיין חי. תוקן (08/09, נמצא בשטח): בלי זה,
+    /// ברגע ש-AeroAdmin נסגר/קורס מכל סיבה (restart של הקיוסק, לדוגמה) אחרי
+    /// שכבר נקרא פעם אחת ה-ID/PIN - שום דבר לא מפעיל אותו מחדש לנצח, והדשבורד
+    /// ממשיך להראות פרטים ישנים בזמן שהקיוסק בפועל "לא מקוון" (offline) מבחינת
+    /// שרתי AeroAdmin. עכשיו: אם התהליך לא רץ - מפעילים אותו מחדש ומסתירים.
+    /// מחזיר true אם בוצע הפעלה מחדש בפועל - הקורא (RemoteControlReportingService)
+    /// צריך במקרה כזה לקרוא ל-RefreshAsync, כי ID/PIN חדשים נוצרים בכל הפעלה
+    /// מחדש של התהליך והדשבורד חייב להתעדכן, לא רק "שהתהליך חי".
+    /// </summary>
+    public bool EnsureHidden()
     {
         try
         {
             var process = Process.GetProcessesByName("AeroAdmin").FirstOrDefault();
-            if (process == null) return;
+            var restarted = false;
+            if (process == null)
+            {
+                process = StartHiddenProcess();
+                if (process == null)
+                {
+                    Logger.Warning("EnsureHidden: AeroAdmin was not running and failed to restart it");
+                    return false;
+                }
+                restarted = true;
+                Logger.Information("EnsureHidden: AeroAdmin process was gone - restarted it (pid {Pid})", process.Id);
+            }
             HideAllWindowsForProcess((uint)process.Id);
+            return restarted;
         }
         catch (Exception ex)
         {
             Logger.Debug(ex, "EnsureHidden failed (non-fatal, will retry next tick)");
+            return false;
         }
     }
 

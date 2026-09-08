@@ -127,7 +127,13 @@ public class RemoteControlReportingService
         _aeroAdminHideEnforceTimer = new Timer(
             _ =>
             {
-                _aeroAdminSetup.EnsureHidden();
+                var restarted = _aeroAdminSetup.EnsureHidden();
+                if (restarted)
+                {
+                    // התהליך היה מת והופעל מחדש - ID/PIN חדשים נוצרו, צריך
+                    // לעדכן את הדשבורד ולא רק להסתמך על aeroadmin-info.txt הישן.
+                    _ = _aeroAdminSetup.RefreshAsync();
+                }
                 _aeroAdminSetup.WatchForConnectionDialogOnce();
             },
             null,
