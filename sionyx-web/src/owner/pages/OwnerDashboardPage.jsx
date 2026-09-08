@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, getOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh, requestTeamViewerLaunch } from "../services/ownerOrgService";
+import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, subscribeToOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh, requestTeamViewerLaunch } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance, getOrgUserPassword } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
@@ -176,15 +176,22 @@ const OwnerDashboardPage = () => {
     setOrgStats(null);
     setOrgComputers([]);
     setOrgStatsLoading(true);
-    const [result, computersResult] = await Promise.all([
-      getOrganizationStats(org.orgId, database),
-      getOrgComputers(org.orgId),
-    ]);
+    // המחשבים עצמם נטענים בזמן אמת ע"י ה-useEffect למטה (subscribeToOrgComputers) -
+    // לא בקריאה חד-פעמית כאן, כדי ש-ID/PIN (למשל של AeroAdmin, שמתחלף לעיתים
+    // תכופות) יתעדכנו על המסך מיד בלי לדרוש רענון ידני של הדף.
+    const result = await getOrganizationStats(org.orgId, database);
     if (result.success) setOrgStats(result.stats);
     else message.error(result.error || "נכשל בטעינת נתוני הארגון");
-    if (computersResult.success) setOrgComputers(computersResult.computers);
     setOrgStatsLoading(false);
   };
+
+  // 08/09: מנוי חי (Firebase onValue) לרשימת המחשבים של הארגון הפתוח בדראוור -
+  // מוחלף/מבוטל אוטומטית בכל פתיחה/סגירה של הדראוור או מעבר לארגון אחר.
+  useEffect(() => {
+    if (!orgDetailVisible || !orgDetailOrg?.orgId) return;
+    const unsub = subscribeToOrgComputers(orgDetailOrg.orgId, setOrgComputers);
+    return () => unsub();
+  }, [orgDetailVisible, orgDetailOrg?.orgId]);
 
   const handleCloseOrgDetail = () => {
     setOrgDetailVisible(false);

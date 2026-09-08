@@ -1,4 +1,4 @@
-﻿import { ref, get, set, remove } from "firebase/database";
+﻿import { ref, get, set, remove, onValue } from "firebase/database";
 import { ownerAuth as auth, ownerDatabase as database } from "../../config/firebase";
 
 const waitForAuth = () =>
@@ -81,6 +81,40 @@ export const getOrgComputers = async (orgId) => {
   } catch (e) {
     return { success: false, error: e.message, computers: [] };
   }
+};
+
+/**
+ * 08/09: גרסה חיה (onValue) של getOrgComputers - נועדה לדראוור פרטי-ארגון
+ * בדשבורד ה-owner, כדי שפרטי שליטה מרחוק (במיוחד ID/PIN של AeroAdmin, שמתחלף
+ * לעיתים תכופות) יתעדכנו על המסך מיד, בלי לדרוש רענון ידני של הדף - בדיוק
+ * כמו subscribeToComputers ב-realtimeService.js הרגיל (שכבר חי), רק בשכבת
+ * ה-owner (מסד נתונים/הרשאות נפרדים).
+ * @returns {Function} unsubscribe
+ */
+export const subscribeToOrgComputers = (orgId, callback) => {
+  if (!orgId) return () => {};
+  const computersRef = ref(database, `organizations/${orgId}/computers`);
+  return onValue(
+    computersRef,
+    snapshot => {
+      if (!snapshot.exists()) { callback([]); return; }
+      const data = snapshot.val();
+      const computers = Object.entries(data).map(([computerId, c]) => ({
+        computerId,
+        computerName: c.computerName || computerId,
+        isActive: !!c.isActive,
+        lastSeen: c.lastSeen || null,
+        rustdesk: c.remoteControl?.rustdesk || null,
+        anydesk: c.remoteControl?.anydesk || null,
+        teamviewer: c.remoteControl?.teamviewer || null,
+        aeroadmin: c.remoteControl?.aeroadmin || null,
+      }));
+      callback(computers);
+    },
+    error => {
+      console.error("subscribeToOrgComputers listener error:", error.message);
+    }
+  );
 };
 
 /** Owner-only: push a new AnyDesk password for a specific kiosk. Written to the
