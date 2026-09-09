@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.14.1] - 2026-09-09
+
+### Bug Fixes
+- **aeroadmin**: move window off-screen instead of SW_HIDE (ad04632a)
+
+
 ## [3.14.0] - 2026-09-08
 
 ### Features
