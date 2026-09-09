@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [3.14.2] - 2026-09-09
+
+### Bug Fixes
+- **tests**: SystemServicesManagerTests missing RemoteCommandService arg (e093edd3)
+
+### Other
+- **aeroadmin**: live raw dump of what UI Automation actually reads each tick (90bd78e5)
+
+
 ## [3.14.1] - 2026-09-09
 
 ### Bug Fixes
