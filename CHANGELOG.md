@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.14.4] - 2026-09-09
+
+### Bug Fixes
+- **aeroadmin**: read ID/PIN via raw Win32 GetDlgItem+WM_GETTEXT, not UI Automation (7087b37e)
+
+
 ## [3.14.3] - 2026-09-09
 
 ### Bug Fixes
