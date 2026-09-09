@@ -411,6 +411,26 @@ export const setLogShipIntervalMs = async ms => {
   }
 };
 
+/** Ask a kiosk to shut down or restart now (or a graceful, delayed variant).
+ * Written to `computers/{id}/powerCommand/requested` - the kiosk's new
+ * RemoteCommandService listens for this in real time (SseListener, same
+ * pattern as RustDesk/AnyDesk/log-shipping) and runs Windows `shutdown.exe`,
+ * then reports back to `powerCommand/lastResult` and clears `requested`.
+ * Admin-only, enforced by database.rules.json on this path. */
+export const requestPowerCommand = async (computerId, type) => {
+  try {
+    const orgId = getOrgId();
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/powerCommand/requested`), {
+      type, // 'shutdown' | 'restart'
+      requestedAt: Date.now(),
+    });
+    return { success: true };
+  } catch (error) {
+    logger.error('Error requesting power command:', error);
+    return { success: false, error: 'Failed to send power command' };
+  }
+};
+
 /**
  * Get users currently using computers
  */

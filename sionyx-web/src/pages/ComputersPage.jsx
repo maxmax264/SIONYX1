@@ -30,6 +30,7 @@ import {
   DownOutlined,
   UpOutlined,
   CloudUploadOutlined,
+  PoweroffOutlined,
 } from '@ant-design/icons';
 import {
   getAllComputers,
@@ -45,6 +46,7 @@ import {
   requestLogShipTriggerAll,
   requestLogShipTrigger,
   setLogShipIntervalMs,
+  requestPowerCommand,
 } from '../services/computerService';
 import { subscribeToComputers, subscribeToUsers } from '../services/realtimeService';
 import { getUserStatus, getStatusLabel, getStatusColor } from '../constants/userStatus';
@@ -501,6 +503,7 @@ const ComputersPage = () => {
     const [settingAnyDeskPassword, setSettingAnyDeskPassword] = useState(false);
     const [launchingTeamViewer, setLaunchingTeamViewer] = useState(false);
     const [sendingLog, setSendingLog] = useState(false);
+    const [sendingPowerCommand, setSendingPowerCommand] = useState(false);
 
     const handleSendLog = async () => {
       setSendingLog(true);
@@ -511,6 +514,29 @@ const ComputersPage = () => {
         message.error(result.error || 'נכשל בשליחת הבקשה');
       }
       setSendingLog(false);
+    };
+
+    const handlePowerCommand = type => {
+      const isShutdown = type === 'shutdown';
+      Modal.confirm({
+        title: isShutdown ? 'כיבוי מחשב' : 'הפעלה מחדש',
+        content: isShutdown
+          ? 'המחשב יכבה - הוא לא ידווח ולא יעבוד עד שיופעל פיזית מחדש. להמשיך?'
+          : 'המחשב יופעל מחדש כעת. להמשיך?',
+        okText: isShutdown ? 'כן, כבה' : 'כן, הפעל מחדש',
+        cancelText: 'ביטול',
+        okType: 'danger',
+        onOk: async () => {
+          setSendingPowerCommand(true);
+          const result = await requestPowerCommand(computerId, type);
+          if (result.success) {
+            message.success(isShutdown ? 'בקשת כיבוי נשלחה' : 'בקשת הפעלה מחדש נשלחה');
+          } else {
+            message.error(result.error || 'נכשל בשליחת הפקודה');
+          }
+          setSendingPowerCommand(false);
+        },
+      });
     };
 
     const handleRefresh = async () => {
@@ -609,6 +635,23 @@ const ComputersPage = () => {
                 loading={sendingLog}
                 onClick={handleSendLog}
                 title='שלח לוג של המחשב הזה לאתר'
+              />
+              <Button
+                type='text'
+                size='small'
+                icon={<PoweroffOutlined />}
+                loading={sendingPowerCommand}
+                onClick={() => handlePowerCommand('restart')}
+                title='הפעל מחשב זה מחדש'
+              />
+              <Button
+                type='text'
+                danger
+                size='small'
+                icon={<PoweroffOutlined />}
+                loading={sendingPowerCommand}
+                onClick={() => handlePowerCommand('shutdown')}
+                title='כבה מחשב זה'
               />
               <Button
                 type='text'

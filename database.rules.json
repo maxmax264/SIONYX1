@@ -128,6 +128,15 @@
                   ".validate": "newData.isString()"
                 }
               }
+            },
+            "powerCommand": {
+              ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists() || root.child('owners').child(auth.uid).exists())",
+              "requested": {
+                ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists())",
+                "type": { ".validate": "newData.isString() && (newData.val() == 'shutdown' || newData.val() == 'restart')" },
+                "requestedAt": { ".validate": "newData.isNumber()" }
+              },
+              "lastResult": { ".write": "auth != null" }
             }
           }
         },
