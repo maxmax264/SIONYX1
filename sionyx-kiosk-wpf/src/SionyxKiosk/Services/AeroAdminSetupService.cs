@@ -406,37 +406,23 @@ public class AeroAdminSetupService
         }
     }
 
-    private const int SW_SHOWNOACTIVATE = 4;
-    private const int GWL_EXSTYLE = -20;
-    private const uint WS_EX_LAYERED = 0x00080000;
-    private const uint LWA_ALPHA = 0x2;
+    private const int SW_HIDE = 0;
 
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-    [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-    [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(
-        IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
 
     /// <summary>
     /// מסתיר בפועל את *כל* החלונות העליונים של התהליך - לא רק ה"חלון הראשי" -
     /// כי דיאלוג EULA/רישוי בהפעלה ראשונה או חלון משנה יכולים להיות תהליך-ID
     /// תואם אבל handle שונה מזה שנמצא לצורך קריאת ה-ID/PIN.
     ///
-    /// היסטוריית תיקונים (09/09, שני ניסיונות שנכשלו בשטח לפני זה):
-    /// 1) ShowWindow(SW_HIDE) - AeroAdmin הפסיק לרענן את ה-PIN הפנימי שהוא
-    ///    מציג ברגע שהחלון הפך ל-invisible; QuickCheckForPinChange המשיך
-    ///    לקרוא ערך קפוא מרגע ההסתרה, גם כשה-PIN האמיתי כבר התחלף.
-    /// 2) SetWindowPos למיקום מחוץ למסך (-32000,-32000) עם SW_SHOWNOACTIVATE -
-    ///    גרוע יותר: aeroadmin-live-debug.txt הראה עץ *ריק לגמרי* (0 אלמנטים) -
-    ///    כנראה שחלון שממוקם כולו מחוץ לגבולות כל מסך לא עובר ציור בפועל
-    ///    (Windows/DWM מדלגים על רינדור למשהו שבטוח לא נראה), כך שה-UIA
-    ///    provider (שכנראה מבוסס-ציור, לא native UIA) לא בונה עץ נגישות בכלל.
-    /// המסקנה: כדי שהאפליקציה תמשיך "לחיות" ולרענן את עצמה (כולל ה-UIA tree),
-    /// החלון חייב להישאר בפועל בתוך גבולות מסך אמיתי ולעבור ציור. הפתרון:
-    /// WS_EX_LAYERED + alpha=0 - החלון "מוצג" ומצויר כרגיל (Windows חושב שהוא
-    /// גלוי ומרנדר אותו) אבל שקוף ב-100% ולכן לא נראה לקופאי בכלל, למרות
-    /// שהוא נשאר במקומו המקורי על המסך (בד"כ במרכז, קטן, לא מפריע גם ויזואלית
-    /// כי הוא שקוף).
+    /// היסטוריית תיקונים (09/09, שלושה ניסיונות שנכשלו בשטח): SW_HIDE, הזזה
+    /// מחוץ למסך, ו-WS_EX_LAYERED שקוף - כל השלושה שיבשו את קריאת ה-PIN
+    /// דרך UI Automation באופן זה או אחר (ערך קפוא / עץ ריק לגמרי), כי
+    /// UI Automation על האפליקציה הזו תלוי ברינדור בפועל של החלון.
+    /// הפתרון האמיתי: הפסקנו להסתמך על UI Automation לקריאה בכלל - ReadOwnId/
+    /// ReadOwnPin קוראים עכשיו ישירות מהבאפר הפנימי של הבקרה (GetDlgItem +
+    /// WM_GETTEXT, ראו ReadDlgItemText) שעובד בלי קשר למצב הציור/נראות. אז
+    /// חוזרים כאן ל-SW_HIDE הפשוט והאמין ביותר - עכשיו זה לא סותר את הקריאה.
     /// </summary>
     private static void HideAllWindowsForProcess(uint processId)
     {
@@ -445,13 +431,7 @@ public class AeroAdminSetupService
             GetWindowThreadProcessId(hWnd, out var pid);
             if (pid == processId)
             {
-                ShowWindow(hWnd, SW_SHOWNOACTIVATE);
-                var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-                if ((exStyle & (int)WS_EX_LAYERED) == 0)
-                {
-                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | (int)WS_EX_LAYERED);
-                }
-                SetLayeredWindowAttributes(hWnd, 0, 0, LWA_ALPHA); // alpha=0 - שקוף לגמרי
+                ShowWindow(hWnd, SW_HIDE);
             }
             return true; // ממשיכים לכל החלונות, לא עוצרים בראשון
         }, IntPtr.Zero);
@@ -580,6 +560,24 @@ public class AeroAdminSetupService
 
     private static string? ReadOwnId(AutomationElement mainWindow)
     {
+        // תוקן (09/09, אחרי שלושה ניסיוני הסתרה שכולם שיבשו את קריאת ה-UI
+        // Automation בדרך זו או אחרת): מנסים קודם קריאה גולמית של Win32 -
+        // GetDlgItem(hwnd, 10132) + WM_GETTEXT - זה קורא ישירות מהבאפר הפנימי
+        // של הבקרה, בלי קשר בכלל למצב הציור/גלוי/מוסתר/שקוף של החלון, כי זה
+        // לא עובר דרך שכבת ה-UI Automation שתלויה ברינדור בפועל. 10132 אומת
+        // בשטח (aeroadmin-ui-debug.txt משני קיוסקים שונים) כ-control ID קבוע
+        // של שדה ה-ID ב-AeroAdmin v4.93. אם זה נכשל (גרסה אחרת, IDs שונים) -
+        // נופלים חזרה לחיפוש ב-UI Automation כרגיל.
+        var raw = ReadDlgItemText(mainWindow, AeroAdminIdControlId);
+        if (!string.IsNullOrWhiteSpace(raw))
+        {
+            var rawMatch = Regex.Match(raw, @"(\d[\d \-]{7,})");
+            if (rawMatch.Success)
+            {
+                return rawMatch.Groups[1].Value.Replace(" ", "").Replace("-", "");
+            }
+        }
+
         // ה-IP/ID העצמי מוצג כטקסט בחלון הבית, בפורמט קבוצות ספרות (למשל
         // "832 796 561"). מחפשים בין כל ה-Text controls את הראשון שמתאים
         // לתבנית של רצף ספרות ארוך (8+) - זה עובד בכל שפת ממשק, כי לא
@@ -611,6 +609,14 @@ public class AeroAdminSetupService
     /// (עברית וכו').</summary>
     private static string? ReadOwnPin(AutomationElement mainWindow, string excludeId)
     {
+        // ניסיון גולמי קודם - ראו הערה ב-ReadOwnId. 10133 אומת בשטח כ-control
+        // ID קבוע של שדה ה-PIN.
+        var raw = ReadDlgItemText(mainWindow, AeroAdminPinControlId)?.Trim();
+        if (!string.IsNullOrWhiteSpace(raw) && Regex.IsMatch(raw, @"^\d{4,6}$") && raw != excludeId)
+        {
+            return raw;
+        }
+
         // תוקן (08/09) - ראו הערה ב-ReadOwnId: גם ה-PIN יושב ב-ControlType.Pane
         // ולא ב-Text בגרסה הזו (למשל Name='6214' AutomationId='10133').
         var texts = mainWindow.FindAll(TreeScope.Descendants,
@@ -626,5 +632,39 @@ public class AeroAdminSetupService
             return value;
         }
         return null;
+    }
+
+    private const int AeroAdminIdControlId = 10132;
+    private const int AeroAdminPinControlId = 10133;
+
+    [DllImport("user32.dll")] private static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
+    [DllImport("user32.dll")] private static extern int GetWindowTextLength(IntPtr hWnd);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+    /// <summary>
+    /// קריאה גולמית של טקסט בקרה דרך Win32 (GetDlgItem + WM_GETTEXT, לא UI
+    /// Automation) - עובדת בלי קשר למצב הציור/נראות של החלון, כי היא קוראת
+    /// את הבאפר הפנימי של הבקרה ישירות, לא את מה שמצויר על המסך. mainWindow
+    /// מגיע כ-AutomationElement (לא HWND ישיר) כי זה מה שכל הקוד הקיים כבר
+    /// מעביר - ממירים בעזרת NativeWindowHandle.
+    /// </summary>
+    private static string? ReadDlgItemText(AutomationElement mainWindow, int controlId)
+    {
+        try
+        {
+            var hwnd = new IntPtr(mainWindow.Current.NativeWindowHandle);
+            var child = GetDlgItem(hwnd, controlId);
+            if (child == IntPtr.Zero) return null;
+            var len = GetWindowTextLength(child);
+            if (len <= 0) return null;
+            var sb = new StringBuilder(len + 1);
+            GetWindowText(child, sb, sb.Capacity);
+            return sb.ToString();
+        }
+        catch
+        {
+            return null; // נופלים חזרה לחיפוש UI Automation הרגיל
+        }
     }
 }
