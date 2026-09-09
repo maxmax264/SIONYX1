@@ -407,37 +407,36 @@ public class AeroAdminSetupService
     }
 
     private const int SW_SHOWNOACTIVATE = 4;
-    private const uint SWP_NOSIZE = 0x0001;
-    private const uint SWP_NOZORDER = 0x0004;
-    private const uint SWP_NOACTIVATE = 0x0010;
-    // הרבה מחוץ לכל שטח מסך אפשרי (גם multi-monitor) - שם החלון "קיים וגלוי"
-    // מבחינת Windows אבל אף אחד לא רואה אותו בפועל.
-    private const int OffscreenX = -32000;
-    private const int OffscreenY = -32000;
+    private const int GWL_EXSTYLE = -20;
+    private const uint WS_EX_LAYERED = 0x00080000;
+    private const uint LWA_ALPHA = 0x2;
 
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")] private static extern bool SetWindowPos(
-        IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+    [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(
+        IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
 
     /// <summary>
-    /// מזיז בכוח (לא מסתיר!) את *כל* החלונות העליונים של התהליך הרחק מחוץ
-    /// לשטח המסך - לא רק ה"חלון הראשי" - כי דיאלוג EULA/רישוי בהפעלה ראשונה
-    /// או חלון משנה יכולים להיות תהליך-ID תואם אבל handle שונה מזה שנמצא
-    /// לצורך קריאת ה-ID/PIN.
+    /// מסתיר בפועל את *כל* החלונות העליונים של התהליך - לא רק ה"חלון הראשי" -
+    /// כי דיאלוג EULA/רישוי בהפעלה ראשונה או חלון משנה יכולים להיות תהליך-ID
+    /// תואם אבל handle שונה מזה שנמצא לצורך קריאת ה-ID/PIN.
     ///
-    /// תוקן (09/09, באג אמיתי שנמצא בשטח): בהתחלה זה עשה ShowWindow(SW_HIDE)
-    /// אמיתי - אבל אז הדשבורד המשיך להראות PIN ישן לצמיתות גם אחרי שהמשתמש
-    /// אימת שה-PIN האמיתי על המסך כן השתנה, ו-QuickCheckForPinChange (שרץ
-    /// כל 3 שניות ומאושר בלוג שהוא רץ) פשוט ממשיך לקרוא את הערך הישן. ההשערה:
-    /// AeroAdmin (כמו הרבה אפליקציות GUI) מפסיק לרענן את הטקסט הפנימי שלו
-    /// (ה-PIN בפרט, שמתחדש עצמאית ע"י התוכנה) כשהחלון שלו מוסתר (SW_HIDE),
-    /// כי הוא בודק IsWindowVisible/מדלג על ציור בחלון נסתר לחיסכון במשאבים -
-    /// כך שהערך הפנימי שה-UI Automation קורא נשאר קפוא על הערך מרגע ההסתרה
-    /// ולא באמת מתעדכן, גם אם ברמת הפרוטוקול/רשת ה-PIN כבר התחלף.
-    /// הפתרון: להזיז את החלון מחוץ לגבולות המסך במקום להסתיר אותו - מבחינת
-    /// Windows/IsWindowVisible הוא עדיין "מוצג כרגיל" (SW_SHOWNOACTIVATE, לא
-    /// SW_HIDE) אז האפליקציה ממשיכה לצייר/לרענן את עצמה כרגיל ברקע, בלי
-    /// שהקופאי יראה אותו בפועל כי הוא פיזית מחוץ לכל מסך.
+    /// היסטוריית תיקונים (09/09, שני ניסיונות שנכשלו בשטח לפני זה):
+    /// 1) ShowWindow(SW_HIDE) - AeroAdmin הפסיק לרענן את ה-PIN הפנימי שהוא
+    ///    מציג ברגע שהחלון הפך ל-invisible; QuickCheckForPinChange המשיך
+    ///    לקרוא ערך קפוא מרגע ההסתרה, גם כשה-PIN האמיתי כבר התחלף.
+    /// 2) SetWindowPos למיקום מחוץ למסך (-32000,-32000) עם SW_SHOWNOACTIVATE -
+    ///    גרוע יותר: aeroadmin-live-debug.txt הראה עץ *ריק לגמרי* (0 אלמנטים) -
+    ///    כנראה שחלון שממוקם כולו מחוץ לגבולות כל מסך לא עובר ציור בפועל
+    ///    (Windows/DWM מדלגים על רינדור למשהו שבטוח לא נראה), כך שה-UIA
+    ///    provider (שכנראה מבוסס-ציור, לא native UIA) לא בונה עץ נגישות בכלל.
+    /// המסקנה: כדי שהאפליקציה תמשיך "לחיות" ולרענן את עצמה (כולל ה-UIA tree),
+    /// החלון חייב להישאר בפועל בתוך גבולות מסך אמיתי ולעבור ציור. הפתרון:
+    /// WS_EX_LAYERED + alpha=0 - החלון "מוצג" ומצויר כרגיל (Windows חושב שהוא
+    /// גלוי ומרנדר אותו) אבל שקוף ב-100% ולכן לא נראה לקופאי בכלל, למרות
+    /// שהוא נשאר במקומו המקורי על המסך (בד"כ במרכז, קטן, לא מפריע גם ויזואלית
+    /// כי הוא שקוף).
     /// </summary>
     private static void HideAllWindowsForProcess(uint processId)
     {
@@ -447,8 +446,12 @@ public class AeroAdminSetupService
             if (pid == processId)
             {
                 ShowWindow(hWnd, SW_SHOWNOACTIVATE);
-                SetWindowPos(hWnd, IntPtr.Zero, OffscreenX, OffscreenY, 0, 0,
-                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                if ((exStyle & (int)WS_EX_LAYERED) == 0)
+                {
+                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | (int)WS_EX_LAYERED);
+                }
+                SetLayeredWindowAttributes(hWnd, 0, 0, LWA_ALPHA); // alpha=0 - שקוף לגמרי
             }
             return true; // ממשיכים לכל החלונות, לא עוצרים בראשון
         }, IntPtr.Zero);
