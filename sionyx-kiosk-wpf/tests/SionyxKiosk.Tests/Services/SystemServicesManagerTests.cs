@@ -20,6 +20,7 @@ public class SystemServicesManagerTests : IDisposable
     private readonly RemoteControlReportingService _remoteControl;
     private readonly ComputerHeartbeatService _heartbeat;
     private readonly LogShippingControlService _logShipping;
+    private readonly RemoteCommandService _remoteCommand;
     private readonly SystemServicesManager _manager;
 
     public SystemServicesManagerTests()
@@ -37,6 +38,7 @@ public class SystemServicesManagerTests : IDisposable
         _remoteControl = new RemoteControlReportingService(_firebase, new AeroAdminSetupService());
         _heartbeat = new ComputerHeartbeatService(TestFirebaseFactory.CreateConfig());
         _logShipping = new LogShippingControlService(_firebase, Path.GetTempPath());
+        _remoteCommand = new RemoteCommandService(_firebase);
         _session = new SessionService(
             _firebase, "user-123", "test-org",
             new ComputerService(_firebase),
@@ -46,7 +48,7 @@ public class SystemServicesManagerTests : IDisposable
 
         _manager = new SystemServicesManager(
             _forceLogout, _chat, _printMonitor, _operatingHours,
-            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat, _logShipping);
+            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat, _logShipping, _remoteCommand);
     }
 
     public void Dispose() => _firebase.Dispose();
