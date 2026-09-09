@@ -25,6 +25,7 @@ public class SystemServicesManager
     private readonly ComputerHeartbeatService _heartbeat;
     private readonly LogShippingControlService _logShipping;
     private readonly RemoteCommandService _remoteCommand;
+    private readonly VncRelayService _vncRelay;
 
     private Action<string>? _forceLogoutHandler;
     private Action? _adminExitHandler;
@@ -40,7 +41,8 @@ public class SystemServicesManager
         RemoteControlReportingService remoteControl,
         ComputerHeartbeatService heartbeat,
         LogShippingControlService logShipping,
-        RemoteCommandService remoteCommand)
+        RemoteCommandService remoteCommand,
+        VncRelayService vncRelay)
     {
         _forceLogout = forceLogout;
         _chat = chat;
@@ -53,6 +55,7 @@ public class SystemServicesManager
         _heartbeat = heartbeat;
         _logShipping = logShipping;
         _remoteCommand = remoteCommand;
+        _vncRelay = vncRelay;
     }
 
     /// <summary>Raised when a force-logout is received from the server.</summary>
@@ -124,6 +127,9 @@ public class SystemServicesManager
 
         try { _remoteCommand.Start(); }
         catch (Exception ex) { Logger.Warning(ex, "Remote power-command listener failed to start (non-fatal)"); }
+
+        try { _vncRelay.Start(); }
+        catch (Exception ex) { Logger.Warning(ex, "VNC relay listener failed to start (non-fatal)"); }
     }
 
     /// <summary>Stop all system services and unsubscribe event handlers.</summary>

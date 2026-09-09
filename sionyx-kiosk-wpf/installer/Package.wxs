@@ -100,6 +100,18 @@
               Source="$(var.SourceDir)\installer\remote-control\install-teamviewer.ps1"
               KeyPath="yes" />
       </Component>
+      <!-- TightVNC: local-only VNC server (127.0.0.1:5900, no firewall
+           exception) used by VncRelayService to bridge a screen-control
+           session out over the sionyx-vnc-relay WebSocket relay. Unlike
+           RustDesk/AnyDesk/TeamViewer this isn't a remote-control app in
+           its own right - it never talks to the internet itself, so it
+           has no certificate for NetFree to reject. See
+           install-tightvnc.ps1 header. -->
+      <Component Id="TightVncInstallScript" Guid="*">
+        <File Id="InstallTightVncPs1"
+              Source="$(var.SourceDir)\installer\remote-control\install-tightvnc.ps1"
+              KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <ComponentGroup Id="TemplateFiles" Directory="TemplatesDir">
@@ -247,6 +259,13 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- Local-only, never talks outbound - see install-tightvnc.ps1. -->
+    <CustomAction Id="CA_InstallTightVnc"
+                  Directory="RemoteControlDir"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-tightvnc.ps1&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
 
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
@@ -283,7 +302,8 @@
       <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE" />
       <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
       <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
+      <Custom Action="CA_InstallTightVnc"    After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallTightVnc"   Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />

@@ -431,6 +431,33 @@ export const requestPowerCommand = async (computerId, type) => {
   }
 };
 
+/** Open a VNC remote-control session for a kiosk.
+ * Generates a one-time random token, writes it to
+ * `computers/{id}/vncRelay/requested` for the kiosk's VncRelayService to
+ * pick up (bridges its local TightVNC to the sionyx-vnc-relay WebSocket
+ * relay), and returns a ready-to-open noVNC viewer URL using that same
+ * token. Admin-only, enforced by database.rules.json on this path.
+ *
+ * VNC_RELAY_BASE_URL below must point at the deployed sionyx-vnc-relay
+ * Render service (separate repo, separate Render service from this app
+ * and from the Understood payment bridge). */
+const VNC_RELAY_BASE_URL = 'https://sionyx-vnc-relay.onrender.com'; // TODO: update after deploying sionyx-vnc-relay on Render
+
+export const requestVncSession = async computerId => {
+  try {
+    const orgId = getOrgId();
+    const token = crypto.getRandomValues(new Uint32Array(4)).join('');
+    await set(ref(database, `organizations/${orgId}/computers/${computerId}/vncRelay/requested`), {
+      token,
+      requestedAt: Date.now(),
+    });
+    return { success: true, viewerUrl: `${VNC_RELAY_BASE_URL}/vnc.html?token=${token}` };
+  } catch (error) {
+    logger.error('Error requesting VNC session:', error);
+    return { success: false, error: 'Failed to start VNC session' };
+  }
+};
+
 /**
  * Get users currently using computers
  */

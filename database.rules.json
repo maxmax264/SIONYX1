@@ -137,6 +137,15 @@
                 "requestedAt": { ".validate": "newData.isNumber()" }
               },
               "lastResult": { ".write": "auth != null" }
+            },
+            "vncRelay": {
+              ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists() || root.child('owners').child(auth.uid).exists())",
+              "requested": {
+                ".write": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('owners').child(auth.uid).exists())",
+                "token": { ".validate": "newData.isString() && newData.val().length >= 8" },
+                "requestedAt": { ".validate": "newData.isNumber()" }
+              },
+              "lastResult": { ".write": "auth != null" }
             }
           }
         },

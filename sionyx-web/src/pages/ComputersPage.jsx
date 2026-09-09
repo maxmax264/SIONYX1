@@ -47,6 +47,7 @@ import {
   requestLogShipTrigger,
   setLogShipIntervalMs,
   requestPowerCommand,
+  requestVncSession,
 } from '../services/computerService';
 import { subscribeToComputers, subscribeToUsers } from '../services/realtimeService';
 import { getUserStatus, getStatusLabel, getStatusColor } from '../constants/userStatus';
@@ -504,6 +505,7 @@ const ComputersPage = () => {
     const [launchingTeamViewer, setLaunchingTeamViewer] = useState(false);
     const [sendingLog, setSendingLog] = useState(false);
     const [sendingPowerCommand, setSendingPowerCommand] = useState(false);
+    const [startingVnc, setStartingVnc] = useState(false);
 
     const handleSendLog = async () => {
       setSendingLog(true);
@@ -537,6 +539,18 @@ const ComputersPage = () => {
           setSendingPowerCommand(false);
         },
       });
+    };
+
+    const handleStartVnc = async () => {
+      setStartingVnc(true);
+      const result = await requestVncSession(computerId);
+      if (result.success) {
+        window.open(result.viewerUrl, '_blank', 'noopener,noreferrer');
+        message.info('נפתח חיבור VNC - ייקח כמה שניות עד שהחיבור יתפוס (וכ-דקה בפעם הראשונה אם ה-relay רדום)');
+      } else {
+        message.error(result.error || 'נכשל בהתחלת חיבור VNC');
+      }
+      setStartingVnc(false);
     };
 
     const handleRefresh = async () => {
@@ -635,6 +649,14 @@ const ComputersPage = () => {
                 loading={sendingLog}
                 onClick={handleSendLog}
                 title='שלח לוג של המחשב הזה לאתר'
+              />
+              <Button
+                type='text'
+                size='small'
+                icon={<DesktopOutlined />}
+                loading={startingVnc}
+                onClick={handleStartVnc}
+                title='שליטה מרחוק (VNC) במחשב הזה'
               />
               <Button
                 type='text'
