@@ -383,13 +383,39 @@ public class AeroAdminSetupService
         }
     }
 
-    private const int SW_HIDE = 0;
-    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    private const int SW_SHOWNOACTIVATE = 4;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    // הרבה מחוץ לכל שטח מסך אפשרי (גם multi-monitor) - שם החלון "קיים וגלוי"
+    // מבחינת Windows אבל אף אחד לא רואה אותו בפועל.
+    private const int OffscreenX = -32000;
+    private const int OffscreenY = -32000;
 
-    /// <summary>מסתיר בכוח (SW_HIDE אמיתי, לא רק רמז ל-CreateProcess) את *כל*
-    /// החלונות העליונים של התהליך - לא רק ה"חלון הראשי" - כי דיאלוג EULA/רישוי
-    /// בהפעלה ראשונה או חלון משנה יכולים להיות תהליך-ID תואם אבל handle שונה
-    /// מזה שנמצא לצורך קריאת ה-ID/PIN.</summary>
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern bool SetWindowPos(
+        IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    /// <summary>
+    /// מזיז בכוח (לא מסתיר!) את *כל* החלונות העליונים של התהליך הרחק מחוץ
+    /// לשטח המסך - לא רק ה"חלון הראשי" - כי דיאלוג EULA/רישוי בהפעלה ראשונה
+    /// או חלון משנה יכולים להיות תהליך-ID תואם אבל handle שונה מזה שנמצא
+    /// לצורך קריאת ה-ID/PIN.
+    ///
+    /// תוקן (09/09, באג אמיתי שנמצא בשטח): בהתחלה זה עשה ShowWindow(SW_HIDE)
+    /// אמיתי - אבל אז הדשבורד המשיך להראות PIN ישן לצמיתות גם אחרי שהמשתמש
+    /// אימת שה-PIN האמיתי על המסך כן השתנה, ו-QuickCheckForPinChange (שרץ
+    /// כל 3 שניות ומאושר בלוג שהוא רץ) פשוט ממשיך לקרוא את הערך הישן. ההשערה:
+    /// AeroAdmin (כמו הרבה אפליקציות GUI) מפסיק לרענן את הטקסט הפנימי שלו
+    /// (ה-PIN בפרט, שמתחדש עצמאית ע"י התוכנה) כשהחלון שלו מוסתר (SW_HIDE),
+    /// כי הוא בודק IsWindowVisible/מדלג על ציור בחלון נסתר לחיסכון במשאבים -
+    /// כך שהערך הפנימי שה-UI Automation קורא נשאר קפוא על הערך מרגע ההסתרה
+    /// ולא באמת מתעדכן, גם אם ברמת הפרוטוקול/רשת ה-PIN כבר התחלף.
+    /// הפתרון: להזיז את החלון מחוץ לגבולות המסך במקום להסתיר אותו - מבחינת
+    /// Windows/IsWindowVisible הוא עדיין "מוצג כרגיל" (SW_SHOWNOACTIVATE, לא
+    /// SW_HIDE) אז האפליקציה ממשיכה לצייר/לרענן את עצמה כרגיל ברקע, בלי
+    /// שהקופאי יראה אותו בפועל כי הוא פיזית מחוץ לכל מסך.
+    /// </summary>
     private static void HideAllWindowsForProcess(uint processId)
     {
         EnumWindows((hWnd, _) =>
@@ -397,7 +423,9 @@ public class AeroAdminSetupService
             GetWindowThreadProcessId(hWnd, out var pid);
             if (pid == processId)
             {
-                ShowWindow(hWnd, SW_HIDE);
+                ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+                SetWindowPos(hWnd, IntPtr.Zero, OffscreenX, OffscreenY, 0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
             }
             return true; // ממשיכים לכל החלונות, לא עוצרים בראשון
         }, IntPtr.Zero);
