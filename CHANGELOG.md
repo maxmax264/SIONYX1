@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.14.3] - 2026-09-09
+
+### Bug Fixes
+- **aeroadmin**: keep window on-screen but fully transparent, instead of hiding/moving it (deb7a0a9)
+
+
 ## [3.14.2] - 2026-09-09
 
 ### Bug Fixes
