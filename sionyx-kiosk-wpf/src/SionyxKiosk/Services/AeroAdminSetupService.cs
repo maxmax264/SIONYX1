@@ -155,6 +155,8 @@ public class AeroAdminSetupService
     /// null אם אין שינוי או שהקריאה נכשלה (למשל החלון עוד לא מוכן/נסגר -
     /// לא בעיה, ה-tick הבא ינסה שוב).
     /// </summary>
+    private const string LiveDebugFile = @"C:\ProgramData\SIONYX\aeroadmin-live-debug.txt";
+
     public string? QuickCheckForPinChange()
     {
         if (_knownMainWindowHandle == IntPtr.Zero)
@@ -172,8 +174,29 @@ public class AeroAdminSetupService
             catch { return null; } // החלון נסגר/התהליך מת - EnsureHidden יטפל בהפעלה מחדש
 
             var id = ReadOwnId(mainWindow);
+            var pin = string.IsNullOrWhiteSpace(id) ? null : ReadOwnPin(mainWindow, id);
+
+            // 09/09: דאמפ חי, נכתב מחדש (לא מוגן ע"י exists!) בכל טיק - כדי
+            // לראות בדיוק מה ה-UI Automation קורא ברגע נתון, בלי תלות בזה
+            // שה-Read הצליח/נכשל. שונה מ-aeroadmin-ui-debug.txt (חד-פעמי,
+            // מוגן ע"י exists, ולכן מיושן ולא רלוונטי לבדיקה חיה).
+            try
+            {
+                var texts = mainWindow.FindAll(TreeScope.Descendants,
+                    new OrCondition(
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text),
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Pane)));
+                var sb = new StringBuilder();
+                sb.AppendLine($"# Live dump {DateTime.Now:yyyy-MM-dd HH:mm:ss} - computed id={id ?? "(null)"} pin={pin ?? "(null)"}");
+                foreach (AutomationElement t in texts)
+                {
+                    sb.AppendLine($"  Name='{t.Current.Name}' AutomationId='{t.Current.AutomationId}'");
+                }
+                File.WriteAllText(LiveDebugFile, sb.ToString());
+            }
+            catch (Exception dumpEx) { Logger.Debug(dumpEx, "Live dump failed (non-fatal)"); }
+
             if (string.IsNullOrWhiteSpace(id)) return null;
-            var pin = ReadOwnPin(mainWindow, id);
             if (string.IsNullOrWhiteSpace(pin)) return null;
 
             var current = $"AeroAdmin ID: {id}\r\nAeroAdmin Password: {pin}\r\n";
