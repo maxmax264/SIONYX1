@@ -1,8 +1,16 @@
 # install-tightvnc.ps1
-# מתקין TightVNC Server (open source, GPL) כשירות רקע, מאזין רק על
-# 127.0.0.1:5900 - לעולם לא חשוף ברשת המקומית של הקיוסק. הגישה היחידה
-# אליו היא דרך VncRelayService (SIONYX) שמגשר החוצה מעל WebSocket ל-
-# sionyx-vnc-relay, ולכן לא צריך את TightVNC לפתוח פורט ב-firewall בכלל.
+# מתקין TightVNC Server (open source, GPL) שרץ **בתוך ה-session של המשתמש
+# המחובר** (לא כשירות Windows!) - מאזין רק על 127.0.0.1:5900, לעולם לא
+# חשוף ברשת המקומית של הקיוסק. הגישה היחידה אליו היא דרך VncRelayService
+# (SIONYX) שמגשר החוצה מעל WebSocket ל-sionyx-vnc-relay.
+#
+# חשוב: TightVNC בהתקנה כשירות (Windows Service) רץ ב-Session 0, שהוא
+# session נפרד מהדסקטופ האינטראקטיבי של המשתמש המחובר - לכן הוא תופס
+# מסך שחור/ריק במקום מה שבאמת מוצג על הצג. הפתרון: לא רושמים אותו
+# כשירות כלל; VncRelayService.cs מפעיל את tvnserver.exe ישירות (עם
+# "-run") מתוך ה-session של הקיוסק בזמן שה-VncRelayService עצמו עולה,
+# בדיוק כמו שהאפליקציה של הקיוסק עצמה רצה. כך tvnserver "רואה" את
+# המסך האמיתי.
 #
 # למה TightVNC ולא RustDesk/AnyDesk לצורך הזה: TightVNC לא עושה שום
 # הצפנה/סרטיפיקט משלו (RFB גולמי) - כל ה-TLS קורה ברמת ה-WebSocket של
@@ -26,12 +34,9 @@ Write-Host "[SIONYX] Installing TightVNC (local-only VNC server for the VNC-rela
 if (-Not (Test-Path $TempDir)) { New-Item -ItemType Directory -Force -Path $TempDir | Out-Null }
 if (-Not (Test-Path $InfoDir)) { New-Item -ItemType Directory -Force -Path $InfoDir | Out-Null }
 
-$existingService = Get-Service -Name "tvnserver" -ErrorAction SilentlyContinue
-if ($existingService -ne $null -and $existingService.Status -eq 'Running') {
-    Write-Host "[SIONYX] TightVNC already installed and running - skipping binary install, keeping existing password."
-    $alreadyInstalled = $true
-} else {
-    $alreadyInstalled = $false
+$alreadyInstalled = Test-Path "$InstallDir\tvnserver.exe"
+if ($alreadyInstalled) {
+    Write-Host "[SIONYX] TightVNC binaries already installed - skipping MSI, keeping existing password."
 }
 
 # סיסמה קבועה - נשמרת בהתקנה חוזרת (update), נוצרת רק בהתקנה ראשונה,
@@ -51,15 +56,16 @@ if (-Not $alreadyInstalled) {
     Write-Host "[SIONYX] Downloading TightVNC..."
     Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath
 
-    Write-Host "[SIONYX] Running silent install (server only, loopback-only listening, VNC auth)..."
+    Write-Host "[SIONYX] Running silent install (server only, loopback-only listening, VNC auth, NOT as a Windows service)..."
     # ADDLOCAL=Server בלבד (בלי Viewer - אין צורך בו על הקיוסק).
-    # ALLOWLOOPBACK רלוונטי רק להרשאות; ההגבלה ל-127.0.0.1 בפועל מתבצעת
-    # ע"י LoopbackOnly ברישום למטה, כי אין property MSI ישיר לזה.
+    # SERVER_REGISTER_AS_SERVICE=0 בכוונה: שירות Windows רץ ב-Session 0
+    # ותופס מסך שחור. tvnserver.exe מופעל בהמשך ישירות מתוך VncRelayService
+    # (ב-SystemServicesManager), בתוך ה-session האינטראקטיבי של הקיוסק.
     $msiArgs = @(
         "/i", "`"$MsiPath`""
         "/quiet", "/norestart"
         "ADDLOCAL=Server"
-        "SERVER_REGISTER_AS_SERVICE=1"
+        "SERVER_REGISTER_AS_SERVICE=0"
         "SERVER_ADD_FIREWALL_EXCEPTION=0"   # לא פותחים חריגת firewall - אין צורך, הגישה רק מקומית
         "SERVER_ALLOW_SAS=1"
         "SET_USEVNCAUTHENTICATION=1"
@@ -68,36 +74,43 @@ if (-Not $alreadyInstalled) {
         "VALUE_OF_PASSWORD=$VncPassword"
     )
     Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait
+}
 
-    Start-Sleep -Seconds 5
-    $svc = Get-Service -Name "tvnserver" -ErrorAction SilentlyContinue
-    $tries = 0
-    while (($svc -eq $null -or $svc.Status -ne 'Running') -and $tries -lt 10) {
-        Start-Sleep -Seconds 3
-        $svc = Get-Service -Name "tvnserver" -ErrorAction SilentlyContinue
-        $tries++
+# אם מהתקנה קודמת (לפני התיקון הזה) tvnserver כבר רשום כשירות Windows -
+# מכבים אותו, כדי שלא יתחרה על פורט 5900 עם ה-session-mode instance
+# ולא ימשיך לתפוס מסך שחור.
+try {
+    $existingService = Get-Service -Name "tvnserver" -ErrorAction SilentlyContinue
+    if ($existingService -ne $null) {
+        Write-Host "[SIONYX] Found tvnserver registered as a Windows service from a previous install - disabling it (session-mode only from now on)."
+        Stop-Service -Name "tvnserver" -Force -ErrorAction SilentlyContinue
+        Set-Service -Name "tvnserver" -StartupType Disabled -ErrorAction SilentlyContinue
     }
+} catch {
+    Write-Warning "[SIONYX] Could not disable a pre-existing tvnserver service (non-fatal): $_"
 }
 
 # הגבלה ל-loopback בלבד ברישום, כדי ש-tvnserver לא יאזין על שום ממשק
 # רשת פיזי - היחיד שיכול להגיע ל-5900 הוא VncRelayService על אותו מחשב.
+# (אותו מפתח רישום נקרא גם ע"י tvnserver.exe במצב session, לא רק שירות.)
 try {
     $regPath = "HKLM:\SOFTWARE\TightVNC\Server"
     if (Test-Path $regPath) {
         Set-ItemProperty -Path $regPath -Name "LoopbackOnly" -Value 1 -Type DWord -ErrorAction SilentlyContinue
-        Restart-Service -Name "tvnserver" -Force -ErrorAction SilentlyContinue
     }
 } catch {
-    Write-Warning "[SIONYX] Could not set LoopbackOnly registry value (non-fatal, service may still be reachable only via 127.0.0.1 by default): $_"
+    Write-Warning "[SIONYX] Could not set LoopbackOnly registry value (non-fatal): $_"
 }
 
 $info = @"
 TightVNC Password: $VncPassword
 Installed at:       $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Hostname:            $env:COMPUTERNAME
+Mode:                Session (launched by VncRelayService, NOT a Windows service)
 Listens on:          127.0.0.1:5900 (loopback only - not reachable from the network)
 "@
 Set-Content -Path $InfoFile -Value $info -Encoding UTF8
 
-Write-Host "[SIONYX] TightVNC installed and listening on 127.0.0.1:5900."
+Write-Host "[SIONYX] TightVNC installed. It will start automatically in the kiosk's own session when VncRelayService runs."
 Write-Host "[SIONYX] Details saved to: $InfoFile"
+

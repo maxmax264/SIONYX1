@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -31,6 +32,7 @@ public class VncRelayService
     private const string DefaultRelayHost = "sionyx-vnc-relay.onrender.com";
     private const string VncHost = "127.0.0.1";
     private const int VncPort = 5900;
+    private const string TightVncExePath = @"C:\Program Files\TightVNC\tvnserver.exe";
     private static readonly TimeSpan MaxSessionDuration = TimeSpan.FromMinutes(30);
 
     private readonly FirebaseClient _firebase;
@@ -51,12 +53,46 @@ public class VncRelayService
         _listener = _firebase.DbListen(
             $"computers/{_computerId}/vncRelay/requested",
             OnSessionRequested);
+
+        // Launch tvnserver in THIS session (the kiosk's own interactive
+        // session) rather than relying on a Windows service - a service
+        // runs in Session 0 and would only ever see a black screen, not
+        // the actual kiosk desktop. install-tightvnc.ps1 deliberately
+        // does not register tvnserver as a service for this reason.
+        EnsureTightVncRunning();
     }
 
     public void Stop()
     {
         _listener?.Stop();
         _activeSessionCts?.Cancel();
+    }
+
+    private void EnsureTightVncRunning()
+    {
+        try
+        {
+            if (Process.GetProcessesByName("tvnserver").Length > 0) return;
+
+            if (!File.Exists(TightVncExePath))
+            {
+                Logger.Warning("TightVNC not found at {Path} - has install-tightvnc.ps1 run on this machine yet?", TightVncExePath);
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = TightVncExePath,
+                Arguments = "-run",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            Logger.Information("Started tvnserver.exe -run in this session (not as a Windows service, so it can see the real kiosk desktop)");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to launch tvnserver.exe (non-fatal - a VNC session request will fail to connect until this is running)");
+        }
     }
 
     private void OnSessionRequested(string eventType, JsonElement? data)
@@ -89,6 +125,8 @@ public class VncRelayService
 
         using var ws = new ClientWebSocket();
         using var tcp = new TcpClient();
+
+        EnsureTightVncRunning(); // safety net in case it wasn't running at Start()
 
         try
         {
