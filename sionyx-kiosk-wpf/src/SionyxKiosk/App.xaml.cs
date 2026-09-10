@@ -137,7 +137,7 @@ public partial class App : Application
                 services.AddSingleton(sp => new ComputerHeartbeatService(sp.GetRequiredService<FirebaseConfig>()));
                 services.AddSingleton(sp => new LogShippingControlService(sp.GetRequiredService<FirebaseClient>(), logDir));
                 services.AddSingleton(sp => new RemoteCommandService(sp.GetRequiredService<FirebaseClient>()));
-                services.AddSingleton(sp => new VncRelayService(sp.GetRequiredService<FirebaseClient>()));
+                services.AddSingleton(sp => new VncRelayService(sp.GetRequiredService<FirebaseConfig>()));
 
                 // System Services
                 services.AddSingleton(_ => new ProcessCleanupService());

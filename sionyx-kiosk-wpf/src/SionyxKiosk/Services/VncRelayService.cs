@@ -22,6 +22,15 @@ namespace SionyxKiosk.Services;
 /// Listens on "computers/{id}/vncRelay/requested" - same
 /// listen-then-clear pattern as RemoteCommandService, so an SSE
 /// reconnect never re-triggers an already-handled session.
+///
+/// Uses its OWN anonymous Firebase identity (like ComputerHeartbeatService),
+/// not the shared app-wide FirebaseClient. That shared client only ever
+/// holds a token while an actual customer is logged in on the kiosk -
+/// this listener needs to work at any time (including the idle login
+/// screen), so it can't depend on that. Bug found in the field: this used
+/// to take the shared FirebaseClient and every SSE reconnect attempted
+/// while no customer was logged in failed with "Not authenticated" and
+/// never recovered until someone happened to log in.
 /// </summary>
 public class VncRelayService
 {
@@ -34,25 +43,27 @@ public class VncRelayService
     private const int VncPort = 5900;
     private const string TightVncExePath = @"C:\Program Files\TightVNC\tvnserver.exe";
     private static readonly TimeSpan MaxSessionDuration = TimeSpan.FromMinutes(30);
+    private const int SignInRetrySeconds = 30;
 
     private readonly FirebaseClient _firebase;
     private string? _computerId;
     private SseListener? _listener;
     private CancellationTokenSource? _activeSessionCts;
     private long _lastHandledRequestedAt;
+    private bool _starting;
+    private bool _signedIn;
 
-    public VncRelayService(FirebaseClient firebase)
+    public VncRelayService(FirebaseConfig config)
     {
-        _firebase = firebase;
+        _firebase = new FirebaseClient(config);
     }
 
-    /// <summary>Call once at startup, after the kiosk is authenticated.</summary>
+    /// <summary>Call once at startup - does not need the kiosk to be authenticated
+    /// (see class remarks: this keeps its own anonymous identity).</summary>
     public void Start()
     {
+        if (_starting || _signedIn) return;
         _computerId = DeviceInfo.GetDeviceId();
-        _listener = _firebase.DbListen(
-            $"computers/{_computerId}/vncRelay/requested",
-            OnSessionRequested);
 
         // Launch tvnserver in THIS session (the kiosk's own interactive
         // session) rather than relying on a Windows service - a service
@@ -60,6 +71,41 @@ public class VncRelayService
         // the actual kiosk desktop. install-tightvnc.ps1 deliberately
         // does not register tvnserver as a service for this reason.
         EnsureTightVncRunning();
+
+        _ = Task.Run(async () =>
+        {
+            _starting = true;
+            try
+            {
+                await EnsureSignedInAndListeningAsync();
+            }
+            finally
+            {
+                _starting = false;
+            }
+        });
+    }
+
+    private async Task EnsureSignedInAndListeningAsync()
+    {
+        var signIn = await _firebase.SignInAnonymouslyAsync();
+        if (!signIn.Success)
+        {
+            Logger.Warning("VncRelay anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, SignInRetrySeconds);
+            var retryTimer = new System.Timers.Timer(SignInRetrySeconds * 1000) { AutoReset = false };
+            retryTimer.Elapsed += async (_, _) =>
+            {
+                retryTimer.Dispose();
+                await EnsureSignedInAndListeningAsync();
+            };
+            retryTimer.Start();
+            return;
+        }
+
+        _signedIn = true;
+        _listener = _firebase.DbListen(
+            $"computers/{_computerId}/vncRelay/requested",
+            OnSessionRequested);
     }
 
     public void Stop()

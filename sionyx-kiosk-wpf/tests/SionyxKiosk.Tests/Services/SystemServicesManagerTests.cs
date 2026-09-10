@@ -40,7 +40,7 @@ public class SystemServicesManagerTests : IDisposable
         _heartbeat = new ComputerHeartbeatService(TestFirebaseFactory.CreateConfig());
         _logShipping = new LogShippingControlService(_firebase, Path.GetTempPath());
         _remoteCommand = new RemoteCommandService(_firebase);
-        _vncRelay = new VncRelayService(_firebase);
+        _vncRelay = new VncRelayService(TestFirebaseFactory.CreateConfig());
         _session = new SessionService(
             _firebase, "user-123", "test-org",
             new ComputerService(_firebase),
