@@ -39,24 +39,20 @@ if ($alreadyInstalled) {
     Write-Host "[SIONYX] TightVNC binaries already installed - skipping MSI, keeping existing password."
 }
 
-# סיסמה קבועה - נשמרת בהתקנה חוזרת (update), נוצרת רק בהתקנה ראשונה,
-# כדי ש-VncRelayService/TightVNC לא "יאבדו" גישה בכל עדכון MSI.
-if (Test-Path $InfoFile) {
-    $existingContent = Get-Content $InfoFile -Raw
-    if ($existingContent -match 'TightVNC Password:\s*(\S+)') {
-        $VncPassword = $matches[1]
-    } else {
-        $VncPassword = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 16 | ForEach-Object {[char]$_})
-    }
-} else {
-    $VncPassword = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 16 | ForEach-Object {[char]$_})
-}
+# אין סיסמת VNC נפרדת בכוונה: הגישה היחידה ל-tvnserver היא מ-127.0.0.1
+# (loopback בלבד, למטה) דרך VncRelayService, שכבר שומר על עצמו מאחורי
+# ה-token החד-פעמי שהדשבורד מייצר. דרשנו בעבר גם VNC Authentication,
+# אבל הדשבורד מעולם לא קיבל/העביר את הסיסמה הזו ל-viewer (novnc) - כל
+# ניסיון חיבור נכשל עם "authentication failed" מיד אחרי החיבור
+# (ה-"nc נפל" ב-vnc.html). במקום לשרשר עוד שכבת סוד שצריך להעביר,
+# מבטלים את שכבת הסיסמה: היא לא הוסיפה הגנה אמיתית (loopback-only +
+# token חד-פעמי כבר עושים את זה) ורק שברה את הזרימה.
 
 if (-Not $alreadyInstalled) {
     Write-Host "[SIONYX] Downloading TightVNC..."
     Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath
 
-    Write-Host "[SIONYX] Running silent install (server only, loopback-only listening, VNC auth, NOT as a Windows service)..."
+    Write-Host "[SIONYX] Running silent install (server only, loopback-only listening, no VNC auth, NOT as a Windows service)..."
     # ADDLOCAL=Server בלבד (בלי Viewer - אין צורך בו על הקיוסק).
     # SERVER_REGISTER_AS_SERVICE=0 בכוונה: שירות Windows רץ ב-Session 0
     # ותופס מסך שחור. tvnserver.exe מופעל בהמשך ישירות מתוך VncRelayService
@@ -69,9 +65,7 @@ if (-Not $alreadyInstalled) {
         "SERVER_ADD_FIREWALL_EXCEPTION=0"   # לא פותחים חריגת firewall - אין צורך, הגישה רק מקומית
         "SERVER_ALLOW_SAS=1"
         "SET_USEVNCAUTHENTICATION=1"
-        "VALUE_OF_USEVNCAUTHENTICATION=1"
-        "SET_PASSWORD=1"
-        "VALUE_OF_PASSWORD=$VncPassword"
+        "VALUE_OF_USEVNCAUTHENTICATION=0"
     )
     Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait
 }
@@ -102,8 +96,33 @@ try {
     Write-Warning "[SIONYX] Could not set LoopbackOnly registry value (non-fatal): $_"
 }
 
+# מכבים VNC Authentication ברישום גם על התקנות קיימות (לא רק MSI חדש) -
+# כדי שקיוסקים שכבר קיבלו TightVNC עם הסיסמה הישנה יתוקנו בלי דרישה
+# להסרה/התקנה מחדש. tvnserver קורא את זה מהרישום גם במצב session.
+try {
+    $regPath = "HKLM:\SOFTWARE\TightVNC\Server"
+    if (Test-Path $regPath) {
+        Set-ItemProperty -Path $regPath -Name "UseVncAuthentication" -Value 0 -Type DWord -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Warning "[SIONYX] Could not disable UseVncAuthentication registry value (non-fatal): $_"
+}
+
+# אם tvnserver כבר רץ (מותקן קודם), נהרוג אותו כדי ש-VncRelayService
+# יפעיל אותו מחדש בפעם הבאה עם ההגדרה החדשה (tvnserver קורא את הרישום
+# רק בעלייה, לא live).
+try {
+    $running = Get-Process -Name "tvnserver" -ErrorAction SilentlyContinue
+    if ($running) {
+        Write-Host "[SIONYX] Restarting tvnserver.exe so the auth-disabled setting takes effect..."
+        Stop-Process -Name "tvnserver" -Force -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Warning "[SIONYX] Could not restart tvnserver.exe (non-fatal): $_"
+}
+
 $info = @"
-TightVNC Password: $VncPassword
+Auth:                Disabled (loopback-only + one-time relay token is the access control)
 Installed at:       $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Hostname:            $env:COMPUTERNAME
 Mode:                Session (launched by VncRelayService, NOT a Windows service)
