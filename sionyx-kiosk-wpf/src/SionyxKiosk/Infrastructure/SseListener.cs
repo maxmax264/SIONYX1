@@ -176,7 +176,29 @@ public sealed class SseListener
 
             if (!string.IsNullOrEmpty(dataStr))
             {
-                var data = JsonSerializer.Deserialize<JsonElement>(dataStr);
+                // Firebase's SSE wire format wraps "put"/"patch" payloads as
+                // {"path": "<changed sub-path>", "data": <new value>} - it is
+                // NOT the raw node value. Every consumer in this codebase
+                // (VncRelayService, RemoteCommandService,
+                // LogShippingControlService, ...) treats the callback's
+                // `data` as the actual node value directly, so every one of
+                // them was silently receiving the wrapper object instead and
+                // failing its own property lookups - e.g. VncRelayService's
+                // OnSessionRequested looked for `data.token`, but the real
+                // token lived at `data.data.token`, so `TryGetProperty`
+                // always missed and every dashboard-triggered VNC/power/log-
+                // shipping request was dropped with no error at all. Unwrap
+                // here, once, so the fix covers every existing and future
+                // DbListen caller instead of patching each one individually.
+                // (This assumes a full-node "put" at path "/", which is what
+                // every caller here already implicitly assumes - a plain
+                // Firebase `set()` from the dashboard always produces that;
+                // only partial `update()` calls would produce a non-"/" path,
+                // which none of today's callers issue.)
+                var envelope = JsonSerializer.Deserialize<JsonElement>(dataStr);
+                var data = envelope.ValueKind == JsonValueKind.Object && envelope.TryGetProperty("data", out var inner)
+                    ? inner
+                    : envelope;
                 _callback(eventType, data);
             }
             else
