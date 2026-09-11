@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text.Json;
+using Microsoft.Win32;
 using Serilog;
 using SionyxKiosk.Infrastructure;
 
@@ -118,6 +119,8 @@ public class VncRelayService
     {
         try
         {
+            EnsureNoAuthRegistry();
+
             if (Process.GetProcessesByName("tvnserver").Length > 0) return;
 
             if (!File.Exists(TightVncExePath))
@@ -138,6 +141,37 @@ public class VncRelayService
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to launch tvnserver.exe (non-fatal - a VNC session request will fail to connect until this is running)");
+        }
+    }
+
+    // TightVNC reads its configuration from a completely different registry
+    // hive depending on how it runs: as a Windows service it reads HKLM
+    // (which is what install-tightvnc.ps1 writes to), but launched directly
+    // via "tvnserver.exe -run" - which is what we do here, since a Session-0
+    // service can't see the real kiosk desktop - it reads HKEY_CURRENT_USER
+    // instead. That meant install-tightvnc.ps1's HKLM write never had any
+    // effect on the process this service actually launches: tvnserver kept
+    // demanding VNC Authentication with no password configured ("Server is
+    // not configured properly"), rejecting every relay connection. Found via
+    // manual field debugging on 11/09/2026, confirmed by comparing HKLM
+    // (showed UseVncAuthentication=0, had no effect) against HKCU (was
+    // completely empty - tvnserver was just running its own hardcoded
+    // default of "require auth, no password set").
+    //
+    // Writing this here, right before every launch, also self-heals kiosks
+    // that already have a stale/empty HKCU key from before this fix - the
+    // very next time tvnserver isn't already running (next kiosk login or
+    // reboot) it will pick up the correct value.
+    private static void EnsureNoAuthRegistry()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\TightVNC\Server");
+            key.SetValue("UseVncAuthentication", 0, RegistryValueKind.DWord);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to set TightVNC no-auth registry value under HKCU (non-fatal - VNC connections will fail with 'Server is not configured properly' until this is set)");
         }
     }
 
