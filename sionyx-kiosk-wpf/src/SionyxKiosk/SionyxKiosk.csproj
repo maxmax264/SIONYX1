@@ -46,6 +46,7 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
     <!-- Last updated 2018, targets .NET Framework 4.5, depends on the unmaintained
          TestStack.White UI-automation library - unverified against the current
          TeamViewer QuickSupport UI. See StartTeamViewerQuickSupportAsync in
