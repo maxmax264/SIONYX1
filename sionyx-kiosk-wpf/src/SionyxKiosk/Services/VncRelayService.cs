@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.ServiceProcess;
 using System.Text.Json;
 using Microsoft.Win32;
 using Serilog;
@@ -119,6 +120,7 @@ public class VncRelayService
     {
         try
         {
+            DisableLegacyTvnServerService();
             EnsureNoAuthRegistry();
 
             if (Process.GetProcessesByName("tvnserver").Length > 0) return;
@@ -141,6 +143,43 @@ public class VncRelayService
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to launch tvnserver.exe (non-fatal - a VNC session request will fail to connect until this is running)");
+        }
+    }
+
+    // install-tightvnc.ps1 already disables a pre-existing "tvnserver"
+    // Windows service on fresh installs/reinstalls, but that script only
+    // runs as an MSI CustomAction - kiosks that only ever received the
+    // lightweight file-based auto-update (the normal path) never had a
+    // chance to run it. Found live on 13/09/2026: a leftover tvnserver
+    // service (from before session-mode was adopted) was still running as
+    // NT AUTHORITY\SYSTEM and listening specifically on 127.0.0.1:5900,
+    // which Windows always prefers over our session-mode instance's
+    // 0.0.0.0:5900 - so VncRelayService's 127.0.0.1 connection silently
+    // went to the wrong (Session-0, black-screen) tvnserver every time,
+    // with no exception anywhere in this file to explain why. Doing the
+    // same cleanup here, on every launch, reaches every already-deployed
+    // kiosk without needing a manual fix or a full reinstall.
+    private static void DisableLegacyTvnServerService()
+    {
+        try
+        {
+            using var sc = new ServiceController("tvnserver");
+            if (sc.Status != ServiceControllerStatus.Stopped)
+            {
+                sc.Stop();
+                sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+            }
+
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\tvnserver", writable: true);
+            key?.SetValue("Start", 4, RegistryValueKind.DWord); // 4 = Disabled
+        }
+        catch (InvalidOperationException)
+        {
+            // No such service on this machine - nothing to clean up.
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to disable legacy tvnserver Windows service (non-fatal - if present, it will keep winning the 127.0.0.1:5900 binding)");
         }
     }
 
