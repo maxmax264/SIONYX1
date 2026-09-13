@@ -227,6 +227,7 @@ public static class AutoUpdateService
             Logger.Information("[Update] Download size: {Bytes} bytes (Content-Length={CL})", totalBytes, response.Content.Headers.ContentLength);
             var buffer = new byte[81920];
             var downloaded = 0L;
+            var lastReportedPercent = -1;
 
             await using var stream = await response.Content.ReadAsStreamAsync();
             await using var fileStream = File.Create(tempPath);
@@ -239,9 +240,29 @@ public static class AutoUpdateService
                 if (totalBytes > 0)
                 {
                     var percent = (int)(downloaded * 100 / totalBytes);
-                    var mb = downloaded / 1024.0 / 1024.0;
-                    var totalMb = totalBytes / 1024.0 / 1024.0;
-                    ProgressChanged?.Invoke(percent, $"מוריד... {mb:F1} / {totalMb:F1} MB");
+                    // Only fire on an actual percent change, not on every
+                    // 80KB chunk. On a fast LAN/disk, a 96MB download can
+                    // read ~1200 chunks in a couple of seconds; each one
+                    // was synchronously blocking the UI thread (Dispatcher
+                    // .Invoke) to update TextBlock text (forcing a WPF
+                    // text re-measure) AND kick a new DoubleAnimation on
+                    // the same progress-bar property, hundreds of times
+                    // per second. That reentrant hammering of the UI
+                    // thread is the suspected cause of a native
+                    // AccessViolationException inside WPF's text
+                    // formatter (LoCreateLine) crashing SionyxKiosk.exe
+                    // moments after a download started - confirmed live
+                    // on two kiosks during the 3.15.1 rollout on
+                    // 13/09/2026. Capping updates to once per percent
+                    // point (~100 UI updates total instead of ~1200)
+                    // removes that pressure entirely.
+                    if (percent != lastReportedPercent)
+                    {
+                        lastReportedPercent = percent;
+                        var mb = downloaded / 1024.0 / 1024.0;
+                        var totalMb = totalBytes / 1024.0 / 1024.0;
+                        ProgressChanged?.Invoke(percent, $"מוריד... {mb:F1} / {totalMb:F1} MB");
+                    }
                 }
             }
 
