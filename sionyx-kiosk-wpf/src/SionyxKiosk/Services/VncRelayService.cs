@@ -158,6 +158,13 @@ public class VncRelayService
     // completely empty - tvnserver was just running its own hardcoded
     // default of "require auth, no password set").
     //
+    // AllowLoopback=1 is a second, unrelated key needed for the same
+    // reason: VncRelayService always connects to TightVNC via 127.0.0.1
+    // (not the kiosk's LAN IP), and TightVNC refuses loopback RFB
+    // connections outright unless this is explicitly enabled - confirmed
+    // live via noVNC's exact error "Sorry, loopback connections are not
+    // enabled" even after UseVncAuthentication was already fixed.
+    //
     // Writing this here, right before every launch, also self-heals kiosks
     // that already have a stale/empty HKCU key from before this fix - the
     // very next time tvnserver isn't already running (next kiosk login or
@@ -168,10 +175,11 @@ public class VncRelayService
         {
             using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\TightVNC\Server");
             key.SetValue("UseVncAuthentication", 0, RegistryValueKind.DWord);
+            key.SetValue("AllowLoopback", 1, RegistryValueKind.DWord);
         }
         catch (Exception ex)
         {
-            Logger.Warning(ex, "Failed to set TightVNC no-auth registry value under HKCU (non-fatal - VNC connections will fail with 'Server is not configured properly' until this is set)");
+            Logger.Warning(ex, "Failed to set TightVNC no-auth/loopback registry values under HKCU (non-fatal - VNC connections will fail until this is set)");
         }
     }
 
