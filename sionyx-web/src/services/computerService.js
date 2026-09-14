@@ -173,9 +173,13 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
     users[u.uid] = u;
   });
 
+  // Kept in sync with HEARTBEAT_ONLINE_THRESHOLD_MS in ComputersPage.jsx/OverviewPage.jsx
+  const HEARTBEAT_ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
   const stats = {
     totalComputers: computers.length,
     activeComputers: 0,
+    onlineComputers: 0,
     computersWithUsers: 0,
     computerDetails: [],
     userComputerUsage: {},
@@ -186,8 +190,10 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
     const computerId = computer.id;
     const currentUserId = computer.currentUserId;
     const isActive = computer.isActive || !!currentUserId;
+    const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
 
     if (isActive) stats.activeComputers++;
+    if (isOnline) stats.onlineComputers++;
     if (currentUserId) stats.computersWithUsers++;
 
     const userData = users[currentUserId] || {};
@@ -213,6 +219,9 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
         computerName: computer.computerName || 'Unknown',
         location: computer.location || '',
         isActive,
+        isOnline,
+        heartbeatAt: computer.heartbeatAt || null,
+        appVersion: computer.appVersion || null,
         currentUserId,
         currentUserName: userName,
         lastSeen: computer.lastSeen || '',
@@ -239,6 +248,9 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
         computerName: computer.computerName || 'Unknown',
         location: computer.location || '',
         isActive,
+        isOnline,
+        heartbeatAt: computer.heartbeatAt || null,
+        appVersion: computer.appVersion || null,
         currentUserId: null,
         currentUserName: null,
         lastSeen: computer.lastSeen || '',

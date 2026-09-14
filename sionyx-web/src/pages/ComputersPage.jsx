@@ -1033,8 +1033,8 @@ const ComputersPage = () => {
             <Col xs={24} sm={12} lg={6}>
               <Card bordered={false} style={{ textAlign: 'center' }}>
                 <Statistic
-                  title='מחשבים פעילים'
-                  value={stats.activeComputers}
+                  title='מחשבים מקוונים'
+                  value={stats.onlineComputers ?? stats.activeComputers}
                   prefix={<DesktopOutlined />}
                   valueStyle={{ color: '#52c41a' }}
                 />
