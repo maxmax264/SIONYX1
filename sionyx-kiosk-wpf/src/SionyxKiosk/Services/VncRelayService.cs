@@ -53,6 +53,26 @@ public class VncRelayService
     // nothing - for 2.5+ hours, until the whole app was restarted by hand).
     private static readonly TimeSpan ListenerStaleThreshold = TimeSpan.FromMinutes(5);
 
+    // A second, different failure mode found the same day (14/09/2026,
+    // investigated after "another model" ran manual field debugging): the
+    // keep-alive channel itself can keep flowing forever while the
+    // underlying subscription for *real* put/patch events silently dies on
+    // the same connection - LastEventUtc keeps refreshing off the
+    // keep-alives, so ListenerStaleThreshold never fires, even though a
+    // pending VNC request just sits unhandled in Firebase indefinitely.
+    //
+    // This can't be fixed by watching for "too long since the last real
+    // event" instead, because a legitimately idle listener (nobody has
+    // requested VNC in a while - completely normal, can be hours) looks
+    // identical to a silently-broken one by that measure alone; either
+    // heuristic would either miss the real failure or restart constantly on
+    // healthy idle kiosks. So instead of trying to detect this state at all,
+    // the listener is unconditionally cycled on a fixed schedule - bounding
+    // how long a zombie stream can go unnoticed to this interval, regardless
+    // of what its keep-alives claim.
+    private static readonly TimeSpan PeriodicReconnectInterval = TimeSpan.FromMinutes(10);
+    private DateTime _listenerStartedUtc = DateTime.UtcNow;
+
     private readonly FirebaseClient _firebase;
     private string? _computerId;
     private SseListener? _listener;
@@ -112,9 +132,7 @@ public class VncRelayService
         }
 
         _signedIn = true;
-        _listener = _firebase.DbListen(
-            $"computers/{_computerId}/vncRelay/requested",
-            OnSessionRequested);
+        RecreateListener();
 
         _watchdogTimer?.Dispose();
         _watchdogTimer = new System.Timers.Timer(TimeSpan.FromMinutes(1).TotalMilliseconds) { AutoReset = true };
@@ -122,25 +140,49 @@ public class VncRelayService
         _watchdogTimer.Start();
     }
 
-    // Self-heal a silently-dead vncRelay/requested listener: IsRunning alone
-    // can't detect this (it only reflects whether Stop() was called, not
-    // whether the read loop is still making progress), so we watch
-    // LastEventUtc instead - see the comment on ListenerStaleThreshold.
+    private void RecreateListener()
+    {
+        _listener = _firebase.DbListen(
+            $"computers/{_computerId}/vncRelay/requested",
+            OnSessionRequested);
+        _listenerStartedUtc = DateTime.UtcNow;
+    }
+
+    // Self-heal a possibly-dead vncRelay/requested listener via two
+    // independent checks:
+    //  1. LastEventUtc gone stale -> catches a fully frozen stream (no
+    //     events of any kind, not even keep-alives).
+    //  2. Fixed-age cycling -> catches the "zombie" variant where
+    //     keep-alives keep the stream looking alive while real data events
+    //     silently stop - see the comment on PeriodicReconnectInterval for
+    //     why this can't instead be detected rather than just bounded.
     private void CheckListenerHealth()
     {
         var listener = _listener;
         if (listener == null) return;
 
         var silentFor = DateTime.UtcNow - listener.LastEventUtc;
-        if (silentFor <= ListenerStaleThreshold) return;
+        var age = DateTime.UtcNow - _listenerStartedUtc;
 
-        Logger.Warning(
-            "vncRelay/requested SSE listener silent for {Minutes:F0} min - forcing restart",
-            silentFor.TotalMinutes);
+        if (silentFor > ListenerStaleThreshold)
+        {
+            Logger.Warning(
+                "vncRelay/requested SSE listener silent for {Minutes:F0} min - forcing restart",
+                silentFor.TotalMinutes);
+        }
+        else if (age > PeriodicReconnectInterval)
+        {
+            Logger.Information(
+                "vncRelay/requested SSE listener reached {Minutes:F0} min - proactive reconnect",
+                age.TotalMinutes);
+        }
+        else
+        {
+            return;
+        }
+
         listener.Stop();
-        _listener = _firebase.DbListen(
-            $"computers/{_computerId}/vncRelay/requested",
-            OnSessionRequested);
+        RecreateListener();
     }
 
     public void Stop()
