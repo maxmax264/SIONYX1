@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [3.14.11] - 2026-09-14
+
+### Bug Fixes
+- throttle update-progress UI callbacks to once per percent (ff1fd002)
+- self-heal TightVNC install when MSI CustomAction silently fails (19377185)
+
+
 ## [3.14.10] - 2026-09-13
 
 
