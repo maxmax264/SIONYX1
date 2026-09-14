@@ -23,6 +23,7 @@ import {
   LogoutOutlined,
   DeleteOutlined,
   EditOutlined,
+  InfoCircleOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -71,6 +72,18 @@ const itemVariants = {
 
 // Heartbeat every 60s (ComputerHeartbeatService.cs) - 2min tolerates one missed beat
 const HEARTBEAT_ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
+// Single, unambiguous status for a computer card - replaces separately showing
+// a user-tied "active/inactive" tag next to a machine-tied "online/offline" tag,
+// which read as two different opinions about the same computer. Online/offline
+// (heartbeatAt) is the ground truth for whether the machine itself is up; whether
+// someone is logged in is shown as a detail underneath it, not a competing status.
+const getComputerStatus = (isOnline, isActive) => {
+  if (!isOnline) return { color: 'error', badge: 'error', text: 'לא מקוון' };
+  return isActive
+    ? { color: 'success', badge: 'success', text: 'מקוון · בשימוש' }
+    : { color: 'processing', badge: 'processing', text: 'מקוון · פנוי' };
+};
 
 const ComputersPage = () => {
   const [computers, setComputers] = useState([]);
@@ -407,6 +420,7 @@ const ComputersPage = () => {
     // Derive isActive from currentUserId (if user is associated, it's active)
     const isActive = !!computer.currentUserId;
     const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
+    const status = getComputerStatus(isOnline, isActive);
 
     return (
       <Card
@@ -414,7 +428,7 @@ const ComputersPage = () => {
         style={{
           marginBottom: 12,
           borderRadius: 8,
-          border: isActive ? '1px solid #52c41a' : '1px solid #d9d9d9',
+          border: isOnline ? '1px solid #52c41a' : '1px solid #d9d9d9',
         }}
         styles={{ body: { padding: '12px 16px' } }}
       >
@@ -422,15 +436,13 @@ const ComputersPage = () => {
           {/* Computer Name & Status */}
           <Col flex='auto'>
             <Space size={8}>
-              <DesktopOutlined style={{ color: isActive ? '#52c41a' : '#bfbfbf', fontSize: 18 }} />
+              <DesktopOutlined style={{ color: isOnline ? '#52c41a' : '#bfbfbf', fontSize: 18 }} />
               <Text strong style={{ fontSize: 15 }}>
                 {computer.computerName}
               </Text>
-              <Tag color={isActive ? 'success' : 'default'} style={{ marginRight: 0 }}>
-                {isActive ? 'פעיל' : 'לא פעיל'}
-              </Tag>
               <Tag
-                icon={<Badge status={isOnline ? 'success' : 'error'} />}
+                icon={<Badge status={status.badge} />}
+                color={status.color}
                 style={{ marginRight: 0 }}
                 title={
                   computer.heartbeatAt
@@ -438,8 +450,13 @@ const ComputersPage = () => {
                     : 'לא התקבל דופק מעולם'
                 }
               >
-                {isOnline ? 'מקוון' : 'לא מקוון'}
+                {status.text}
               </Tag>
+              {computer.appVersion && (
+                <Tag style={{ marginRight: 0 }} title='גרסת אפליקציה מותקנת'>
+                  v{computer.appVersion}
+                </Tag>
+              )}
             </Space>
           </Col>
 
@@ -493,12 +510,14 @@ const ComputersPage = () => {
     // Machine-level online/offline, independent of whether a user is logged in -
     // based on ComputerHeartbeatService.cs writing heartbeatAt every 60s
     const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
+    const status = getComputerStatus(isOnline, isActive);
     const computerId = computer.id;
     const rustdesk = computer.remoteControl?.rustdesk;
     const anydesk = computer.remoteControl?.anydesk;
     const teamviewer = computer.remoteControl?.teamviewer;
     const aeroadmin = computer.remoteControl?.aeroadmin;
     const [showRemote, setShowRemote] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [newAnyDeskPassword, setNewAnyDeskPassword] = useState('');
     const [settingAnyDeskPassword, setSettingAnyDeskPassword] = useState(false);
@@ -594,7 +613,7 @@ const ComputersPage = () => {
         style={{
           marginBottom: 12,
           borderRadius: 8,
-          border: isActive ? '1px solid #52c41a' : '1px solid #d9d9d9',
+          border: isOnline ? '1px solid #52c41a' : '1px solid #d9d9d9',
         }}
         styles={{ body: { padding: '12px 16px' } }}
       >
@@ -602,15 +621,13 @@ const ComputersPage = () => {
           {/* Computer Name & Status */}
           <Col>
             <Space size={8}>
-              <DesktopOutlined style={{ color: isActive ? '#52c41a' : '#bfbfbf', fontSize: 18 }} />
+              <DesktopOutlined style={{ color: isOnline ? '#52c41a' : '#bfbfbf', fontSize: 18 }} />
               <Text strong style={{ fontSize: 15 }}>
                 {computer.computerName}
               </Text>
-              <Tag color={isActive ? 'success' : 'default'} style={{ marginRight: 0 }}>
-                {isActive ? 'פעיל' : 'לא פעיל'}
-              </Tag>
               <Tag
-                icon={<Badge status={isOnline ? 'success' : 'error'} />}
+                icon={<Badge status={status.badge} />}
+                color={status.color}
                 style={{ marginRight: 0 }}
                 title={
                   computer.heartbeatAt
@@ -618,14 +635,28 @@ const ComputersPage = () => {
                     : 'לא התקבל דופק מעולם'
                 }
               >
-                {isOnline ? 'מחשב מקוון' : 'מחשב לא מקוון'}
+                {status.text}
               </Tag>
+              {computer.appVersion && (
+                <Tag style={{ marginRight: 0 }} title='גרסת אפליקציה מותקנת'>
+                  v{computer.appVersion}
+                </Tag>
+              )}
             </Space>
           </Col>
 
           {/* Actions */}
           <Col>
             <Space>
+              <Button
+                type='text'
+                size='small'
+                icon={<InfoCircleOutlined />}
+                onClick={() => setShowDetails(v => !v)}
+                title='פרטים'
+              >
+                פרטים
+              </Button>
               <Button
                 type='text'
                 size='small'
@@ -686,6 +717,28 @@ const ComputersPage = () => {
             </Space>
           </Col>
         </Row>
+        {showDetails && (
+          <Row style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
+            <Col span={24}>
+              <Space direction='vertical' size={4} style={{ width: '100%' }}>
+                <Text type='secondary'>שם מחשב: <Text strong>{computer.computerName || 'ללא שם'}</Text></Text>
+                <Text type='secondary'>גרסה מותקנת: <Text strong copyable={!!computer.appVersion}>{computer.appVersion ? `v${computer.appVersion}` : 'לא דווח עדיין'}</Text></Text>
+                <Text type='secondary'>מזהה מחשב: <Text copyable style={{ fontFamily: 'monospace' }}>{computerId}</Text></Text>
+                <Text type='secondary'>
+                  דופק אחרון: {computer.heartbeatAt
+                    ? new Date(computer.heartbeatAt).toLocaleString('he-IL')
+                    : 'לא התקבל דופק מעולם'}
+                </Text>
+                {computer.currentUserId && (
+                  <Text type='secondary'>משתמש מחובר: <Text strong>{computer.currentUserId}</Text></Text>
+                )}
+                {computer.networkInfo?.local_ip && (
+                  <Text type='secondary'>כתובת IP: <Text copyable>{computer.networkInfo.local_ip}</Text></Text>
+                )}
+              </Space>
+            </Col>
+          </Row>
+        )}
         {showRemote && (
           <Row style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
             <Col span={24}>

@@ -87,6 +87,10 @@ public class ComputerHeartbeatService
                 new Dictionary<string, object>
                 {
                     ["heartbeatAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    // Reported every beat (not just at registration) so the dashboard
+                    // always shows the version currently running, even if the name
+                    // or version was set/changed after this machine was first set up.
+                    ["appVersion"] = DeviceInfo.GetAppVersion(),
                 });
             if (!result.Success)
                 Logger.Warning("Heartbeat write failed: {Error}", result.Error);

@@ -68,6 +68,8 @@
             <TextBlock Text="SIONYX" FontSize="12" FontWeight="Bold"
                        Foreground="#99FFFFFF" Margin="0,0,6,0" />
             <TextBlock Text="{Binding AppVersion}" FontSize="12"
+                       Foreground="#66FFFFFF" Margin="0,0,6,0" />
+            <TextBlock Text="{Binding ComputerName}" FontSize="12"
                        Foreground="#66FFFFFF" />
         </StackPanel>
 
@@ -238,14 +240,20 @@
                                        TextAlignment="Center" FontWeight="Light" />
                         </StackPanel>
 
-                        <!-- Version number bottom center -->
-                        <TextBlock Text="{Binding AppVersion}"
-                                   VerticalAlignment="Bottom"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,0,0,20"
-                                   FontSize="13"
-                                   Foreground="#88FFFFFF"
-                                   FontWeight="Light" />
+                        <!-- Version number + computer name, bottom center -->
+                        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                                    Margin="0,0,0,20" Orientation="Vertical">
+                            <TextBlock Text="{Binding AppVersion}"
+                                       HorizontalAlignment="Center"
+                                       FontSize="13"
+                                       Foreground="#88FFFFFF"
+                                       FontWeight="Light" />
+                            <TextBlock Text="{Binding ComputerName}"
+                                       HorizontalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="#66FFFFFF"
+                                       FontWeight="Light" />
+                        </StackPanel>
                     </Grid>
                 </Border>
             </Canvas>

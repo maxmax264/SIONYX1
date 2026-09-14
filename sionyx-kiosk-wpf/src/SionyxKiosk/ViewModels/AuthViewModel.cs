@@ -34,31 +34,12 @@ public partial class AuthViewModel : ObservableObject
     [ObservableProperty] private string _welcomeSubtext = "התחבר לחשבון שלך";
     [ObservableProperty] private bool _showRegister = true;
     [ObservableProperty] private bool _cleanMode = false;
-    public string AppVersion => $"v{ReadVersion()}";
-    private static string ReadVersion()
-    {
-        // First try Registry (production)
-        try
-        {
-            var reg = SionyxKiosk.Infrastructure.RegistryConfig.ReadValue("Version");
-            if (!string.IsNullOrWhiteSpace(reg)) return reg;
-        }
-        catch { }
+    public string AppVersion => $"v{SionyxKiosk.Infrastructure.DeviceInfo.GetAppVersion()}";
 
-        // Fallback: version.json (development)
-        try
-        {
-            var p = System.IO.Path.Combine(AppContext.BaseDirectory, "version.json");
-            if (System.IO.File.Exists(p))
-            {
-                var json = System.IO.File.ReadAllText(p);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("version", out var v)) return v.GetString() ?? "1.0.0";
-            }
-        }
-        catch { }
-        return "1.0.0";
-    }
+    // Shown next to the version watermark so this screen also identifies which
+    // physical machine you're looking at (matches the name shown in the dashboard).
+    public string ComputerName => SionyxKiosk.Infrastructure.RegistryConfig.ReadValue("ComputerName")
+        ?? SionyxKiosk.Infrastructure.DeviceInfo.GetComputerName();
     [ObservableProperty] private double _formX = 50;
     [ObservableProperty] private double _formY = 50;
     [ObservableProperty] private double _formWidth = 480;

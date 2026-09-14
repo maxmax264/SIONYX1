@@ -62,6 +62,10 @@ import { logger } from '../utils/logger';
 
 const { Title, Text } = Typography;
 
+// Heartbeat every 60s (ComputerHeartbeatService.cs) - 2min tolerates one missed beat.
+// Kept in sync with the same constant in ComputersPage.jsx / computerService.js.
+const HEARTBEAT_ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
 const DASHBOARD_WIDGETS_KEY = 'dashboard-widgets';
 
 const WIDGET_DEFINITIONS = {
@@ -192,7 +196,13 @@ const OverviewPage = () => {
     }
 
     if (computerResult.success && computerResult.data) {
-      setComputerStats(computerResult.data);
+      // Use heartbeat-based online count (see subscribeToComputers below) so this
+      // matches the live value once the realtime subscription kicks in, instead of
+      // the user-tied activeComputers count computerService.js also returns.
+      setComputerStats({
+        ...computerResult.data,
+        activeComputers: computerResult.data.onlineComputers ?? computerResult.data.activeComputers,
+      });
     }
 
     if (errors.length > 0) {
@@ -230,9 +240,13 @@ const OverviewPage = () => {
     const unsubComputers = subscribeToComputers(orgId, computers => {
       if (!isMounted.current) return;
       const list = Object.values(computers || {});
+      // Machine-level online/offline (heartbeatAt), independent of whether a user
+      // is logged in - matches ComputersPage.jsx. Using isActive/currentUserId here
+      // was wrong: those only reflect a logged-in user, so a fully working but
+      // userless kiosk showed as "offline".
       setComputerStats({
         totalComputers: list.length,
-        activeComputers: list.filter(c => c.isActive || c.currentUserId).length,
+        activeComputers: list.filter(c => !!c.heartbeatAt && (Date.now() - c.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS).length,
       });
     });
 
@@ -713,7 +727,7 @@ const OverviewPage = () => {
                 >
                   {computerStats && computerStats.totalComputers > 0 ? (
                     <MiniStatCard
-                      label='מחשבים פעילים מתוך סה"כ'
+                      label='מחשבים מקוונים מתוך סה"כ'
                       value={`${Math.round((computerStats.activeComputers / computerStats.totalComputers) * 100)}%`}
                       icon={<PercentageOutlined />}
                       color='info'

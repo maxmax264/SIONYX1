@@ -47,6 +47,35 @@ public static class DeviceInfo
         }
     }
 
+    /// <summary>
+    /// Get the installed app version - Registry first (production, set by the MSI
+    /// installer/auto-updater), falling back to version.json next to the exe (dev).
+    /// Shared by the login screen watermark and the heartbeat write, so both agree.
+    /// </summary>
+    public static string GetAppVersion()
+    {
+        try
+        {
+            var reg = RegistryConfig.ReadValue("Version");
+            if (!string.IsNullOrWhiteSpace(reg)) return reg;
+        }
+        catch { }
+
+        try
+        {
+            var p = Path.Combine(AppContext.BaseDirectory, "version.json");
+            if (File.Exists(p))
+            {
+                var json = File.ReadAllText(p);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("version", out var v)) return v.GetString() ?? "1.0.0";
+            }
+        }
+        catch { }
+
+        return "1.0.0";
+    }
+
     /// <summary>Get the computer name/hostname.</summary>
     public static string GetComputerName()
     {

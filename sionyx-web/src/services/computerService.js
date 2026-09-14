@@ -63,10 +63,15 @@ export const getComputerUsageStats = async () => {
     const usersSnapshot = await get(usersRef);
     const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
 
+    // Heartbeat every 60s (ComputerHeartbeatService.cs) - 2min tolerates one missed beat.
+    // Kept in sync with the same constant in ComputersPage.jsx.
+    const HEARTBEAT_ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
     // Process statistics
     const stats = {
       totalComputers: computers.length,
       activeComputers: 0,
+      onlineComputers: 0,
       computersWithUsers: 0,
       computerDetails: [],
       userComputerUsage: {},
@@ -75,9 +80,15 @@ export const getComputerUsageStats = async () => {
     computers.forEach(computer => {
       const currentUserId = computer.currentUserId;
       const isActive = computer.isActive || !!currentUserId;
+      // Machine-level online/offline, independent of whether a user is logged in -
+      // this is the field that should drive any "is it actually working" stat.
+      const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
 
       if (isActive) {
         stats.activeComputers++;
+      }
+      if (isOnline) {
+        stats.onlineComputers++;
       }
 
       if (currentUserId) {
@@ -92,6 +103,9 @@ export const getComputerUsageStats = async () => {
           computerName: computer.computerName || 'Unknown',
           location: computer.location || '',
           isActive: isActive,
+          isOnline: isOnline,
+          heartbeatAt: computer.heartbeatAt || null,
+          appVersion: computer.appVersion || null,
           currentUserId: currentUserId,
           currentUserName: userName,
           lastSeen: computer.lastSeen || '',
@@ -121,6 +135,9 @@ export const getComputerUsageStats = async () => {
           computerName: computer.computerName || 'Unknown',
           location: computer.location || '',
           isActive: isActive,
+          isOnline: isOnline,
+          heartbeatAt: computer.heartbeatAt || null,
+          appVersion: computer.appVersion || null,
           currentUserId: null,
           currentUserName: null,
           lastSeen: computer.lastSeen || '',
