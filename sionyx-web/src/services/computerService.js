@@ -100,7 +100,7 @@ export const getComputerUsageStats = async () => {
 
         stats.computerDetails.push({
           computerId: computer.id,
-          computerName: computer.computerName || 'Unknown',
+          computerName: computer.computerName || 'ללא שם',
           location: computer.location || '',
           isActive: isActive,
           isOnline: isOnline,
@@ -125,14 +125,14 @@ export const getComputerUsageStats = async () => {
 
         stats.userComputerUsage[currentUserId].computersUsed.push({
           computerId: computer.id,
-          computerName: computer.computerName || 'Unknown',
+          computerName: computer.computerName || 'ללא שם',
           loginTime: computer.lastUserLogin || '',
         });
       } else {
         // Computer without user
         stats.computerDetails.push({
           computerId: computer.id,
-          computerName: computer.computerName || 'Unknown',
+          computerName: computer.computerName || 'ללא שם',
           location: computer.location || '',
           isActive: isActive,
           isOnline: isOnline,
@@ -205,7 +205,7 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
         userName,
         userPhone: userData.phoneNumber || '',
         computerId,
-        computerName: computer.computerName || 'Unknown',
+        computerName: computer.computerName || 'ללא שם',
         computerLocation: computer.location || '',
         loginTime: computer.lastUserLogin || '',
         sessionStartTime: userData.sessionStartTime || null,
@@ -216,7 +216,7 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
 
       stats.computerDetails.push({
         computerId,
-        computerName: computer.computerName || 'Unknown',
+        computerName: computer.computerName || 'ללא שם',
         location: computer.location || '',
         isActive,
         isOnline,
@@ -239,13 +239,13 @@ export const deriveFromComputersAndUsers = (computers, usersArray) => {
       }
       stats.userComputerUsage[currentUserId].computersUsed.push({
         computerId,
-        computerName: computer.computerName || 'Unknown',
+        computerName: computer.computerName || 'ללא שם',
         loginTime: computer.lastUserLogin || '',
       });
     } else {
       stats.computerDetails.push({
         computerId,
-        computerName: computer.computerName || 'Unknown',
+        computerName: computer.computerName || 'ללא שם',
         location: computer.location || '',
         isActive,
         isOnline,
@@ -514,7 +514,7 @@ export const getActiveComputerUsers = async () => {
             userName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
             userPhone: userData.phoneNumber || '',
             computerId: computer.id,
-            computerName: computer.computerName || 'Unknown',
+            computerName: computer.computerName || 'ללא שם',
             computerLocation: computer.location || '',
             loginTime: computer.lastUserLogin || '',
             sessionStartTime: userData.sessionStartTime || null,
