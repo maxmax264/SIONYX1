@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.ServiceProcess;
@@ -47,10 +46,17 @@ public class VncRelayService
     private const string TightVncExePath = @"C:\Program Files\TightVNC\tvnserver.exe";
     private static readonly TimeSpan MaxSessionDuration = TimeSpan.FromMinutes(30);
     private const int SignInRetrySeconds = 30;
+    // Firebase SSE keep-alives arrive roughly every 15-20s when a stream is
+    // healthy, so 5 minutes of total silence on this specific listener is a
+    // strong signal it has gone quietly dead (observed live, 14/09/2026: a
+    // listener stopped receiving anything - no errors, no reconnect logs,
+    // nothing - for 2.5+ hours, until the whole app was restarted by hand).
+    private static readonly TimeSpan ListenerStaleThreshold = TimeSpan.FromMinutes(5);
 
     private readonly FirebaseClient _firebase;
     private string? _computerId;
     private SseListener? _listener;
+    private System.Timers.Timer? _watchdogTimer;
     private CancellationTokenSource? _activeSessionCts;
     private long _lastHandledRequestedAt;
     private bool _starting;
@@ -109,6 +115,32 @@ public class VncRelayService
         _listener = _firebase.DbListen(
             $"computers/{_computerId}/vncRelay/requested",
             OnSessionRequested);
+
+        _watchdogTimer?.Dispose();
+        _watchdogTimer = new System.Timers.Timer(TimeSpan.FromMinutes(1).TotalMilliseconds) { AutoReset = true };
+        _watchdogTimer.Elapsed += (_, _) => CheckListenerHealth();
+        _watchdogTimer.Start();
+    }
+
+    // Self-heal a silently-dead vncRelay/requested listener: IsRunning alone
+    // can't detect this (it only reflects whether Stop() was called, not
+    // whether the read loop is still making progress), so we watch
+    // LastEventUtc instead - see the comment on ListenerStaleThreshold.
+    private void CheckListenerHealth()
+    {
+        var listener = _listener;
+        if (listener == null) return;
+
+        var silentFor = DateTime.UtcNow - listener.LastEventUtc;
+        if (silentFor <= ListenerStaleThreshold) return;
+
+        Logger.Warning(
+            "vncRelay/requested SSE listener silent for {Minutes:F0} min - forcing restart",
+            silentFor.TotalMinutes);
+        listener.Stop();
+        _listener = _firebase.DbListen(
+            $"computers/{_computerId}/vncRelay/requested",
+            OnSessionRequested);
     }
 
     public void Stop()
@@ -128,24 +160,7 @@ public class VncRelayService
 
             if (!File.Exists(TightVncExePath))
             {
-                // install-tightvnc.ps1 runs as an MSI CustomAction during
-                // SIONYX's own install - but Windows Installer holds a
-                // global mutex for the whole duration of that install, so
-                // a nested msiexec (installing TightVNC) fails outright
-                // with 1618 ("another installation is already in
-                // progress"). The script never checked msiexec's exit
-                // code, so this failed completely silently: no warning
-                // anywhere, tvnserver-info.txt still got written, and the
-                // kiosk was left with the HKCU/HKLM registry values set
-                // but no tvnserver.exe to ever use them. Confirmed live
-                // on 13/09/2026 (manually re-running the same msiexec
-                // command outside the MSI context succeeded immediately).
-                // Self-heal here instead: this method runs at every app
-                // startup and every VNC request, long after SIONYX's own
-                // MSI install has fully finished and released its mutex,
-                // so a nested install here does not hit the same problem.
-                Logger.Warning("TightVNC not found at {Path} - attempting to install it now (self-heal for a CustomAction that may have failed during setup)", TightVncExePath);
-                _ = Task.Run(() => TryInstallTightVncAsync());
+                Logger.Warning("TightVNC not found at {Path} - has install-tightvnc.ps1 run on this machine yet?", TightVncExePath);
                 return;
             }
 
@@ -161,75 +176,6 @@ public class VncRelayService
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to launch tvnserver.exe (non-fatal - a VNC session request will fail to connect until this is running)");
-        }
-    }
-
-    private const string TightVncMsiUrl = "https://www.tightvnc.com/download/2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi";
-
-    // Same install flow/arguments as install-tightvnc.ps1, run here (outside
-    // any MSI CustomAction context) so it isn't blocked by SIONYX's own
-    // installer mutex. See EnsureTightVncRunning's comment for why this
-    // exists. Safe to call repeatedly - if tvnserver.exe already exists by
-    // the time this runs, it does nothing.
-    private async Task TryInstallTightVncAsync()
-    {
-        try
-        {
-            if (File.Exists(TightVncExePath)) return;
-
-            var tempDir = @"C:\Temp";
-            Directory.CreateDirectory(tempDir);
-            var msiPath = Path.Combine(tempDir, "tightvnc-setup.msi");
-
-            if (!File.Exists(msiPath))
-            {
-                Logger.Information("Downloading TightVNC installer...");
-                using var http = new HttpClient();
-                using var response = await http.GetAsync(TightVncMsiUrl);
-                response.EnsureSuccessStatusCode();
-                await using var fs = File.Create(msiPath);
-                await response.Content.CopyToAsync(fs);
-            }
-
-            Logger.Information("Installing TightVNC (server only, loopback-only, no VNC auth, not as a Windows service)...");
-            var psi = new ProcessStartInfo
-            {
-                FileName = "msiexec.exe",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            psi.ArgumentList.Add("/i");
-            psi.ArgumentList.Add(msiPath);
-            psi.ArgumentList.Add("/quiet");
-            psi.ArgumentList.Add("/norestart");
-            psi.ArgumentList.Add("ADDLOCAL=Server");
-            psi.ArgumentList.Add("SERVER_REGISTER_AS_SERVICE=0");
-            psi.ArgumentList.Add("SERVER_ADD_FIREWALL_EXCEPTION=0");
-            psi.ArgumentList.Add("SERVER_ALLOW_SAS=1");
-            psi.ArgumentList.Add("SET_USEVNCAUTHENTICATION=1");
-            psi.ArgumentList.Add("VALUE_OF_USEVNCAUTHENTICATION=0");
-
-            using var proc = Process.Start(psi)!;
-            await proc.WaitForExitAsync();
-
-            if (proc.ExitCode != 0)
-            {
-                Logger.Warning("TightVNC self-heal install failed with msiexec exit code {ExitCode}", proc.ExitCode);
-                return;
-            }
-
-            if (!File.Exists(TightVncExePath))
-            {
-                Logger.Warning("msiexec reported success but {Path} still does not exist", TightVncExePath);
-                return;
-            }
-
-            Logger.Information("TightVNC self-heal install succeeded");
-            EnsureTightVncRunning(); // now that the exe exists, start it
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "TightVNC self-heal install failed (non-fatal - a VNC session request will fail to connect until this is resolved)");
         }
     }
 
