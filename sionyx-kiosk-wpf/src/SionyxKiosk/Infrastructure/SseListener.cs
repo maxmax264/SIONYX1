@@ -25,6 +25,19 @@ public sealed class SseListener
 
     public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
 
+    /// <summary>
+    /// UTC time of the last event (including keep-alives) actually received
+    /// from this stream. A healthy listener should update this every ~15-20s.
+    /// Callers can use "has this gone stale?" as a liveness check that a plain
+    /// IsRunning cannot provide: IsRunning only reflects whether Stop() was
+    /// called, not whether the underlying read loop is still making progress -
+    /// e.g. a stream that closes cleanly (server-side) reconnects silently
+    /// with no log line at all, and if that reconnect then hangs indefinitely
+    /// (observed live on 14/09/2026, root cause not fully identified), nothing
+    /// else surfaces the problem.
+    /// </summary>
+    public DateTime LastEventUtc { get; private set; } = DateTime.UtcNow;
+
     internal SseListener(
         FirebaseClient firebase,
         string path,
@@ -124,6 +137,7 @@ public sealed class SseListener
         response.EnsureSuccessStatusCode();
 
         _reconnectDelay = 1; // Reset backoff on successful connection
+        LastEventUtc = DateTime.UtcNow;
         Logger.Information("SSE stream connected: {Path}", orgPath);
 
         using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -157,12 +171,13 @@ public sealed class SseListener
 
     private void ProcessEvent(string eventType, string dataStr)
     {
+        LastEventUtc = DateTime.UtcNow;
         try
         {
             switch (eventType)
             {
                 case "keep-alive":
-                    Logger.Debug("SSE keep-alive received");
+                    Logger.Debug("SSE keep-alive received for {Path}", _path);
                     return;
                 case "cancel":
                     Logger.Warning("SSE stream cancelled by server");
