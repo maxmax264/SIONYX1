@@ -146,6 +146,54 @@ internal sealed class InputInjector
         }
     }
 
+    /// <summary>
+    /// Genuine Windows UAC elevation prompts render on the Secure Desktop
+    /// by design (Microsoft's own remote-assistance team has documented
+    /// this exact "black screen through a remote tool" problem and the
+    /// fix: the "Allow UIAccess applications to prompt for elevation
+    /// without using the secure desktop" policy). With it off, our
+    /// existing session-mode TightVNC - unmodified - can see and click a
+    /// real UAC prompt like any other window, no SYSTEM-level capture
+    /// engineering needed for that specific case.
+    ///
+    /// This is a real, if small on a locked-down single-purpose kiosk,
+    /// security trade-off: it applies machine-wide, not just to remote
+    /// sessions, so any future UAC prompt (from any user, any moment) is
+    /// visible/spoofable to anything already running at Medium integrity
+    /// or higher on the box - not to a remote attacker with no code
+    /// execution on the kiosk already. Worth it here given the kiosk is
+    /// already locked down (custom shell, Netfree-filtered), but this is
+    /// a deliberate choice, not a free lunch - flagged, not silent.
+    ///
+    /// NOTE: this only affects genuine Windows UAC. It does NOT explain
+    /// or fix AeroAdmin's own approval dialog if that turns out to use
+    /// its own separate desktop object rather than Windows' Secure
+    /// Desktop - see TryClick/TryTypeText's OpenInputDesktop-based
+    /// approach for that case instead, which follows whatever desktop is
+    /// actually active regardless of who created it.
+    /// </summary>
+    public void EnsureUacPromptOnNormalDesktop()
+    {
+        const string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+        const string valueName = "PromptOnSecureDesktop";
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(keyPath);
+            var current = key.GetValue(valueName);
+            int currentValue = current is int i ? i : 1; // Windows default is effectively "on"
+            if (currentValue != 0)
+            {
+                key.SetValue(valueName, 0, RegistryValueKind.DWord);
+                _log.LogInformation("Set {ValueName} to 0 (was {Current}) so UAC prompts render on the normal desktop, visible to the existing VNC session",
+                    valueName, currentValue);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Could not set PromptOnSecureDesktop policy - genuine UAC prompts will still show as a black screen over VNC until this is set");
+        }
+    }
+
     /// <summary>Sends a real Secure Attention Sequence (Ctrl+Alt+Del).</summary>
     public void SendCtrlAltDel()
     {

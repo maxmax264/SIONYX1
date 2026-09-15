@@ -39,6 +39,7 @@ internal sealed class PipeServerWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _injector.EnsureSoftwareSasPolicy();
+        _injector.EnsureUacPromptOnNormalDesktop();
 
         while (!stoppingToken.IsCancellationRequested)
         {
