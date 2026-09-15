@@ -182,6 +182,46 @@ function Invoke-Publish {
     return $true
 }
 
+# Added 2026-09-14 alongside SionyxInputInjector (see that project's
+# README.md - unverified end to end until this has actually run once on a
+# real Windows machine). Soft-fail on purpose: this is a bonus feature
+# (elevated click / real Ctrl+Alt+Del), not core kiosk functionality, so a
+# problem publishing it must never block the main SionyxKiosk build or
+# installer - install-input-injector.ps1 already handles a missing output
+# directory by skipping silently rather than failing the MSI.
+function Invoke-PublishInputInjector {
+    Write-Header "Publishing SionyxInputInjector (elevated-click/Ctrl+Alt+Del service)"
+
+    $injectorCsproj = Join-Path $ScriptDir "src\SionyxInputInjector\SionyxInputInjector.csproj"
+    $injectorOutDir = Join-Path $ScriptDir "installer\remote-control\SionyxInputInjector"
+
+    if (-not (Test-Path $injectorCsproj)) {
+        Write-Warn "SionyxInputInjector.csproj not found at $injectorCsproj - skipping (elevated-click feature will be unavailable in this build)"
+        return $false
+    }
+
+    if (Test-Path $injectorOutDir) { Remove-Item $injectorOutDir -Recurse -Force }
+
+    dotnet publish $injectorCsproj `
+        -c Release `
+        -r win-x64 `
+        --self-contained true `
+        /p:PublishSingleFile=true `
+        /p:IncludeNativeLibrariesForSelfExtract=true `
+        /p:DebugType=none `
+        /p:DebugSymbols=false `
+        -o $injectorOutDir
+
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $injectorOutDir "SionyxInputInjector.exe"))) {
+        Write-Warn "SionyxInputInjector publish failed - continuing without it (main kiosk app is unaffected)"
+        if (Test-Path $injectorOutDir) { Remove-Item $injectorOutDir -Recurse -Force }
+        return $false
+    }
+
+    Write-Ok "Published: SionyxInputInjector.exe"
+    return $true
+}
+
 function Test-InstallerSecrets {
     # Local/manual builds forget to set this every new PowerShell session,
     # so default it here. GitHub Actions still wins - it sets
@@ -306,6 +346,7 @@ function New-Installer([string]$ver) {
         -p:ProductVersion=$ver `
         -p:PublishDir=$publishDir `
         -p:SourceDir=$sourceDir `
+        -p:HasInputInjector=$(if ($hasInputInjector) { "true" } else { "false" }) `
         2>&1
     $wixExit = $LASTEXITCODE
     $wixOutput | ForEach-Object { Write-Host $_ }
@@ -398,6 +439,7 @@ if (-not (Invoke-Publish)) {
     Write-Err "Publish failed"
     exit 1
 }
+$hasInputInjector = Invoke-PublishInputInjector
 
 # Create installer
 $installerPath = New-Installer $newVersion
