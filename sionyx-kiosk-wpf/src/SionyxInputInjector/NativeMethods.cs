@@ -30,6 +30,21 @@ internal static class NativeMethods
     public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     public const uint MOUSEEVENTF_LEFTUP = 0x0004;
     public const uint KEYEVENTF_KEYUP = 0x0002;
+    public const uint KEYEVENTF_UNICODE = 0x0004;
+    public const ushort VK_RETURN = 0x0D;
+
+    // Ctrl+Alt+Del is a Secure Attention Sequence - Windows deliberately
+    // makes it impossible to fake with SendInput/keybd_event, by design,
+    // specifically so malware can't spoof the trusted login/lock screen.
+    // SendSAS is the one documented, legitimate way for software to
+    // trigger a real SAS - built by Microsoft for exactly this remote-
+    // support scenario, gated by the SoftwareSASGeneration policy (see
+    // InputInjector.EnsureSoftwareSasPolicy). It returns void with no
+    // success/failure signal, which is a known trap - see InputInjector's
+    // comment on that method for why we verify the policy ourselves
+    // instead of trusting this call silently "succeeding".
+    [DllImport("sas.dll")]
+    public static extern void SendSAS(bool asUser);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr OpenInputDesktop(uint dwFlags, bool fInherit, uint dwDesiredAccess);

@@ -38,6 +38,8 @@ internal sealed class PipeServerWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _injector.EnsureSoftwareSasPolicy();
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -107,6 +109,14 @@ internal sealed class PipeServerWorker : BackgroundService
                     && root.TryGetProperty("yFrac", out var yEl))
                 {
                     _injector.TryClick(xEl.GetDouble(), yEl.GetDouble());
+                }
+                else if (type == "ctrlaltdel")
+                {
+                    _injector.SendCtrlAltDel();
+                }
+                else if (type == "typeText" && root.TryGetProperty("text", out var textEl))
+                {
+                    _injector.TryTypeText(textEl.GetString() ?? string.Empty);
                 }
                 else
                 {

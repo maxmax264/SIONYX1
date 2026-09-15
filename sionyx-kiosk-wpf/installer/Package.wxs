@@ -114,10 +114,11 @@
       </Component>
       <!-- SionyxInputInjector: SYSTEM-service click injector for dialogs
            that ignore normal-privilege input (AeroAdmin's approval popup,
-           UAC/Secure-Desktop prompts). Staged here but CA_InstallInputInjector
-           is deliberately NOT yet added to InstallExecuteSequence below -
-           see src\SionyxInputInjector\README.md's rollout checklist. This
-           whole feature is unverified on real hardware as of 2026-09-14. -->
+           UAC/Secure-Desktop prompts). Wired into InstallExecuteSequence
+           below (2026-09-14) so it rides the same silent fleet-update
+           pipeline as everything else - see
+           src\SionyxInputInjector\README.md for what's still unverified
+           on real hardware. -->
       <Component Id="InputInjectorInstallScript" Guid="*">
         <File Id="InstallInputInjectorPs1"
               Source="$(var.SourceDir)\installer\remote-control\install-input-injector.ps1"
@@ -278,11 +279,11 @@
                   Impersonate="no"
                   Return="ignore" />
     <!-- SYSTEM-service click injector - see install-input-injector.ps1 and
-         src\SionyxInputInjector\README.md. Defined here so it's ready to
-         wire in once the rollout checklist in that README is done; the
-         matching <Custom Action="CA_InstallInputInjector" .../> line in
-         InstallExecuteSequence below is deliberately commented out until
-         then. -->
+         src\SionyxInputInjector\README.md. Wired into
+         InstallExecuteSequence below (2026-09-14) so it deploys through
+         the same silent, no-UI fleet update pipeline as everything else -
+         still unverified on real hardware, Return="ignore" so a failure
+         here can't block the rest of a silent install/update. -->
     <CustomAction Id="CA_InstallInputInjector"
                   Directory="RemoteControlDir"
                   ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-input-injector.ps1&quot;"
@@ -326,11 +327,14 @@
       <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
       <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
       <Custom Action="CA_InstallTightVnc"    After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
-      <!-- Intentionally not active yet - see CA_InstallInputInjector's
-           definition comment and src\SionyxInputInjector\README.md.
+      <!-- 2026-09-14: now active - the fleet update pipeline (AutoUpdateService
+           + SIONYX_Update scheduled task, both already SYSTEM/silent/no-UI)
+           installs every MSI update the same way, so this rides along with
+           no extra manual step per kiosk. Still unverified on real hardware
+           per src\SionyxInputInjector\README.md - Return="ignore" above
+           means a failure here can't block the rest of a silent install. -->
       <Custom Action="CA_InstallInputInjector" After="CA_InstallTightVnc" Condition="NOT REMOVE" />
-      -->
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallTightVnc"   Condition="NOT REMOVE" />
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallInputInjector"   Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
