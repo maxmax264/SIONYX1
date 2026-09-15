@@ -199,6 +199,7 @@ public class VncRelayService
         {
             DisableLegacyTvnServerService();
             EnsureNoAuthRegistry();
+            EnsureTightVncDpiCompatibility();
 
             if (Process.GetProcessesByName("tvnserver").Length > 0) return;
 
@@ -296,6 +297,48 @@ public class VncRelayService
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to set TightVNC no-auth/loopback registry values under HKCU (non-fatal - VNC connections will fail until this is set)");
+        }
+    }
+
+    // Added 2026-09-14, after community research turned up an exact match
+    // for the reported symptom (a click on a small target - AeroAdmin's
+    // approval dialog - never registers, while a click anywhere generously
+    // sized on the open desktop still roughly works): this is a
+    // well-documented TightVNC/UltraVNC bug class on any display running
+    // above 100% Windows scaling. tvnserver is an old GDI app with no
+    // per-monitor DPI awareness of its own, so Windows silently
+    // virtualizes both its screen capture AND the coordinates it injects
+    // through SendInput/SetCursorPos into a scaled, non-physical
+    // coordinate space - see TightVNC bug #1196 ("makes the TightVNC
+    // Server application unusable while DPI is set to 150%") and the
+    // matching UltraVNC forum thread, both found via web search. The
+    // offset grows the further a click is from the top-left corner, and
+    // is proportional to the scaling percentage - which is exactly why a
+    // big taskbar icon still basically works but a small dialog button
+    // consistently misses.
+    //
+    // The standard fix (normally set by hand via
+    // Properties > Compatibility > "Override high DPI scaling behavior" >
+    // System (Enhanced)) is this exact registry value - setting it here
+    // means every kiosk self-heals the next time tvnserver isn't already
+    // running, with no manual step and no separate installer action.
+    //
+    // NOTE: if this turns out to be the whole story, the SionyxInputInjector
+    // SYSTEM service added earlier the same day may not even be needed for
+    // the AeroAdmin case - it only actually helps if a dialog additionally
+    // runs at a higher Windows integrity level (still relevant for real
+    // UAC/Secure-Desktop prompts). Test this fix first; it's the simpler,
+    // fully-automatic one.
+    private static void EnsureTightVncDpiCompatibility()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers");
+            key.SetValue(TightVncExePath, "~ GDIDPISCALING DPIUNAWARE", RegistryValueKind.String);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to set TightVNC DPI-compatibility registry flag (non-fatal - clicks may be offset on a scaled display until this is set)");
         }
     }
 

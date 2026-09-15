@@ -80,4 +80,17 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    // Declared explicitly at process start (see Program.cs) rather than
+    // via an embedded app manifest, since a .NET single-file/self-contained
+    // publish doesn't reliably carry a custom manifest without extra csproj
+    // wiring I can't verify without a real build. Without this, this
+    // process would be subject to the exact same DPI-virtualization bug
+    // that EnsureTightVncDpiCompatibility() fixes for tvnserver.exe -
+    // GetSystemMetrics and SendInput would report/act on a scaled,
+    // non-physical coordinate space instead of true screen pixels.
+    public static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 }
