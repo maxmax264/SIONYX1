@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.ServiceProcess;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Win32;
 using Serilog;
@@ -344,6 +346,13 @@ public class VncRelayService
             var netStream = tcp.GetStream();
             var wsToTcp = PumpWebSocketToTcpAsync(ws, netStream, ct);
             var tcpToWs = PumpTcpToWebSocketAsync(netStream, ws, ct);
+            // Fire-and-forget, deliberately not part of the WhenAny below:
+            // this is the "V מוגבר" elevated-click side channel (added
+            // 2026-09-14, see SionyxInputInjector/README.md - UNVERIFIED on
+            // real hardware). If it fails to connect or errors mid-session
+            // that must never end the actual VNC session, which is the
+            // part that's already proven to work.
+            _ = RunControlChannelAsync(token, relayHost, ct);
             await Task.WhenAny(wsToTcp, tcpToWs);
         }
         catch (SocketException ex)
@@ -387,6 +396,79 @@ public class VncRelayService
             var read = await tcp.ReadAsync(buffer, 0, buffer.Length, ct);
             if (read == 0) break; // remote closed the VNC connection
             await ws.SendAsync(new ArraySegment<byte>(buffer, 0, read), WebSocketMessageType.Binary, true, ct);
+        }
+    }
+
+    // "V מוגבר" (elevated click) side channel - added 2026-09-14.
+    // UNVERIFIED end-to-end on real hardware, see
+    // src/SionyxInputInjector/README.md before trusting this in the field.
+    //
+    // Deliberately a completely separate WebSocket from the main
+    // /agent/<token> byte-pipe above (not multiplexed onto it): the main
+    // pipe forwards raw, unparsed bytes straight into TightVNC's TCP
+    // socket, so mixing a JSON control message into that stream would risk
+    // corrupting the VNC protocol if anything here misbehaves. Keeping
+    // them separate means a bug in this method can, at worst, make the
+    // elevated-click button silently do nothing - it can't touch the VNC
+    // session that's already proven to work.
+    private static async Task RunControlChannelAsync(string token, string relayHost, CancellationToken ct)
+    {
+        try
+        {
+            var controlUri = new Uri($"wss://{relayHost}/controlAgent/{Uri.EscapeDataString(token)}");
+            using var controlWs = new ClientWebSocket();
+            await controlWs.ConnectAsync(controlUri, ct);
+            Logger.Information("VNC elevated-click control channel connected");
+
+            var buffer = new byte[4 * 1024];
+            while (controlWs.State == WebSocketState.Open && !ct.IsCancellationRequested)
+            {
+                var result = await controlWs.ReceiveAsync(buffer, ct);
+                if (result.MessageType == WebSocketMessageType.Close) break;
+                if (result.Count <= 0) continue;
+
+                var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                await ForwardToInputInjectorAsync(json, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // session ended - normal
+        }
+        catch (Exception ex)
+        {
+            // Never let a control-channel problem surface as a session
+            // failure - the elevated-click button is a bonus feature, not
+            // part of the core VNC session's success/failure reporting.
+            Logger.Warning(ex, "VNC elevated-click control channel error (non-fatal - normal VNC session is unaffected)");
+        }
+    }
+
+    // Opens a fresh pipe connection per command rather than keeping one
+    // open for the session - elevated clicks are rare (a handful per
+    // session at most), so the extra ~few ms of connect overhead per call
+    // is a fair trade for not having to detect/recover a stale long-lived
+    // pipe connection if SionyxInputInjector restarts mid-session.
+    private static async Task ForwardToInputInjectorAsync(string jsonLine, CancellationToken ct)
+    {
+        try
+        {
+            using var pipe = new NamedPipeClientStream(".", "SionyxInputInjector", PipeDirection.Out, PipeOptions.Asynchronous);
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            connectCts.CancelAfter(TimeSpan.FromSeconds(2));
+            await pipe.ConnectAsync(connectCts.Token);
+
+            var bytes = Encoding.UTF8.GetBytes(jsonLine.TrimEnd('\n') + "\n");
+            await pipe.WriteAsync(bytes, ct);
+            await pipe.FlushAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // Most likely SionyxInputInjector isn't installed/running yet
+            // on this kiosk (this whole feature ships before the service
+            // does, see README) - log once per attempt, not fatal to
+            // anything.
+            Logger.Warning(ex, "Could not reach SionyxInputInjector pipe - is the service installed and running?");
         }
     }
 
