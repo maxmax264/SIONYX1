@@ -411,6 +411,29 @@ public class AeroAdminSetupService
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     /// <summary>
+    /// 2026-09-15: added one exception to "hide everything" (see the
+    /// original comment below for why that's normally correct) - while a
+    /// remote-support VNC session is actually connected
+    /// (<see cref="VncRelayService.IsSessionActive"/>), stop force-hiding
+    /// any window that isn't the already-known main window.
+    ///
+    /// Field report the same day: an admin trying to click Accept/Decline
+    /// on AeroAdmin's own incoming-connection dialog via the kiosk's VNC
+    /// found the mouse "immediately disappearing" and couldn't interact
+    /// with it at all. The cause wasn't UIPI or DPI scaling (both fixed
+    /// earlier that day) - it was this exact method, called every 20
+    /// seconds by the enforcement timer (and immediately on any restart),
+    /// blindly hiding *every* AeroAdmin window including the one they were
+    /// trying to click. The kiosk's own anti-popup code was fighting the
+    /// admin trying to use the popup.
+    ///
+    /// This only relaxes things while VncRelayService reports a session is
+    /// live - i.e. while an admin is already looking at the screen on
+    /// purpose. The rest of the time (99%+ of a kiosk's life, including
+    /// any first-run EULA dialog per the original comment) behavior is
+    /// completely unchanged: hide everything, immediately.
+    /// </summary>
+    /// <summary>
     /// מסתיר בפועל את *כל* החלונות העליונים של התהליך - לא רק ה"חלון הראשי" -
     /// כי דיאלוג EULA/רישוי בהפעלה ראשונה או חלון משנה יכולים להיות תהליך-ID
     /// תואם אבל handle שונה מזה שנמצא לצורך קריאת ה-ID/PIN.
@@ -426,11 +449,25 @@ public class AeroAdminSetupService
     /// </summary>
     private static void HideAllWindowsForProcess(uint processId)
     {
+        var sessionActive = VncRelayService.IsSessionActive;
         EnumWindows((hWnd, _) =>
         {
             GetWindowThreadProcessId(hWnd, out var pid);
             if (pid == processId)
             {
+                // During an active VNC session, leave anything that isn't
+                // the already-known main window alone - that "something
+                // else" is very plausibly the exact dialog the admin is
+                // there to click. Before the main window is even known
+                // yet (_knownMainWindowHandle == IntPtr.Zero), keep the
+                // original behavior (hide everything) regardless of
+                // session state - that startup window is always noise,
+                // never something to click.
+                var isUnknownWindow = _knownMainWindowHandle != IntPtr.Zero && hWnd != _knownMainWindowHandle;
+                if (sessionActive && isUnknownWindow)
+                {
+                    return true; // leave it visible/interactable
+                }
                 ShowWindow(hWnd, SW_HIDE);
             }
             return true; // ממשיכים לכל החלונות, לא עוצרים בראשון

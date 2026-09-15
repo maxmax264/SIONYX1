@@ -364,6 +364,14 @@ public class VncRelayService
         _ = Task.Run(() => RunSessionAsync(token, cts.Token));
     }
 
+    // Exposed so other services can tell "an admin is actually looking at
+    // this screen right now via VNC" apart from normal unattended kiosk
+    // operation - see AeroAdminSetupService's hide-enforcement, which
+    // needs to stop yanking away a real incoming-connection dialog while
+    // someone is trying to click it, without giving up on suppressing
+    // AeroAdmin's own noise (EULA popups etc.) the rest of the time.
+    public static bool IsSessionActive { get; private set; }
+
     private async Task RunSessionAsync(string token, CancellationToken ct)
     {
         var relayHost = RegistryConfig.ReadValue("VncRelayUrl", DefaultRelayHost)!.Trim().TrimEnd('/');
@@ -385,6 +393,7 @@ public class VncRelayService
 
             await ReportResultAsync("connected");
             await ClearRequestedAsync();
+            IsSessionActive = true;
 
             var netStream = tcp.GetStream();
             var wsToTcp = PumpWebSocketToTcpAsync(ws, netStream, ct);
@@ -414,6 +423,7 @@ public class VncRelayService
         }
         finally
         {
+            IsSessionActive = false;
             try { if (ws.State == WebSocketState.Open) await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None); }
             catch { /* best effort */ }
             await ReportResultAsync("ended");
