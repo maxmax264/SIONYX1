@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { Form, Switch, Input, Button, Alert, Divider } from 'antd';
+import { Form, Switch, Input, Button, Alert, Divider, Radio } from 'antd';
 import { App } from 'antd';
 import { CreditCardOutlined, BankOutlined, SafetyOutlined } from '@ant-design/icons';
 import { getPaymentSettings, updatePaymentSettings, getBillingSettings, updateBillingSettings } from '../../services/paymentSettingsService';
@@ -22,6 +22,7 @@ const PaymentSettings = () => {
         form.setFieldsValue({
           saveCardEnabled: paymentRes.payment.saveCardEnabled,
           nedarimApiValid: paymentRes.payment.nedarimApiValid || '',
+          paymentMethod: paymentRes.payment.paymentMethod || 'keva',
         });
         setSaveCardEnabled(paymentRes.payment.saveCardEnabled);
       }
@@ -44,7 +45,11 @@ const PaymentSettings = () => {
     }
     setSaving(true);
     const [paymentRes, billingRes] = await Promise.all([
-      updatePaymentSettings(orgId, { saveCardEnabled: values.saveCardEnabled, nedarimApiValid: values.nedarimApiValid || '' }),
+      updatePaymentSettings(orgId, {
+        saveCardEnabled: values.saveCardEnabled,
+        nedarimApiValid: values.nedarimApiValid || '',
+        paymentMethod: values.paymentMethod || 'keva',
+      }),
       updateBillingSettings(orgId, {
         nedarimMosadId: values.billingNedarimMosadId || '',
         nedarimApiValid: values.billingNedarimApiValid || '',
@@ -75,7 +80,7 @@ const PaymentSettings = () => {
         <BankOutlined /> פרטי חיוב נדרים פלוס
       </h4>
       <p style={{ color: '#666', marginBottom: 20 }}>הזן את מזהה המוסד ומפתח ה-API של נדרים פלוס כדי לאפשר תשלומים בארגון.</p>
-      <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ saveCardEnabled: false, nedarimApiValid: '', billingNedarimMosadId: '', billingNedarimApiValid: '' }}>
+      <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ saveCardEnabled: false, nedarimApiValid: '', billingNedarimMosadId: '', billingNedarimApiValid: '', paymentMethod: 'keva' }}>
         <Form.Item name="billingNedarimMosadId" label="מזהה מוסד NEDARIM">
           <Input placeholder="הזן את מזהה המוסד" disabled={loading} style={{ direction: 'ltr', fontFamily: 'monospace' }} prefix={<BankOutlined />} />
         </Form.Item>
@@ -97,6 +102,21 @@ const PaymentSettings = () => {
             <Alert type="info" showIcon style={{ marginBottom: 16 }} message="הכרטיס נשמר אצל נדרים פלוס בצורה מאובטחת (PCI DSS). המערכת שומרת רק טוקן." />
             <Form.Item name="nedarimApiValid" label="קוד API לשמירת כרטיסים (ApiValid מנדרים פלוס)" rules={[{ required: true, message: 'נא להזין קוד API' }]}>
               <Input placeholder="הזן את קוד ה-ApiValid מנדרים פלוס" disabled={loading} style={{ direction: 'ltr', fontFamily: 'monospace' }} />
+            </Form.Item>
+
+            <Divider style={{ margin: '24px 0' }} />
+            <h4 style={{ margin: '0 0 12px' }}>שיטת חיוב לכרטיס שמור</h4>
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="ברירת המחדל (הוראת קבע) היא השיטה שעובדת בפועל בפרודקשן. אל תשנה לחיוב רגיל אלא אם בדקת שהוא עובד עבור המוסד שלך - ניתן לחזור בחזרה בכל רגע."
+            />
+            <Form.Item name="paymentMethod">
+              <Radio.Group disabled={loading}>
+                <Radio.Button value="keva">הוראת קבע (מומלץ, עובד כיום)</Radio.Button>
+                <Radio.Button value="regular">חיוב רגיל (חד-פעמי, ניסיוני)</Radio.Button>
+              </Radio.Group>
             </Form.Item>
           </>
         )}

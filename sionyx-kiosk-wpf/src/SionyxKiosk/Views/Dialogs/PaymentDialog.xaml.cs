@@ -29,6 +29,14 @@ public partial class PaymentDialog : Window
     private string? _purchaseId;
     private SseListener? _statusListener;
 
+    // Org setting (metadata/settings/payment/paymentMethod): "keva" (default,
+    // DebitKeva.aspx - the confirmed-working standing-order charge) or
+    // "regular" (DebitCard.aspx - true one-time token charge). Read once
+    // when the dialog loads; missing/unrecognized value always falls back
+    // to "keva" so orgs that never touch this setting see zero behavior
+    // change.
+    private string _paymentMethod = "keva";
+
     public bool PaymentSucceeded { get; private set; }
 
     public PaymentDialog(
@@ -246,8 +254,11 @@ public partial class PaymentDialog : Window
                 saveCardEnabled = paymentData.TryGetProperty("saveCardEnabled", out var sce) && sce.GetBoolean();
                 saveCardApiValid = paymentData.TryGetProperty("nedarimApiValid", out var scav)
                     ? scav.GetString() ?? "" : "";
+                var methodValue = paymentData.TryGetProperty("paymentMethod", out var pmEl)
+                    ? pmEl.GetString() : null;
+                _paymentMethod = methodValue == "regular" ? "regular" : "keva";
             }
-            Logger.Information("Payment settings: saveCard={SaveCard}", saveCardEnabled);
+            Logger.Information("Payment settings: saveCard={SaveCard} paymentMethod={PaymentMethod}", saveCardEnabled, _paymentMethod);
 
             // Uses the same base-URL override as CallFunctionAsync so both
             // point at the Render bridge when configured (see FirebaseConfig.

@@ -2,14 +2,21 @@
 import { database } from '../config/firebase';
 import { logger } from '../utils/logger';
 
+// paymentMethod controls which Nedarim endpoint saved-card charges use:
+// 'keva' (DebitKeva.aspx - creates a standing order, currently the only
+// confirmed-working live path) or 'regular' (DebitCard.aspx - true
+// one-time token charge, no standing-order object created). Defaults to
+// 'keva' so existing orgs are completely unaffected unless someone
+// explicitly opts in to 'regular'.
 export const getPaymentSettings = async (orgId) => {
   try {
     const settingsRef = ref(database, `organizations/${orgId}/metadata/settings/payment`);
     const snapshot = await get(settingsRef);
     if (!snapshot.exists()) {
-      return { success: true, payment: { saveCardEnabled: false, nedarimApiValid: '' } };
+      return { success: true, payment: { saveCardEnabled: false, nedarimApiValid: '', paymentMethod: 'keva' } };
     }
-    return { success: true, payment: snapshot.val() };
+    const payment = snapshot.val();
+    return { success: true, payment: { paymentMethod: 'keva', ...payment } };
   } catch (error) {
     logger.error('Error getting payment settings:', error);
     return { success: false, error: error.message };
@@ -22,6 +29,7 @@ export const updatePaymentSettings = async (orgId, payment) => {
       payment: {
         saveCardEnabled: !!payment.saveCardEnabled,
         nedarimApiValid: (payment.nedarimApiValid || '').trim(),
+        paymentMethod: payment.paymentMethod === 'regular' ? 'regular' : 'keva',
       },
     });
     logger.info('Payment settings updated');
