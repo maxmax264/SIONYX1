@@ -475,7 +475,7 @@ public partial class App : Application
                     Log.Information("Phone verification required - showing waiting screen");
                     var firebase = _host!.Services.GetRequiredService<FirebaseClient>();
                     var userId = auth.CurrentUser?.Uid ?? "";
-                    var phone = "0775022924";
+                    var phone = "0747276899";
 
                     if (MainWindow is AuthWindow aw2) { aw2.AllowClose(); aw2.Close(); }
 
