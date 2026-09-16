@@ -118,11 +118,22 @@ public class SessionService : BaseService, ISessionService
         // Fetch user data from Firebase (blocking — need the result)
         var now = DateTime.Now.ToString("o");
         var fetchTask = FetchAndValidateUserAsync(initialRemainingTime);
-        // Process cleanup runs in background — no reason to block session start
+        // Process + browser cleanup runs in background — no reason to block session start.
+        // Also wipes browser cookies/login-data/downloads here (not just on logout), so a
+        // session that starts right after a crash/power-outage (previous user never logged
+        // out) still gets a fully clean browser — not just closed windows with the old
+        // cookies still on disk.
         _ = Task.Run(() =>
         {
             try { _processCleanup.CleanupUserProcesses(); }
             catch (Exception ex) { Logger.Warning(ex, "Process cleanup failed (non-fatal)"); }
+
+            try
+            {
+                _browserCleanup.CleanupWithBrowserClose();
+                _browserCleanup.CleanupDownloads();
+            }
+            catch (Exception ex) { Logger.Warning(ex, "Browser cleanup failed (non-fatal)"); }
         });
         var userCheck = await fetchTask;
         if (!userCheck.Valid) return Error(userCheck.ErrorMessage!);
