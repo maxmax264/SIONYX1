@@ -34,16 +34,28 @@ public class ComputerService : BaseService
                     name = $"PC-{computerId[..8].ToUpper()}";
             }
 
+            // The dashboard owns the name once one exists there: renaming a
+            // computer in the dashboard (e.g. after machines are physically
+            // moved) must stick, and used to be silently reverted to the
+            // install-time registry value on the next login. We only write the
+            // name here when Firebase has none yet.
+            var existing = await Firebase.DbGetAsync($"computers/{computerId}/computerName");
+            var hasExistingName = existing.Success
+                && existing.Data is System.Text.Json.JsonElement nameEl
+                && nameEl.ValueKind == System.Text.Json.JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(nameEl.GetString());
+
             var now = DateTime.Now.ToString("o");
             var data = new Dictionary<string, object?>
             {
-                ["computerName"] = name,
                 ["currentUserId"] = null,
                 ["isActive"] = false,
                 ["lastSeen"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 ["createdAt"] = now,
                 ["updatedAt"] = now,
             };
+            if (!hasExistingName)
+                data["computerName"] = name;
             if (!string.IsNullOrEmpty(location))
                 data["location"] = location;
 

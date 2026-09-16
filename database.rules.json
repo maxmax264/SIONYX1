@@ -114,7 +114,14 @@
           "$computerId": {
             ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
             ".write": "auth != null && root.child('organizations').child($orgId).child('users').child(auth.uid).exists()",
-            "heartbeatAt": { ".write": "auth != null", ".validate": "newData.isNumber()" }, "remoteControl": {
+            "heartbeatAt": { ".write": "auth != null", ".validate": "newData.isNumber()" },
+            "appVersion": { ".write": "auth != null", ".validate": "newData.isString()" },
+            "autoLogonConfigured": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
+            "autoLogonUser": { ".write": "auth != null", ".validate": "newData.isString()" },
+            "computerName": {
+              ".write": "auth != null && (!data.exists() || root.child('organizations').child($orgId).child('users').child(auth.uid).exists())",
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+            }, "remoteControl": {
               ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists() || root.child('owners').child(auth.uid).exists())",
               "rustdesk": {
                 "setPassword": {

@@ -130,10 +130,78 @@ public class ComputerHeartbeatService
                 });
             if (!result.Success)
                 Logger.Warning("Heartbeat write failed: {Error}", result.Error);
+
+            await SyncComputerNameAsync();
         }
         catch (Exception ex)
         {
             Logger.Warning(ex, "Heartbeat write threw (non-fatal)");
+        }
+    }
+
+    /// <summary>
+    /// Raised when the dashboard-side computer name changes, so any open UI
+    /// (e.g. the login screen watermark) can refresh itself without a restart.
+    /// </summary>
+    public static event Action<string>? ComputerNameUpdated;
+
+    /// <summary>Local (HKCU) cache of the name the dashboard currently shows.</summary>
+    public const string DashboardNameValue = "DashboardComputerName";
+
+    /// <summary>
+    /// Keeps the install-time name and the dashboard name in sync, in the one
+    /// direction each that the user actually wants:
+    ///
+    ///  - Firebase has NO name yet (fresh install, nobody has logged in on this
+    ///    machine): seed it from the install-time registry name, so the name
+    ///    typed during setup shows up in the dashboard on its own, within one
+    ///    heartbeat, without waiting for a user login. This was the actual bug -
+    ///    computerName was only ever written by ComputerService.RegisterComputerAsync(),
+    ///    which only runs on login, so an installed-but-not-yet-used kiosk showed
+    ///    "ללא שם" in the dashboard even though the kiosk itself displayed the name.
+    ///
+    ///  - Firebase HAS a name: the dashboard wins (that's where renames happen,
+    ///    e.g. when machines are physically moved around), and we mirror it into
+    ///    HKCU so the kiosk's own screens show the same name. We deliberately do
+    ///    NOT push the registry name over it, which would make the dashboard's
+    ///    rename button silently revert every 60s.
+    /// </summary>
+    private async Task SyncComputerNameAsync()
+    {
+        try
+        {
+            var read = await _deviceFirebase.DbGetAsync($"computers/{_computerId}/computerName");
+            if (!read.Success) return;
+
+            var dbName = read.Data is System.Text.Json.JsonElement el
+                         && el.ValueKind == System.Text.Json.JsonValueKind.String
+                ? el.GetString()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(dbName))
+            {
+                var installName = RegistryConfig.ReadValue("ComputerName");
+                if (string.IsNullOrWhiteSpace(installName))
+                    installName = DeviceInfo.GetComputerName();
+                if (string.IsNullOrWhiteSpace(installName)) return;
+
+                var seed = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}",
+                    new Dictionary<string, object> { ["computerName"] = installName });
+                if (seed.Success)
+                    Logger.Information("Seeded dashboard computer name from install-time registry value: {Name}", installName);
+                return;
+            }
+
+            var cached = RegistryConfig.ReadValueCurrentUser(DashboardNameValue);
+            if (cached == dbName) return;
+
+            RegistryConfig.WriteValue(DashboardNameValue, dbName!);
+            Logger.Information("Computer name updated from dashboard: {Name}", dbName);
+            ComputerNameUpdated?.Invoke(dbName!);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Computer name sync failed (non-fatal)");
         }
     }
 

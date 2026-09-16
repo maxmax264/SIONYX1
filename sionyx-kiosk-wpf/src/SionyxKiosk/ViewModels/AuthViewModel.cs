@@ -38,8 +38,20 @@ public partial class AuthViewModel : ObservableObject
 
     // Shown next to the version watermark so this screen also identifies which
     // physical machine you're looking at (matches the name shown in the dashboard).
-    public string ComputerName => SionyxKiosk.Infrastructure.RegistryConfig.ReadValue("ComputerName")
-        ?? SionyxKiosk.Infrastructure.DeviceInfo.GetComputerName();
+    // Priority: 1) the name currently shown in the dashboard (mirrored into
+    // HKCU by ComputerHeartbeatService, so a rename there shows here too),
+    // 2) the install-time name from HKLM, 3) the Windows hostname.
+    public string ComputerName
+    {
+        get
+        {
+            var dashboardName = SionyxKiosk.Infrastructure.RegistryConfig.ReadValueCurrentUser(
+                SionyxKiosk.Services.ComputerHeartbeatService.DashboardNameValue);
+            if (!string.IsNullOrWhiteSpace(dashboardName)) return dashboardName!;
+            return SionyxKiosk.Infrastructure.RegistryConfig.ReadValue("ComputerName")
+                ?? SionyxKiosk.Infrastructure.DeviceInfo.GetComputerName();
+        }
+    }
     [ObservableProperty] private double _formX = 50;
     [ObservableProperty] private double _formY = 50;
     [ObservableProperty] private double _formWidth = 480;
@@ -74,6 +86,27 @@ public partial class AuthViewModel : ObservableObject
         _metadataService = metadataService;
         _ = LoadBackgroundAsync();
         _ = StartRefreshListenerAsync();
+
+        // A rename done in the dashboard reaches this screen on the next
+        // heartbeat, without needing an app restart. Tracked via a single
+        // static subscription pointing at the current instance, rather than
+        // one subscription per instance - a static event holds its handlers
+        // forever, so per-instance subscriptions would keep every AuthViewModel
+        // ever created alive for the life of the process.
+        _current = this;
+    }
+
+    private static AuthViewModel? _current;
+
+    static AuthViewModel()
+    {
+        SionyxKiosk.Services.ComputerHeartbeatService.ComputerNameUpdated += _ =>
+        {
+            var vm = _current;
+            if (vm == null) return;
+            System.Windows.Application.Current?.Dispatcher.Invoke(
+                () => vm.OnPropertyChanged(nameof(ComputerName)));
+        };
     }
 
     public async Task ReloadBackgroundAsync() => await LoadBackgroundAsync();
