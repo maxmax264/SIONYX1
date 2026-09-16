@@ -79,10 +79,44 @@ public class ComputerHeartbeatService
         _timer.Start();
     }
 
+    // Added 2026-09-15: read-only check, NEVER reads or reports the
+    // DefaultPassword value - only whether AutoAdminLogon is turned on and
+    // a username is set. Motivation: a kiosk without Windows auto-logon
+    // configured sits at the Windows password screen after any restart
+    // (dashboard-triggered via RemoteCommandService, a power outage,
+    // anything) - and at that screen, SionyxKiosk.exe (and therefore
+    // VncRelayService/TightVNC, all of it) hasn't even started yet, so
+    // remote support can't see or reach the machine at all. This makes
+    // that state visible on the dashboard proactively instead of only
+    // being discovered the hard way after an actual restart.
+    private static (bool configured, string? user) CheckAutoLogon()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon");
+            var autoAdminLogon = key?.GetValue("AutoAdminLogon") as string;
+            var defaultUser = key?.GetValue("DefaultUserName") as string;
+            var configured = autoAdminLogon == "1" && !string.IsNullOrEmpty(defaultUser);
+            return (configured, defaultUser);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Could not check AutoAdminLogon registry state (non-fatal)");
+            return (false, null);
+        }
+    }
+
     private async Task SendHeartbeatAsync()
     {
         try
         {
+            var (autoLogonConfigured, autoLogonUser) = CheckAutoLogon();
+            if (!autoLogonConfigured)
+            {
+                Logger.Warning("Windows AutoAdminLogon is NOT configured on this kiosk - a restart will stop at the Windows logon screen, where remote support (VNC, etc.) cannot reach it at all until someone logs in physically");
+            }
+
             var result = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}",
                 new Dictionary<string, object>
                 {
@@ -91,6 +125,8 @@ public class ComputerHeartbeatService
                     // always shows the version currently running, even if the name
                     // or version was set/changed after this machine was first set up.
                     ["appVersion"] = DeviceInfo.GetAppVersion(),
+                    ["autoLogonConfigured"] = autoLogonConfigured,
+                    ["autoLogonUser"] = autoLogonUser ?? "",
                 });
             if (!result.Success)
                 Logger.Warning("Heartbeat write failed: {Error}", result.Error);
