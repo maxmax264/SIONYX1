@@ -12,7 +12,11 @@ public class DesktopSnapshotService
 {
     private static readonly ILogger Logger = Log.ForContext<DesktopSnapshotService>();
 
-    private const string DesktopPath = @"C:\Users\SionyxUser\Desktop";
+    // Was hardcoded to "C:\Users\SionyxUser\Desktop" - broke with DirectoryNotFoundException
+    // on any kiosk whose local account isn't literally named "SionyxUser" (or whose Desktop
+    // is redirected, e.g. via OneDrive). Resolve the actual desktop of whichever account the
+    // kiosk app is running as instead.
+    private static string DesktopPath => Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
     private const string SnapshotPath = @"C:\Users\Public\Documents\SIONYX\DesktopSnapshot";
     private const string WallpaperRegistryKey = @"Control Panel\Desktop";
     private const string WallpaperRegistryValue = "Wallpaper";
@@ -35,6 +39,8 @@ public class DesktopSnapshotService
 
             // Copy all desktop files
             var copied = 0;
+            if (!Directory.Exists(DesktopPath))
+                Directory.CreateDirectory(DesktopPath);
             foreach (var file in Directory.GetFiles(DesktopPath, "*", SearchOption.TopDirectoryOnly))
             {
                 var dest = Path.Combine(SnapshotPath, Path.GetFileName(file));
@@ -72,6 +78,12 @@ public class DesktopSnapshotService
 
         try
         {
+            // Desktop folder can legitimately be missing (fresh/never-used Windows profile) -
+            // create it instead of letting GetFiles throw and aborting the whole restore
+            // (including the wallpaper restore below).
+            if (!Directory.Exists(DesktopPath))
+                Directory.CreateDirectory(DesktopPath);
+
             // Remove all files currently on desktop
             foreach (var file in Directory.GetFiles(DesktopPath, "*", SearchOption.TopDirectoryOnly))
             {
