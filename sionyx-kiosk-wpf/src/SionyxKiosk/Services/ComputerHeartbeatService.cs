@@ -117,6 +117,19 @@ public class ComputerHeartbeatService
                 Logger.Warning("Windows AutoAdminLogon is NOT configured on this kiosk - a restart will stop at the Windows logon screen, where remote support (VNC, etc.) cannot reach it at all until someone logs in physically");
             }
 
+            // install-tightvnc.ps1 downloads TightVNC's installer live from
+            // tightvnc.com during setup (Return="ignore" on that CustomAction
+            // means an MSI install can "succeed" overall even if this one
+            // download failed - e.g. Netfree not yet whitelisting that
+            // domain on a freshly-deployed machine/network). Without this
+            // check, that failure is invisible until someone tries VNC and
+            // it hangs on "connecting" forever with no obvious cause.
+            var tightVncInstalled = System.IO.File.Exists(@"C:\Program Files\TightVNC\tvnserver.exe");
+            if (!tightVncInstalled)
+            {
+                Logger.Warning("TightVNC is NOT installed on this kiosk (C:\\Program Files\\TightVNC\\tvnserver.exe missing) - remote VNC support will hang on 'connecting' forever. Likely cause: the live download in install-tightvnc.ps1 failed, often because Netfree hasn't whitelisted tightvnc.com on this machine/network yet");
+            }
+
             var result = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}",
                 new Dictionary<string, object>
                 {
@@ -127,6 +140,7 @@ public class ComputerHeartbeatService
                     ["appVersion"] = DeviceInfo.GetAppVersion(),
                     ["autoLogonConfigured"] = autoLogonConfigured,
                     ["autoLogonUser"] = autoLogonUser ?? "",
+                    ["tightVncInstalled"] = tightVncInstalled,
                 });
             if (!result.Success)
                 Logger.Warning("Heartbeat write failed: {Error}", result.Error);

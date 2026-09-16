@@ -50,7 +50,34 @@ if ($alreadyInstalled) {
 
 if (-Not $alreadyInstalled) {
     Write-Host "[SIONYX] Downloading TightVNC..."
-    Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath
+    # 2026-09-15: retry added after a fresh kiosk deploy silently ended up
+    # without TightVNC at all - this CustomAction runs with Return="ignore"
+    # (by design, so a remote-control hiccup can never block the main
+    # kiosk install/update), which also means a failed download here used
+    # to fail completely silently: the MSI reports success, and nobody
+    # finds out until someone tries VNC and it hangs on "connecting"
+    # forever. Most likely cause on a brand-new machine/network: Netfree
+    # hasn't whitelisted tightvnc.com yet. Retrying can't fix a genuinely
+    # blocked domain, but it does paper over a transient blip - and
+    # ComputerHeartbeatService now reports tightVncInstalled=false either
+    # way, so a real block is at least visible on the dashboard instead of
+    # only discovered by a stuck VNC session.
+    $maxAttempts = 3
+    $downloaded = $false
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath -TimeoutSec 30
+            $downloaded = $true
+            break
+        } catch {
+            Write-Host "[SIONYX] Download attempt $attempt/$maxAttempts failed: $($_.Exception.Message)"
+            if ($attempt -lt $maxAttempts) { Start-Sleep -Seconds (5 * $attempt) }
+        }
+    }
+    if (-Not $downloaded) {
+        Write-Host "[SIONYX] ERROR: could not download TightVNC after $maxAttempts attempts - likely Netfree hasn't whitelisted tightvnc.com on this machine/network. Remote VNC support will not work on this kiosk until that's fixed and the app is restarted."
+        exit 0  # let the MSI continue - this feature failing must never block the rest of the install
+    }
 
     Write-Host "[SIONYX] Running silent install (server only, loopback-only listening, no VNC auth, NOT as a Windows service)..."
     # ADDLOCAL=Server בלבד (בלי Viewer - אין צורך בו על הקיוסק).
