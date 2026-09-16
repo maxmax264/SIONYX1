@@ -1,5 +1,6 @@
 using Serilog;
 using SionyxKiosk.Infrastructure;
+using SionyxKiosk.Infrastructure.Logging;
 
 namespace SionyxKiosk.Services;
 
@@ -129,6 +130,8 @@ public class ComputerHeartbeatService
             {
                 Logger.Warning("TightVNC is NOT installed on this kiosk (C:\\Program Files\\TightVNC\\tvnserver.exe missing) - remote VNC support will hang on 'connecting' forever. Likely cause: the live download in install-tightvnc.ps1 failed, often because Netfree hasn't whitelisted tightvnc.com on this machine/network yet");
             }
+            ChannelLogSink.Current?.ReportStatus("tightvnc", tightVncInstalled,
+                tightVncInstalled ? null : "tvnserver.exe missing - install-tightvnc.ps1 download likely failed");
 
             var result = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}",
                 new Dictionary<string, object>

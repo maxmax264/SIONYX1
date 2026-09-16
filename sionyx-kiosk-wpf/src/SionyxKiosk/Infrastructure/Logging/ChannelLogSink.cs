@@ -34,7 +34,13 @@ namespace SionyxKiosk.Infrastructure.Logging;
 /// </summary>
 public sealed class ChannelLogSink : ILogEventSink
 {
-    private const string DefaultChannelUrl = "https://entertainment-channel.onrender.com";
+    // entertainment-channel.onrender.com is retired (ran out of storage - it
+    // kept every posted line forever with no cap/expiry). Default destination
+    // is now the Understood payment bridge's /logs endpoints, backed by a
+    // Redis list capped at N lines + a TTL per computer, so it cannot refill
+    // the same way. Logs are read/deleted only from the owner dashboard
+    // (pc-sion.web.app/owner) - there is no public viewer page anymore.
+    private const string DefaultChannelUrl = "https://understood-n5ok.onrender.com";
     private const string DefaultApiKey = "k9f2sh392zh32_secure_random_key";
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
@@ -54,9 +60,15 @@ public sealed class ChannelLogSink : ILogEventSink
         public bool Enabled = true;
         public TimeSpan MinInterval;
         public DateTime LastSentAt = DateTime.MinValue;
+        /// <summary>True = POST {url}/logs/ingest with the Understood bridge's
+        /// {computerId, computerName, level, message, timestamp} body. False =
+        /// legacy {url}/api/import/post TheChannel format (kept for any
+        /// dashboard-configured destination that still expects it).</summary>
+        public bool SionyxFormat = true;
     }
 
     private readonly string _author;
+    private readonly string _computerId;
     private readonly object _gate = new();
     private List<Destination> _destinations;
 
@@ -72,6 +84,7 @@ public sealed class ChannelLogSink : ILogEventSink
         // channel's "author" matches what's already familiar from the
         // computers list - falls back to the raw hostname if that's unset.
         _author = RegistryConfig.ReadValue("ComputerName", null) ?? DeviceInfo.GetComputerName();
+        _computerId = DeviceInfo.GetDeviceId();
 
         var url = (RegistryConfig.ReadValue("LogShipUrl", DefaultChannelUrl) ?? DefaultChannelUrl).TrimEnd('/');
         var apiKey = RegistryConfig.ReadValue("LogShipApiKey", DefaultApiKey) ?? DefaultApiKey;
@@ -106,6 +119,10 @@ public sealed class ChannelLogSink : ILogEventSink
                 ApiKey = d.apiKey ?? "",
                 Enabled = d.enabled,
                 MinInterval = TimeSpan.FromMilliseconds(Math.Max(0, d.intervalMs)),
+                // Dashboard-configured custom destinations keep the legacy
+                // TheChannel format - only the built-in default targets the
+                // new bridge /logs endpoints.
+                SionyxFormat = false,
             })
             .ToList();
 
@@ -134,6 +151,7 @@ public sealed class ChannelLogSink : ILogEventSink
     {
         var text = FormatText(logEvent);
         var timestamp = logEvent.Timestamp.UtcDateTime;
+        var level = logEvent.Level.ToString();
 
         List<Destination> snapshot;
         lock (_gate) { snapshot = _destinations; }
@@ -152,7 +170,7 @@ public sealed class ChannelLogSink : ILogEventSink
                 }
             }
 
-            SendTo(dest, text, timestamp);
+            SendTo(dest, text, timestamp, level);
         }
     }
 
@@ -164,23 +182,81 @@ public sealed class ChannelLogSink : ILogEventSink
         lock (_gate) { snapshot = _destinations; }
         foreach (var dest in snapshot)
         {
-            if (dest.Enabled) SendTo(dest, text, timestampUtc ?? DateTime.UtcNow);
+            if (dest.Enabled) SendTo(dest, text, timestampUtc ?? DateTime.UtcNow, "Information");
         }
     }
 
-    private void SendTo(Destination dest, string text, DateTime timestampUtc)
+    /// <summary>Reports a one-off structured install/feature status (e.g.
+    /// "tightvnc" -> installed or not) to every Sionyx-format destination's
+    /// /logs/status endpoint - shown as a checklist in the owner dashboard's
+    /// Logs tab, separate from the scrolling raw log tail.</summary>
+    public void ReportStatus(string feature, bool success, string? message = null)
+    {
+        List<Destination> snapshot;
+        lock (_gate) { snapshot = _destinations; }
+
+        foreach (var dest in snapshot)
+        {
+            if (!dest.Enabled || !dest.SionyxFormat) continue;
+            try
+            {
+                var body = JsonSerializer.Serialize(new
+                {
+                    computerId = _computerId,
+                    computerName = _author,
+                    feature,
+                    success,
+                    message = message ?? "",
+                });
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{dest.Url}/logs/status")
+                {
+                    Content = new StringContent(body, Encoding.UTF8, "application/json"),
+                };
+                request.Headers.Add("X-API-Key", dest.ApiKey);
+                _ = Http.SendAsync(request).ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        SelfLogger.Debug(t.Exception, "Status report to {DestId} failed (non-fatal)", dest.Id);
+                }, TaskContinuationOptions.OnlyOnFaulted);
+            }
+            catch
+            {
+                // Never throw
+            }
+        }
+    }
+
+    private void SendTo(Destination dest, string text, DateTime timestampUtc, string level)
     {
         try
         {
-            var body = JsonSerializer.Serialize(new
+            string body;
+            string path;
+            if (dest.SionyxFormat)
             {
-                author = _author,
-                text,
-                timestamp = timestampUtc,
-                is_ads = false,
-            });
+                body = JsonSerializer.Serialize(new
+                {
+                    computerId = _computerId,
+                    computerName = _author,
+                    level,
+                    message = text,
+                    timestamp = timestampUtc,
+                });
+                path = "/logs/ingest";
+            }
+            else
+            {
+                body = JsonSerializer.Serialize(new
+                {
+                    author = _author,
+                    text,
+                    timestamp = timestampUtc,
+                    is_ads = false,
+                });
+                path = "/api/import/post";
+            }
 
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{dest.Url}/api/import/post")
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{dest.Url}{path}")
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),
             };

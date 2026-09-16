@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { formatTimeHebrewCompact } from "../../utils/timeFormatter";
 import dayjs from "dayjs";
 import OrgRegistrationModal from "../components/OrgRegistrationModal";
+import OwnerLogsTab from "../components/OwnerLogsTab";
 
 const { Title, Text } = Typography;
 
@@ -454,6 +455,18 @@ const OwnerDashboardPage = () => {
           rowKey={(r) => `${r.orgId}-${r.uid}`}
           pagination={{ pageSize: 20, showSizeChanger: false }}
           size="small"
+        />
+      </Card>
+
+      <Card title="הגדרות" size="small" style={{ marginBottom: 24 }}>
+        <Tabs
+          items={[
+            {
+              key: "logs",
+              label: "לוגים",
+              children: <OwnerLogsTab />,
+            },
+          ]}
         />
       </Card>
 
