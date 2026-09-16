@@ -26,7 +26,16 @@ $InstallDir  = "${env:ProgramFiles}\TightVNC"
 $TempDir     = "C:\Temp"
 $InfoDir     = "C:\ProgramData\SIONYX"
 $InfoFile    = "$InfoDir\tightvnc-info.txt"
-$MsiUrl      = "https://www.tightvnc.com/download/2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi"
+$MsiUrl      = "https://github.com/maxmax264/sionyx-releases/releases/download/tightvnc-2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi"
+# 2026-09-15: was https://www.tightvnc.com/download/2.8.88/tightvnc-2.8.88-gpl-setup-64bit.msi -
+# confirmed field-blocked by Netfree with "file type not supported by
+# automatic filtering" (a content-type/file-type block, not a domain
+# block - a raw.githubusercontent.com mirror of the same file was ALSO
+# blocked for the same reason). Mirrored as an actual GitHub Release asset
+# instead - github.com/.../releases/download/... is the exact URL pattern
+# this kiosk's own app updates already use successfully through Netfree,
+# and this specific link was confirmed working from an actual kiosk
+# network before this change shipped.
 $MsiPath     = "$TempDir\tightvnc-setup.msi"
 
 Write-Host "[SIONYX] Installing TightVNC (local-only VNC server for the VNC-relay remote-control feature)..."

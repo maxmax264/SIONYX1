@@ -28,11 +28,13 @@ internal sealed class PipeServerWorker : BackgroundService
     public const string PipeName = "SionyxInputInjector";
 
     private readonly InputInjector _injector;
+    private readonly TightVncInstaller _tightVncInstaller;
     private readonly ILogger<PipeServerWorker> _log;
 
-    public PipeServerWorker(InputInjector injector, ILogger<PipeServerWorker> log)
+    public PipeServerWorker(InputInjector injector, TightVncInstaller tightVncInstaller, ILogger<PipeServerWorker> log)
     {
         _injector = injector;
+        _tightVncInstaller = tightVncInstaller;
         _log = log;
     }
 
@@ -41,6 +43,14 @@ internal sealed class PipeServerWorker : BackgroundService
         var sasChanged = _injector.EnsureSoftwareSasPolicy();
         var uacChanged = _injector.EnsureUacPromptOnNormalDesktop();
         _injector.ScheduleRebootIfPolicyChanged(sasChanged, uacChanged);
+
+        // Fire-and-forget, deliberately not awaited here: "don't give up
+        // quickly" means this keeps checking/retrying for as long as the
+        // service runs, completely independent of whether the pipe below
+        // ever gets a connection. A failure in here must never take down
+        // the pipe server (the elevated-click/Ctrl+Alt+Del feature), so it
+        // has its own try/catch per cycle inside RunTightVncMaintenanceLoopAsync.
+        _ = RunTightVncMaintenanceLoopAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -63,6 +73,35 @@ internal sealed class PipeServerWorker : BackgroundService
                 _log.LogError(ex, "Pipe server loop error - restarting listener");
                 await Task.Delay(1000, stoppingToken).ContinueWith(_ => { });
             }
+        }
+    }
+
+    // "Don't give up quickly" - checks every 15 minutes for as long as the
+    // service runs, forever, rather than only during install/update. A
+    // Netfree block that clears up later (or gets whitelisted by an admin
+    // after noticing the tightVncInstalled=false heartbeat) gets picked up
+    // automatically on the very next cycle, no further app update needed.
+    private static readonly TimeSpan TightVncCheckInterval = TimeSpan.FromMinutes(15);
+
+    private async Task RunTightVncMaintenanceLoopAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await _tightVncInstaller.EnsureInstalledAsync(stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // shutting down
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "TightVNC maintenance cycle threw unexpectedly - will retry next cycle regardless");
+            }
+
+            try { await Task.Delay(TightVncCheckInterval, stoppingToken); }
+            catch (OperationCanceledException) { /* shutting down */ }
         }
     }
 

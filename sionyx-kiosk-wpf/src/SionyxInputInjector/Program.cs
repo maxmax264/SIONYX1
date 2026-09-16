@@ -21,6 +21,7 @@ builder.Services.AddWindowsService(options =>
 });
 
 builder.Services.AddSingleton<InputInjector>();
+builder.Services.AddSingleton<TightVncInstaller>();
 builder.Services.AddHostedService<PipeServerWorker>();
 
 var host = builder.Build();
