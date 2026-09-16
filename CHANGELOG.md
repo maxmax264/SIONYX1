@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.14.24] - 2026-09-16
+
+### Other
+- fix DirectoryNotFoundException on kiosks not using the SionyxUser account name (be635dc9)
+
+
 ## [3.14.23] - 2026-09-16
 
 
