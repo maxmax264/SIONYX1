@@ -57,14 +57,17 @@ public partial class App : Application
         Directory.CreateDirectory(publicLogDir);
 
         // Stage 3 of the log-shipping feature: ships every log line (by
-        // default) to the entertainment-channel site so logs scattered
-        // across kiosks are visible in one place. Level is registry-
-        // overridable (LogShipMinLevel) - default Information matches "ship
-        // everything the app normally logs", not just warnings/errors.
+        // default) to the payment bridge's /logs endpoints so logs scattered
+        // across kiosks are visible in one place (owner dashboard > הגדרות >
+        // לוגים). Level is registry-overridable (LogShipMinLevel) - default
+        // is Warning, not Information: shipping every routine Information
+        // line from every kiosk continuously is enough volume to exhaust the
+        // bridge's rate limit on its own even with a generous ceiling, and
+        // Warning+ is what "did X install ok" style status actually needs.
         var logShipLevel = Enum.TryParse<Serilog.Events.LogEventLevel>(
-            Infrastructure.RegistryConfig.ReadValue("LogShipMinLevel", "Information"), ignoreCase: true, out var lvl)
+            Infrastructure.RegistryConfig.ReadValue("LogShipMinLevel", "Warning"), ignoreCase: true, out var lvl)
             ? lvl
-            : Serilog.Events.LogEventLevel.Information;
+            : Serilog.Events.LogEventLevel.Warning;
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
