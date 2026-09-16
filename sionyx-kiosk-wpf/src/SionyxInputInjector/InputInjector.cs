@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace SionyxInputInjector;
@@ -122,7 +123,7 @@ internal sealed class InputInjector
     /// rather than overwriting, in case something else on the machine
     /// already set "Ease of Access" (2) deliberately.
     /// </summary>
-    public void EnsureSoftwareSasPolicy()
+    public bool EnsureSoftwareSasPolicy()
     {
         const string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
         const string valueName = "SoftwareSASGeneration";
@@ -138,11 +139,14 @@ internal sealed class InputInjector
                 key.SetValue(valueName, desired, RegistryValueKind.DWord);
                 _log.LogInformation("Set {ValueName} to {Desired} (was {Current}) so SendSAS actually works from this service",
                     valueName, desired, currentValue);
+                return true;
             }
+            return false;
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Could not set SoftwareSASGeneration policy - Ctrl+Alt+Del requests will silently do nothing until this is set");
+            return false;
         }
     }
 
@@ -172,7 +176,7 @@ internal sealed class InputInjector
     /// approach for that case instead, which follows whatever desktop is
     /// actually active regardless of who created it.
     /// </summary>
-    public void EnsureUacPromptOnNormalDesktop()
+    public bool EnsureUacPromptOnNormalDesktop()
     {
         const string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
         const string valueName = "PromptOnSecureDesktop";
@@ -186,11 +190,72 @@ internal sealed class InputInjector
                 key.SetValue(valueName, 0, RegistryValueKind.DWord);
                 _log.LogInformation("Set {ValueName} to 0 (was {Current}) so UAC prompts render on the normal desktop, visible to the existing VNC session",
                     valueName, currentValue);
+                return true;
             }
+            return false;
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Could not set PromptOnSecureDesktop policy - genuine UAC prompts will still show as a black screen over VNC until this is set");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Added 2026-09-15 per explicit request: a kiosk should need this
+    /// installed exactly once, ever - no admin visiting every machine to
+    /// manually restart it afterwards. Both policy fixes above only take
+    /// effect after Windows re-reads them (confirmed via research: "won't
+    /// reflect unless you reboot or log back into a workstation" - these
+    /// are Winlogon/Application-Info-level security policies, not settings
+    /// polled live). So when either one actually changed something, this
+    /// schedules a ONE-TIME Windows restart automatically - at 4:00 AM
+    /// local time (never "right now") specifically so it can never land in
+    /// the middle of a live customer transaction. A scheduled task is used
+    /// instead of a simple in-process timer so the restart still happens
+    /// even if this service itself restarts or the machine loses power and
+    /// comes back before 4 AM.
+    /// </summary>
+    public void ScheduleRebootIfPolicyChanged(bool sasPolicyChanged, bool uacPolicyChanged)
+    {
+        if (!sasPolicyChanged && !uacPolicyChanged) return;
+
+        try
+        {
+            var now = DateTime.Now;
+            var targetTime = now.Date.AddHours(4);
+            if (now >= targetTime) targetTime = targetTime.AddDays(1); // already past 4 AM today - use tomorrow
+            var dateArg = targetTime.ToString("MM/dd/yyyy");
+            var timeArg = targetTime.ToString("HH:mm");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "schtasks.exe",
+                // /f overwrites a same-named task if one already exists,
+                // so re-running this (e.g. both policies changing on the
+                // same first run) never creates duplicate reboots.
+                Arguments = "/create /tn \"SIONYX_PolicyReboot\" /tr \"shutdown.exe /r /t 60 /c \\\"SIONYX: restarting to apply a one-time security-policy update\\\"\" " +
+                            $"/sc once /sd {dateArg} /st {timeArg} /ru SYSTEM /rl HIGHEST /f",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            using var process = Process.Start(psi);
+            process?.WaitForExit(10_000);
+            if (process?.ExitCode == 0)
+            {
+                _log.LogInformation("Scheduled a one-time restart for {Target} to apply the SoftwareSASGeneration/PromptOnSecureDesktop policy change - this should only ever happen once per machine", targetTime);
+            }
+            else
+            {
+                var stderr = process?.StandardError.ReadToEnd();
+                _log.LogError("schtasks.exe failed to schedule the policy-change restart (exit {Code}): {Error}", process?.ExitCode, stderr);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Could not schedule the one-time policy-change restart - Ctrl+Alt+Del/UAC-visibility fixes won't take effect until the machine is restarted manually");
         }
     }
 
