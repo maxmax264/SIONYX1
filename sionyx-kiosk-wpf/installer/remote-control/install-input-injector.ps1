@@ -10,11 +10,16 @@
 # Runs as an MSI CustomAction (Execute="deferred", Impersonate="no", i.e.
 # as SYSTEM during install) - same pattern as install-tightvnc.ps1.
 #
-# NOT YET WIRED into Package.wxs's InstallExecuteSequence on purpose - see
-# the README's rollout checklist. Once that checklist is done, add:
-#   <Custom Action="CA_InstallInputInjector" After="CA_InstallTightVnc" Condition="NOT REMOVE" />
-# alongside the CA_InstallInputInjector CustomAction definition already
-# added to Package.wxs.
+# STALE NOTE (was here since 2026-09-14, now corrected): this comment used
+# to say the CustomAction was deliberately NOT wired into Package.wxs's
+# InstallExecuteSequence until the README's manual-verification checklist
+# was done. That was true when this file was written, but Package.wxs was
+# edited afterwards to add <Custom Action="CA_InstallInputInjector" .../>
+# BEFORE that checklist was actually completed - so every fleet auto-update
+# has been silently shipping and installing this still-unverified service.
+# See src\SionyxInputInjector\README.md for the checklist that still needs
+# to happen on real hardware, and don't trust this feature in the field
+# until it has.
 
 $ErrorActionPreference = 'Stop'
 
