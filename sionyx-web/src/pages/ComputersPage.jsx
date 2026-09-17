@@ -195,8 +195,8 @@ const ComputersPage = () => {
   const handleForceLogout = async (userId, computerId) => {
     Modal.confirm({
       title: 'התנתקות כפויה',
-      content: 'האם אתה בטוח שברצונך להתנתק את המשתמש הזה?',
-      okText: 'כן, התנתק',
+      content: 'האם אתה בטוח שברצונך לנתק את המשתמש הזה?',
+      okText: 'כן, נתק',
       cancelText: 'ביטול',
       onOk: async () => {
         const key = `logout-${userId}`;
@@ -793,11 +793,11 @@ const ComputersPage = () => {
                       <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{teamviewer.id}</Text></Text>
                       <Text type='secondary'>
                         סיסמה נוכחית: <Text copyable style={{ fontFamily: 'monospace' }}>{teamviewer.password || '—'}</Text>
-                        {' '}(משתנה בכל הפעלה - לחץ "הפעל" לפני חיבור)
+                        {' '}(משתנה בכל הפעלה - לחץ &quot;הפעל&quot; לפני חיבור)
                       </Text>
                     </Space>
                   ) : (
-                    <Text type='secondary'>עדיין לא דווח - לחץ "הפעל" כדי לקבל ID+סיסמה</Text>
+                    <Text type='secondary'>עדיין לא דווח - לחץ &quot;הפעל&quot; כדי לקבל ID+סיסמה</Text>
                   )}
                   <div style={{ marginTop: 8 }}>
                     <Button size='small' icon={<ReloadOutlined />} loading={launchingTeamViewer} onClick={handleLaunchTeamViewer}>
