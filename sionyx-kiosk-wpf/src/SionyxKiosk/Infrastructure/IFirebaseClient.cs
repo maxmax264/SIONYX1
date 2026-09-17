@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace SionyxKiosk.Infrastructure;
 
@@ -10,6 +10,9 @@ public interface IFirebaseClient : IDisposable
     string ProjectId { get; }
     string? FunctionsBaseUrl { get; }
     bool IsAuthenticated { get; }
+
+    /// <summary>Raised when the refresh token is found to be permanently invalid.</summary>
+    event Action? AuthenticationLost;
 
     Task<FirebaseResult> SignUpAsync(string email, string password);
     Task<FirebaseResult> SignInAsync(string email, string password);

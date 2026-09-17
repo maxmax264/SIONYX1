@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SionyxKiosk.Models;
 using SionyxKiosk.Services;
@@ -22,6 +22,23 @@ public partial class MainViewModel : ObservableObject
     {
         _auth = auth;
         CurrentUser = auth.CurrentUser;
+        _auth.SessionExpired += OnSessionExpired;
+    }
+
+    // Session died server-side (refresh token revoked/expired) rather than
+    // an explicit user logout - route through the same LogoutRequested flow
+    // App.xaml.cs already handles, so the kiosk lands back on the login
+    // screen instead of sitting there with every background SSE listener
+    // silently failing forever. Fires from a background SSE task, not the
+    // UI thread, so marshal before touching the observable property.
+    private void OnSessionExpired()
+    {
+        System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            if (IsLoggingOut) return;
+            IsLoggingOut = true;
+            LogoutRequested?.Invoke();
+        });
     }
 
     [RelayCommand]
@@ -36,8 +53,8 @@ public partial class MainViewModel : ObservableObject
         if (IsLoggingOut) return;
         IsLoggingOut = true;
 
-        // Don't call auth.LogoutAsync() here — the App.xaml.cs OnLogoutRequested
-        // handler owns the full logout sequence (stop services → logout → show auth window).
+        // Don't call auth.LogoutAsync() here ג€” the App.xaml.cs OnLogoutRequested
+        // handler owns the full logout sequence (stop services ג†’ logout ג†’ show auth window).
         // Calling it here would double-logout and could race with service teardown.
         LogoutRequested?.Invoke();
     }

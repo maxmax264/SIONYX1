@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -48,6 +48,16 @@ public sealed class FirebaseClient : IFirebaseClient
     /// </summary>
     public string? FunctionsBaseUrl => _functionsBaseUrl;
     public bool IsAuthenticated => _idToken != null && _userId != null;
+
+    /// <summary>
+    /// Raised when the refresh token is found to be permanently invalid
+    /// (revoked, expired, or the user was disabled) rather than a transient
+    /// network failure. Auth state has already been cleared by the time this
+    /// fires. Subscribers should send the user back to the login screen -
+    /// without this, every EnsureValidTokenAsync caller (SseListener x5 in
+    /// this app) just keeps failing silently forever with no way back in.
+    /// </summary>
+    public event Action? AuthenticationLost;
 
     public FirebaseClient(FirebaseConfig config, HttpClient? httpClient = null)
     {
@@ -141,9 +151,47 @@ public sealed class FirebaseClient : IFirebaseClient
             Logger.Information("Token refreshed successfully");
             return true;
         }
+        catch (FirebaseApiException ex) when (IsPermanentAuthFailure(ex))
+        {
+            // The refresh token itself is dead - no amount of retrying will
+            // fix this. Clear auth now so every other caller (SseListener x5,
+            // etc.) short-circuits on the null check at the top of
+            // EnsureValidTokenAsync instead of hitting this endpoint again
+            // next reconnect, and tell the app so it can log the user out
+            // properly instead of leaving dead listeners running forever.
+            Logger.Warning(ex, "Refresh token permanently invalid - clearing auth");
+            ClearAuth();
+            AuthenticationLost?.Invoke();
+            return false;
+        }
         catch (Exception ex)
         {
+            // Transient failure (network blip, timeout, Firebase 5xx) - leave
+            // the existing tokens in place so the next attempt can still
+            // succeed once things recover.
             Logger.Error(ex, "Token refresh failed");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// True for securetoken.googleapis.com error codes that mean the refresh
+    /// token is dead and retrying it is pointless - as opposed to a
+    /// transient network/server error, which should just be retried.
+    /// </summary>
+    private static bool IsPermanentAuthFailure(FirebaseApiException ex)
+    {
+        try
+        {
+            var message = JsonDocument.Parse(ex.ResponseBody).RootElement
+                .GetProperty("error").GetProperty("message").GetString() ?? "";
+            return message.Contains("TOKEN_EXPIRED")
+                || message.Contains("USER_DISABLED")
+                || message.Contains("USER_NOT_FOUND")
+                || message.Contains("INVALID_REFRESH_TOKEN");
+        }
+        catch
+        {
             return false;
         }
     }

@@ -1,10 +1,13 @@
-using SionyxKiosk.Models;
+﻿using SionyxKiosk.Models;
 
 namespace SionyxKiosk.Services;
 
 public interface IAuthService
 {
     UserData? CurrentUser { get; }
+
+    /// <summary>Raised when the session dies from underneath the app (not an explicit user logout).</summary>
+    event Action? SessionExpired;
 
     Task<bool> IsLoggedInAsync();
     Task<ServiceResult> LoginAsync(string phone, string password);

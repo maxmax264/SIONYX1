@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using SionyxKiosk.Infrastructure;
 using SionyxKiosk.Models;
 
@@ -21,10 +21,34 @@ public class AuthService : BaseService, IAuthService
 
     public UserData? CurrentUser { get; private set; }
 
+    /// <summary>
+    /// Raised when the session died from underneath the app (refresh token
+    /// revoked/expired/user disabled) rather than an explicit user logout.
+    /// MainViewModel routes this into the same LogoutRequested flow as a
+    /// normal logout, so the kiosk lands back on the login screen instead of
+    /// sitting there with every background listener silently failing forever.
+    /// </summary>
+    public event Action? SessionExpired;
+
     public AuthService(FirebaseClient firebase, LocalDatabase localDb, ComputerService computerService) : base(firebase)
     {
         _localDb = localDb;
         _computerService = computerService;
+        Firebase.AuthenticationLost += HandleAuthenticationLost;
+    }
+
+    private void HandleAuthenticationLost()
+    {
+        // Firebase.ClearAuth() already ran (that's what raised this event).
+        // Don't attempt any authenticated network calls here - the token is
+        // dead, so just drop local state and let the normal logout flow
+        // take the user back to the login screen.
+        _localDb.Delete("refresh_token");
+        _localDb.Delete("user_id");
+        _localDb.Delete("phone");
+        CurrentUser = null;
+        Logger.Warning("Session expired (auth revoked) - requesting logout");
+        SessionExpired?.Invoke();
     }
 
     /// <summary>Check if user is already logged in via stored token.</summary>
@@ -41,7 +65,7 @@ public class AuthService : BaseService, IAuthService
         var refreshed = await Firebase.RefreshTokenAsync();
         if (!refreshed)
         {
-            // Token expired or revoked ג€” clear local storage
+            // Token expired or revoked ׳’ג‚¬ג€ clear local storage
             _localDb.Delete("refresh_token");
             _localDb.Delete("user_id");
             _localDb.Delete("phone");
@@ -99,7 +123,7 @@ public class AuthService : BaseService, IAuthService
         {
             var remaining = GetLockoutRemaining(phone);
             Logger.Warning("Login blocked: too many attempts for {Phone}, locked for {Seconds}s", phone, (int)remaining.TotalSeconds);
-            return Error($"יותר מדי ניסיונות כניסה. נסה שוב בעוד {(int)remaining.TotalMinutes + 1} דקות.");
+            return Error($"׳™׳•׳×׳¨ ׳׳“׳™ ׳ ׳™׳¡׳™׳•׳ ׳•׳× ׳›׳ ׳™׳¡׳”. ׳ ׳¡׳” ׳©׳•׳‘ ׳‘׳¢׳•׳“ {(int)remaining.TotalMinutes + 1} ׳“׳§׳•׳×.");
         }
 
         var email = PhoneToEmail(phone);
@@ -120,17 +144,17 @@ public class AuthService : BaseService, IAuthService
 
         // Blocked user check
         if (userData.TryGetProperty("blocked", out var blocked) && blocked.GetBoolean())
-            return Error("החשבון שלך נחסם. פנה למנהל המערכת.");
+            return Error("׳”׳—׳©׳‘׳•׳ ׳©׳׳ ׳ ׳—׳¡׳. ׳₪׳ ׳” ׳׳׳ ׳”׳ ׳”׳׳¢׳¨׳›׳×.");
 
         // Single-session enforcement
         if (IsLoggedInOnAnotherComputer(userData))
-            return Error("המשתמש כבר מחובר במחשב אחר. יש להתנתק שם קודם.");
+            return Error("׳”׳׳©׳×׳׳© ׳›׳‘׳¨ ׳׳—׳•׳‘׳¨ ׳‘׳׳—׳©׳‘ ׳׳—׳¨. ׳™׳© ׳׳”׳×׳ ׳×׳§ ׳©׳ ׳§׳•׳“׳.");
 
         CurrentUser = ParseUserData(userData, uid);
         await RecoverOrphanedSessionAsync(uid, userData);
         await HandleComputerRegistrationAsync(uid);
 
-        // Store tokens locally ג€” persist the REAL refresh token for auto-login
+        // Store tokens locally ׳’ג‚¬ג€ persist the REAL refresh token for auto-login
         _localDb.Set("refresh_token", Firebase.RefreshToken ?? "");
         _localDb.Set("user_id", uid);
         _localDb.Set("phone", phone);
@@ -223,7 +247,7 @@ public class AuthService : BaseService, IAuthService
     {
         var result = await Firebase.ChangePasswordAsync(ToFirebasePassword(newPassword));
         if (!result.Success)
-            return Error(result.Error ?? "׳©׳’׳™׳׳” ׳‘׳©׳™׳ ׳•׳™ ׳”׳¡׳™׳¡׳׳”");
+            return Error(result.Error ?? "׳³ֲ©׳³ג€™׳³ג„¢׳³ֲ׳³ג€ ׳³ג€˜׳³ֲ©׳³ג„¢׳³ֲ ׳³ג€¢׳³ג„¢ ׳³ג€׳³ֲ¡׳³ג„¢׳³ֲ¡׳³ֲ׳³ג€");
         if (!string.IsNullOrEmpty(Firebase.RefreshToken))
             _localDb.Set("refresh_token", Firebase.RefreshToken);
         return Success();
@@ -302,7 +326,7 @@ public class AuthService : BaseService, IAuthService
             if (!computerResult.IsSuccess)
                 Logger.Warning("Computer registration failed (non-fatal): {Id}", computerId);
 
-            // Always attempt user association ג€” sets isLoggedIn and computer link
+            // Always attempt user association ׳’ג‚¬ג€ sets isLoggedIn and computer link
             var assocResult = await _computerService.AssociateUserWithComputerAsync(userId, computerId, isLogin: true);
 
             if (assocResult.IsSuccess && CurrentUser != null)
