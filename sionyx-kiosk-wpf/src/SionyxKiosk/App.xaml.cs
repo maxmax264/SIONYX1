@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -30,6 +31,16 @@ public partial class App : Application
     private bool _hasFrozenSession = false; // true when admin exits while client is logged in
     private Views.Windows.MainWindow? _frozenMainWindow; // the actual minimized window instance, so restore reuses it instead of creating a new one
     private Views.Windows.MainWindow? _prewarmedMainWindow; // built ahead of time while AuthWindow is showing, so the login-time transition is just Show() with no DI/construction work on the critical path
+
+    // Power-saving: keeps the kiosk machine from going to sleep / turning off the display
+    // for as long as this process is alive. Does not touch any global power policy/registry -
+    // reverts to normal OS behavior automatically the moment the app exits or crashes.
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern uint SetThreadExecutionState(uint esFlags);
+
+    private const uint ES_CONTINUOUS = 0x80000000;
+    private const uint ES_SYSTEM_REQUIRED = 0x00000001;
+    private const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -86,6 +97,10 @@ public partial class App : Application
             .CreateLogger();
 
         Log.Information("SIONYX Kiosk WPF starting, version {Version}", GetVersion());
+
+        // Prevent sleep/display-off while the kiosk app is running (public-facing kiosk).
+        try { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED); }
+        catch (Exception ex) { Log.Warning(ex, "[Startup] SetThreadExecutionState failed"); }
 
         // ================================================================
         // Global exception handlers
