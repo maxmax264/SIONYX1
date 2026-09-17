@@ -23,6 +23,14 @@ public sealed class SseListener
     private int _reconnectDelay = 1;
     private const int MaxReconnectDelay = 60;
 
+    // Fixed, quiet retry pace while there is no signed-in session at all
+    // (e.g. an idle kiosk waiting for a customer). This is a normal,
+    // expected state - not a failure - so it deliberately does NOT use the
+    // Error-level exponential-backoff path below, which ships to the
+    // dashboard (see ChannelLogSink / LogShipMinLevel, default Warning+).
+    private const int IdleRetrySeconds = 30;
+    private bool _idleLogged;
+
     public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
 
     /// <summary>
@@ -90,6 +98,35 @@ public sealed class SseListener
     {
         while (!ct.IsCancellationRequested)
         {
+            // No signed-in session yet - normal for an idle kiosk, not a
+            // failure. Skip the connection attempt entirely (no exception,
+            // no Error log, nothing shipped to the dashboard) and just wait
+            // at a calm fixed pace. Log the state transition once, at
+            // Debug, purely for local troubleshooting - not every retry.
+            if (!_firebase.IsAuthenticated)
+            {
+                if (!_idleLogged)
+                {
+                    Logger.Debug("SSE listener for {Path} idle: no signed-in session yet", _path);
+                    _idleLogged = true;
+                }
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(IdleRetrySeconds), ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                continue;
+            }
+
+            if (_idleLogged)
+            {
+                Logger.Debug("SSE listener for {Path} resuming: session now available", _path);
+                _idleLogged = false;
+            }
+
             try
             {
                 await ConnectAndStreamAsync(ct);
@@ -102,6 +139,9 @@ public sealed class SseListener
             {
                 if (ct.IsCancellationRequested) break;
 
+                // A real failure: we DID have a session, but connecting (or
+                // its token refresh) failed anyway. Keep this at Error so it
+                // still ships to the dashboard - this is genuine signal.
                 Logger.Error(ex, "SSE connection error for {Path}", _path);
                 _errorCallback?.Invoke(ex.Message);
 

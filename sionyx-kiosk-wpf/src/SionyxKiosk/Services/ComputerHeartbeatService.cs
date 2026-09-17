@@ -10,6 +10,16 @@ public class ComputerHeartbeatService
     private const int IntervalSeconds = 60;
     private const int SignInRetrySeconds = 30;
 
+    // Explicit "still alive" confirmation shipped straight to the dashboard
+    // log stream once an hour, on top of the heartbeatAt/"last seen" field
+    // the dashboard already shows. This is intentionally separate from
+    // Logger.Information/Warning/Error: it goes through ChannelLogSink's
+    // SendRaw (bypasses the Serilog level filter entirely - see
+    // App.xaml.cs's LogShipMinLevel, default Warning+) so it always ships,
+    // without having to fake a Warning severity for a healthy status line.
+    private const int AliveLogEveryNBeats = 60; // ~1 hour at IntervalSeconds=60
+    private int _beatsSinceAliveLog;
+
     private readonly FirebaseClient _deviceFirebase;
     private readonly string _computerId;
     private System.Timers.Timer? _timer;
@@ -172,7 +182,18 @@ public class ComputerHeartbeatService
                     ["inputInjectorRunning"] = inputInjectorRunning,
                 });
             if (!result.Success)
+            {
                 Logger.Warning("Heartbeat write failed: {Error}", result.Error);
+                // Don't count a failed beat toward the "alive" confirmation -
+                // if we're actually unhealthy right now, stay quiet instead
+                // of claiming otherwise once the counter rolls over.
+                _beatsSinceAliveLog = 0;
+            }
+            else if (++_beatsSinceAliveLog >= AliveLogEveryNBeats)
+            {
+                _beatsSinceAliveLog = 0;
+                ChannelLogSink.Current?.SendRaw("המחשב פעיל ותקין (בדיקה תקופתית)");
+            }
 
             await SyncComputerNameAsync();
         }
