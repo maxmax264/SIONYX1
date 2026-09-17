@@ -6,10 +6,19 @@
     "supervisors": {
       ".read": "auth != null",
       "$uid": {
-        ".read": "auth.uid === $uid",
+        ".read": "auth.uid === $uid || root.child('owners').child(auth.uid).exists()",
         ".write": false,
-        "displayName": { ".read": "auth != null", ".write": "auth.uid === $uid" },
-        "organizations": { "$orgId": { ".read": "auth.uid === $uid" } },
+        "displayName": {
+          ".read": "auth != null",
+          ".write": "auth.uid === $uid || root.child('owners').child(auth.uid).exists()"
+        },
+        "organizations": {
+          ".write": "root.child('owners').child(auth.uid).exists()",
+          "$orgId": {
+            ".read": "auth.uid === $uid || root.child('owners').child(auth.uid).exists()",
+            ".write": "root.child('owners').child(auth.uid).exists() || root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'"
+          }
+        },
         "blockedUsers": {
           ".read": "auth.uid === $uid",
           ".write": "auth.uid === $uid",
@@ -119,10 +128,12 @@
             "autoLogonConfigured": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
             "autoLogonUser": { ".write": "auth != null", ".validate": "newData.isString()" },
             "tightVncInstalled": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
+            "inputInjectorRunning": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
             "computerName": {
               ".write": "auth != null && (!data.exists() || root.child('organizations').child($orgId).child('users').child(auth.uid).exists())",
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
-            }, "remoteControl": {
+            },
+            "remoteControl": {
               ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists() || root.child('owners').child(auth.uid).exists())",
               "rustdesk": {
                 "setPassword": {
@@ -221,7 +232,10 @@
         }
       }
     },
-    "systemSettings": { ".read": "auth != null", ".write": "auth != null" },
+    "systemSettings": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('owners').child(auth.uid).exists()"
+    },
     "owners": { ".read": "auth != null", ".write": false },
     "sessionLogs": {
       "$userId": {
