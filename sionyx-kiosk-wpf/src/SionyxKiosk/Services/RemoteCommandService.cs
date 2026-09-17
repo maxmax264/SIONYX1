@@ -13,14 +13,30 @@ namespace SionyxKiosk.Services;
 /// "computers/{id}/powerCommand/lastResult", then clears "requested" so
 /// the same command isn't re-applied on the next SSE reconnect (Firebase
 /// replays existing data as an initial "put" when a listener (re)starts).
+///
+/// Uses its OWN anonymous Firebase identity (like ComputerHeartbeatService
+/// and VncRelayService), not the shared app-wide FirebaseClient. That
+/// shared client only ever holds a token while an actual customer is
+/// logged in on the kiosk - this listener needs to work at any time
+/// (including the idle login screen), so it can't depend on that. Bug
+/// found in the field: this used to take the shared FirebaseClient, so a
+/// restart/shutdown issued from the dashboard while the kiosk was idle was
+/// silently dropped - it only actually executed once a customer happened
+/// to log in afterwards (at which point Firebase replayed the still-
+/// pending "requested" node the moment the listener could finally
+/// connect), making it look like the reboot came out of nowhere right
+/// after login.
 /// </summary>
 public class RemoteCommandService
 {
     private static readonly ILogger Logger = Log.ForContext<RemoteCommandService>();
+    private const int SignInRetrySeconds = 30;
 
     private readonly FirebaseClient _firebase;
     private string? _computerId;
     private SseListener? _listener;
+    private bool _starting;
+    private bool _signedIn;
 
     // Guards against acting twice on the same command - e.g. the SSE
     // stream reconnecting and Firebase replaying the still-present
@@ -28,15 +44,44 @@ public class RemoteCommandService
     // round-trips.
     private long _lastHandledRequestedAt;
 
-    public RemoteCommandService(FirebaseClient firebase)
+    public RemoteCommandService(FirebaseConfig config)
     {
-        _firebase = firebase;
+        _firebase = new FirebaseClient(config);
     }
 
-    /// <summary>Call once at startup, after the kiosk is authenticated.</summary>
+    /// <summary>Call once at startup - does not need the kiosk to be
+    /// authenticated (see class remarks: this keeps its own anonymous
+    /// identity so it works at the idle login screen too).</summary>
     public void Start()
     {
+        if (_starting || _signedIn) return;
         _computerId = DeviceInfo.GetDeviceId();
+
+        _ = Task.Run(async () =>
+        {
+            _starting = true;
+            try { await EnsureSignedInAndListeningAsync(); }
+            finally { _starting = false; }
+        });
+    }
+
+    private async Task EnsureSignedInAndListeningAsync()
+    {
+        var signIn = await _firebase.SignInAnonymouslyAsync();
+        if (!signIn.Success)
+        {
+            Logger.Warning("RemoteCommand anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, SignInRetrySeconds);
+            var retryTimer = new System.Timers.Timer(SignInRetrySeconds * 1000) { AutoReset = false };
+            retryTimer.Elapsed += async (_, _) =>
+            {
+                retryTimer.Dispose();
+                await EnsureSignedInAndListeningAsync();
+            };
+            retryTimer.Start();
+            return;
+        }
+
+        _signedIn = true;
         _listener = _firebase.DbListen(
             $"computers/{_computerId}/powerCommand/requested",
             OnCommandRequested);
