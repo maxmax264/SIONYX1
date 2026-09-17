@@ -98,8 +98,8 @@ public partial class App : Application
 
         Log.Information("SIONYX Kiosk WPF starting, version {Version}", GetVersion());
 
-        // Prevent sleep/display-off while the kiosk app is running (public-facing kiosk).
-        try { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED); }
+        // Prevent system sleep while the kiosk app is running - screen is still allowed to turn off (power saving).
+        try { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED); }
         catch (Exception ex) { Log.Warning(ex, "[Startup] SetThreadExecutionState failed"); }
 
         // ================================================================
