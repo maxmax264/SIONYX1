@@ -1,4 +1,4 @@
-﻿ן»¿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Row, Col, List, Card, Tag, Button, Empty, Spin, App, Popconfirm, Typography, Space, Input } from "antd";
 import { ReloadOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, CopyOutlined } from "@ant-design/icons";
 import { getLogComputers, getComputerLogs, deleteComputerLogs, deleteAllLogs } from "../services/ownerLogService";
