@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.16.9] - 2026-09-17
+
+### Bug Fixes
+- RemoteCommandService now uses its own anonymous Firebase identity so restart/shutdown commands work even when no customer session is active (216baddd)
+
+
 ## [3.16.8] - 2026-09-17
 
 ### Bug Fixes
