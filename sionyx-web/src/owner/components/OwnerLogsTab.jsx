@@ -1,6 +1,6 @@
-﻿import { useEffect, useState } from "react";
+﻿ן»¿import { useEffect, useState } from "react";
 import { Row, Col, List, Card, Tag, Button, Empty, Spin, App, Popconfirm, Typography, Space, Input } from "antd";
-import { ReloadOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined } from "@ant-design/icons";
+import { ReloadOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, CopyOutlined } from "@ant-design/icons";
 import { getLogComputers, getComputerLogs, deleteComputerLogs, deleteAllLogs } from "../services/ownerLogService";
 import dayjs from "dayjs";
 
@@ -16,7 +16,7 @@ const LEVEL_COLORS = {
 };
 
 /**
- * Owner-only "לוגים" tab: pc-sion.web.app/owner is the ONLY place these are
+ * Owner-only "׳׳•׳’׳™׳" tab: pc-sion.web.app/owner is the ONLY place these are
  * readable from - kiosks ship straight to the Understood bridge's Redis-
  * backed /logs endpoints (capped ring buffer + TTL per computer, so this
  * can never fill up storage the way the old entertainment-channel dump
@@ -36,7 +36,7 @@ const OwnerLogsTab = () => {
     setLoadingList(true);
     const result = await getLogComputers();
     if (result.success) setComputers(result.computers || []);
-    else message.error(result.error || "שגיאה בטעינת רשימת המחשבים");
+    else message.error(result.error || "׳©׳’׳™׳׳” ׳‘׳˜׳¢׳™׳ ׳× ׳¨׳©׳™׳׳× ׳”׳׳—׳©׳‘׳™׳");
     setLoadingList(false);
   };
 
@@ -47,36 +47,53 @@ const OwnerLogsTab = () => {
     setLoadingDetail(true);
     const result = await getComputerLogs(id);
     if (result.success) setDetail(result);
-    else { message.error(result.error || "שגיאה בטעינת הלוגים"); setDetail(null); }
+    else { message.error(result.error || "׳©׳’׳™׳׳” ׳‘׳˜׳¢׳™׳ ׳× ׳”׳׳•׳’׳™׳"); setDetail(null); }
     setLoadingDetail(false);
   };
 
   const handleDeleteOne = async (id) => {
     const result = await deleteComputerLogs(id);
     if (result.success) {
-      message.success("הלוגים נמחקו");
+      message.success("׳”׳׳•׳’׳™׳ ׳ ׳׳—׳§׳•");
       if (selectedId === id) { setSelectedId(null); setDetail(null); }
       loadComputers();
     } else {
-      message.error(result.error || "מחיקה נכשלה");
+      message.error(result.error || "׳׳—׳™׳§׳” ׳ ׳›׳©׳׳”");
     }
   };
 
   const handleDeleteAll = async () => {
     const result = await deleteAllLogs();
     if (result.success) {
-      message.success(`נמחקו לוגים של ${result.deleted ?? 0} מחשבים`);
+      message.success(`׳ ׳׳—׳§׳• ׳׳•׳’׳™׳ ׳©׳ ${result.deleted ?? 0} ׳׳—׳©׳‘׳™׳`);
       setSelectedId(null);
       setDetail(null);
       loadComputers();
     } else {
-      message.error(result.error || "מחיקה נכשלה");
+      message.error(result.error || "׳׳—׳™׳§׳” ׳ ׳›׳©׳׳”");
     }
   };
 
   const filteredComputers = computers.filter((c) =>
     !search || (c.name || c.id).toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleCopyLog = async () => {
+    const lines = detail?.lines || [];
+    if (!lines.length) return;
+    const text = lines
+      .map((line) => {
+        const ts = line.timestamp ? dayjs(line.timestamp).format("DD/MM HH:mm:ss") : "";
+        return `[${line.level || "-"}] ${ts} ${line.message || ""}`;
+      })
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success("׳”׳׳•׳’ ׳”׳•׳¢׳×׳§");
+    } catch {
+      message.error("׳”׳”׳¢׳×׳§׳” ׳ ׳›׳©׳׳”");
+    }
+  };
 
   const statusEntries = detail ? Object.entries(detail.status || {}) : [];
 
@@ -85,13 +102,13 @@ const OwnerLogsTab = () => {
       <Col span={8}>
         <Card
           size="small"
-          title={`מחשבים (${computers.length})`}
+          title={`׳׳—׳©׳‘׳™׳ (${computers.length})`}
           extra={<Button size="small" icon={<ReloadOutlined />} onClick={loadComputers} />}
           styles={{ body: { padding: 0 } }}
         >
           <div style={{ padding: "8px 12px" }}>
             <Input
-              placeholder="חיפוש מחשב"
+              placeholder="׳—׳™׳₪׳•׳© ׳׳—׳©׳‘"
               prefix={<SearchOutlined />}
               size="small"
               value={search}
@@ -102,7 +119,7 @@ const OwnerLogsTab = () => {
           {loadingList ? (
             <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
           ) : computers.length === 0 ? (
-            <Empty description="אין עדיין לוגים משום מחשב" style={{ padding: 24 }} />
+            <Empty description="׳׳™׳ ׳¢׳“׳™׳™׳ ׳׳•׳’׳™׳ ׳׳©׳•׳ ׳׳—׳©׳‘" style={{ padding: 24 }} />
           ) : (
             <List
               size="small"
@@ -119,7 +136,7 @@ const OwnerLogsTab = () => {
                   actions={[
                     <Popconfirm
                       key="del"
-                      title="למחוק את הלוגים של המחשב הזה?"
+                      title="׳׳׳—׳•׳§ ׳׳× ׳”׳׳•׳’׳™׳ ׳©׳ ׳”׳׳—׳©׳‘ ׳”׳–׳”?"
                       onConfirm={(e) => { e?.stopPropagation?.(); handleDeleteOne(c.id); }}
                       onCancel={(e) => e?.stopPropagation?.()}
                     >
@@ -134,25 +151,25 @@ const OwnerLogsTab = () => {
           )}
           <div style={{ padding: 12, borderTop: "1px solid #f0f0f0" }}>
             <Popconfirm
-              title="למחוק את הלוגים של כל המחשבים?"
-              description="פעולה זו בלתי הפיכה"
+              title="׳׳׳—׳•׳§ ׳׳× ׳”׳׳•׳’׳™׳ ׳©׳ ׳›׳ ׳”׳׳—׳©׳‘׳™׳?"
+              description="׳₪׳¢׳•׳׳” ׳–׳• ׳‘׳׳×׳™ ׳”׳₪׳™׳›׳”"
               onConfirm={handleDeleteAll}
               okButtonProps={{ danger: true }}
             >
-              <Button danger block icon={<DeleteOutlined />}>מחק את כל הלוגים</Button>
+              <Button danger block icon={<DeleteOutlined />}>׳׳—׳§ ׳׳× ׳›׳ ׳”׳׳•׳’׳™׳</Button>
             </Popconfirm>
           </div>
         </Card>
       </Col>
       <Col span={16}>
         {!selectedId ? (
-          <Card size="small"><Empty description="בחר מחשב כדי לראות את הלוגים שלו" /></Card>
+          <Card size="small"><Empty description="׳‘׳—׳¨ ׳׳—׳©׳‘ ׳›׳“׳™ ׳׳¨׳׳•׳× ׳׳× ׳”׳׳•׳’׳™׳ ׳©׳׳•" /></Card>
         ) : loadingDetail ? (
           <Card size="small"><div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div></Card>
         ) : (
           <>
             {statusEntries.length > 0 && (
-              <Card size="small" title="סטטוס התקנות" style={{ marginBottom: 12 }}>
+              <Card size="small" title="׳¡׳˜׳˜׳•׳¡ ׳”׳×׳§׳ ׳•׳×" style={{ marginBottom: 12 }}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   {statusEntries.map(([feature, s]) => (
                     <div key={feature} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -161,7 +178,7 @@ const OwnerLogsTab = () => {
                         <Text strong>{feature}</Text>
                         {s.message && <Text type="secondary" style={{ fontSize: 12 }}>{s.message}</Text>}
                       </Space>
-                      <Tag color={s.success ? "green" : "red"}>{s.success ? "הצליח" : "נכשל"}</Tag>
+                      <Tag color={s.success ? "green" : "red"}>{s.success ? "׳”׳¦׳׳™׳—" : "׳ ׳›׳©׳"}</Tag>
                     </div>
                   ))}
                 </Space>
@@ -169,11 +186,23 @@ const OwnerLogsTab = () => {
             )}
             <Card
               size="small"
-              title={`לוג גולמי (${detail?.lines?.length || 0} שורות אחרונות)`}
-              extra={<Button size="small" icon={<ReloadOutlined />} onClick={() => openComputer(selectedId)} />}
+              title={`׳׳•׳’ ׳’׳•׳׳׳™ (${detail?.lines?.length || 0} ׳©׳•׳¨׳•׳× ׳׳—׳¨׳•׳ ׳•׳×)`}
+              extra={
+                <Space size="small">
+                  <Button
+                    size="small"
+                    icon={<CopyOutlined />}
+                    onClick={handleCopyLog}
+                    disabled={!detail?.lines?.length}
+                  >
+                    ׳”׳¢׳×׳§
+                  </Button>
+                  <Button size="small" icon={<ReloadOutlined />} onClick={() => openComputer(selectedId)} />
+                </Space>
+              }
             >
               {!detail?.lines?.length ? (
-                <Empty description="אין שורות לוג" />
+                <Empty description="׳׳™׳ ׳©׳•׳¨׳•׳× ׳׳•׳’" />
               ) : (
                 <div style={{ maxHeight: 480, overflowY: "auto", direction: "ltr", fontFamily: "monospace", fontSize: 12 }}>
                   {detail.lines.map((line, i) => (
