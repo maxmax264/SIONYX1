@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [3.16.8] - 2026-09-17
+
+### Bug Fixes
+- repair broken Hebrew encoding in ComputersPage + enforce UTF-8 (07c1045b)
+
+### Other
+- enforce UTF-8 encoding in .gitattributes (06256e64)
+
+
 ## [3.14.32] - 2026-09-17
 
 
