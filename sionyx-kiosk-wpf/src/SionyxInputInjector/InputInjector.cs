@@ -216,26 +216,27 @@ internal sealed class InputInjector
     /// even if this service itself restarts or the machine loses power and
     /// comes back before 4 AM.
     /// </summary>
+    /// <summary>
+    /// Simplified 2026-09-15: used to schedule this for the next 4:00 AM to
+    /// avoid any chance of interrupting a live customer. That added a
+    /// confusing overnight delay for something that only ever happens once
+    /// per machine (the very first time this policy needs to change) - so
+    /// instead this now just restarts immediately, with a short (2 minute)
+    /// warning delay via shutdown.exe's own /t flag. One brief restart
+    /// during a one-time software rollout is a normal, acceptable cost -
+    /// simpler to reason about than "the fix is scheduled for some night
+    /// this week."
+    /// </summary>
     public void ScheduleRebootIfPolicyChanged(bool sasPolicyChanged, bool uacPolicyChanged)
     {
         if (!sasPolicyChanged && !uacPolicyChanged) return;
 
         try
         {
-            var now = DateTime.Now;
-            var targetTime = now.Date.AddHours(4);
-            if (now >= targetTime) targetTime = targetTime.AddDays(1); // already past 4 AM today - use tomorrow
-            var dateArg = targetTime.ToString("MM/dd/yyyy");
-            var timeArg = targetTime.ToString("HH:mm");
-
             var psi = new ProcessStartInfo
             {
-                FileName = "schtasks.exe",
-                // /f overwrites a same-named task if one already exists,
-                // so re-running this (e.g. both policies changing on the
-                // same first run) never creates duplicate reboots.
-                Arguments = "/create /tn \"SIONYX_PolicyReboot\" /tr \"shutdown.exe /r /t 60 /c \\\"SIONYX: restarting to apply a one-time security-policy update\\\"\" " +
-                            $"/sc once /sd {dateArg} /st {timeArg} /ru SYSTEM /rl HIGHEST /f",
+                FileName = "shutdown.exe",
+                Arguments = "/r /t 120 /c \"SIONYX: restarting once to apply a security-policy update (Ctrl+Alt+Del / UAC visibility)\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
@@ -245,12 +246,12 @@ internal sealed class InputInjector
             process?.WaitForExit(10_000);
             if (process?.ExitCode == 0)
             {
-                _log.LogInformation("Scheduled a one-time restart for {Target} to apply the SoftwareSASGeneration/PromptOnSecureDesktop policy change - this should only ever happen once per machine", targetTime);
+                _log.LogInformation("Restarting in 2 minutes to apply the SoftwareSASGeneration/PromptOnSecureDesktop policy change - this should only ever happen once per machine");
             }
             else
             {
                 var stderr = process?.StandardError.ReadToEnd();
-                _log.LogError("schtasks.exe failed to schedule the policy-change restart (exit {Code}): {Error}", process?.ExitCode, stderr);
+                _log.LogError("shutdown.exe failed to schedule the policy-change restart (exit {Code}): {Error}", process?.ExitCode, stderr);
             }
         }
         catch (Exception ex)

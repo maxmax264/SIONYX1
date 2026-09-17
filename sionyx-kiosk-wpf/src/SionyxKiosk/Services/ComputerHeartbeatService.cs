@@ -133,6 +133,31 @@ public class ComputerHeartbeatService
             ChannelLogSink.Current?.ReportStatus("tightvnc", tightVncInstalled,
                 tightVncInstalled ? null : "tvnserver.exe missing - install-tightvnc.ps1 download likely failed");
 
+            // SionyxInputInjector: the SYSTEM service behind Ctrl+Alt+Del,
+            // elevated-click, and the AeroAdmin-approval workaround. Checked
+            // the same way as tightVncInstalled above - if the MSI's
+            // CustomAction ever silently skips installing it (e.g. the
+            // publish step failed at build time, see build.ps1's
+            // Invoke-PublishInputInjector), this makes that visible on the
+            // dashboard instead of only discovered by a dead Ctrl+Alt+Del
+            // button with no error anywhere.
+            bool inputInjectorRunning;
+            try
+            {
+                using var sc = new System.ServiceProcess.ServiceController("SionyxInputInjector");
+                inputInjectorRunning = sc.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+            }
+            catch
+            {
+                inputInjectorRunning = false; // service doesn't exist at all
+            }
+            if (!inputInjectorRunning)
+            {
+                Logger.Warning("SionyxInputInjector service is NOT running on this kiosk - Ctrl+Alt+Del and elevated-click via VNC will silently do nothing. Likely cause: the MSI's publish step for this project failed at build time, or the service crashed");
+            }
+            ChannelLogSink.Current?.ReportStatus("inputInjector", inputInjectorRunning,
+                inputInjectorRunning ? null : "SionyxInputInjector service missing or not running");
+
             var result = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}",
                 new Dictionary<string, object>
                 {
@@ -144,6 +169,7 @@ public class ComputerHeartbeatService
                     ["autoLogonConfigured"] = autoLogonConfigured,
                     ["autoLogonUser"] = autoLogonUser ?? "",
                     ["tightVncInstalled"] = tightVncInstalled,
+                    ["inputInjectorRunning"] = inputInjectorRunning,
                 });
             if (!result.Success)
                 Logger.Warning("Heartbeat write failed: {Error}", result.Error);
