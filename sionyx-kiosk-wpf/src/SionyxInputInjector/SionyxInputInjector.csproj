@@ -21,6 +21,15 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+    <!-- Required for NamedPipeServerStreamAcl/PipeSecurity/PipeAccessRule in
+         PipeServerWorker.cs. On every TFM from net5.0 through net10.0 these
+         types live in a separate assembly that is NOT part of the shared
+         framework - only from net11.0 onward is it built in. Without this
+         reference the project fails to compile (CS0246), which is exactly
+         what was silently happening on every build - see PipeServerWorker.cs
+         and build.ps1's Invoke-PublishInputInjector for why that failure was
+         never visible. -->
+    <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
   </ItemGroup>
 
 </Project>
