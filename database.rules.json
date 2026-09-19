@@ -7,7 +7,7 @@
       ".read": "auth != null",
       "$uid": {
         ".read": "auth.uid === $uid || root.child('owners').child(auth.uid).exists()",
-        ".write": false,
+        ".write": "root.child('owners').child(auth.uid).exists()",
         "displayName": {
           ".read": "auth != null",
           ".write": "auth.uid === $uid || root.child('owners').child(auth.uid).exists()"
@@ -30,6 +30,7 @@
       ".read": "auth != null",
       ".write": false,
       "$orgId": {
+        ".write": "root.child('owners').child(auth.uid).exists()",
         "users": {
           ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin' || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
           ".indexOn": ["isActive", "createdAt", "lastSeen"],
