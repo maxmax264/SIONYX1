@@ -260,15 +260,57 @@ internal sealed class InputInjector
         }
     }
 
-    /// <summary>Sends a real Secure Attention Sequence (Ctrl+Alt+Del).</summary>
-    public void SendCtrlAltDel()
+    /// <summary>
+    /// Read-only check of the same registry value EnsureSoftwareSasPolicy
+    /// sets - lets a caller ask "will SendSAS actually do anything right
+    /// now?" without side effects. Used by SendCtrlAltDel to report a real
+    /// answer back to the caller instead of the previous "call was made,
+    /// no idea if it worked" silence.
+    /// </summary>
+    private bool IsSoftwareSasPolicySet()
+    {
+        const string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+        const string valueName = "SoftwareSASGeneration";
+        const int servicesBit = 1;
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(keyPath);
+            var current = key?.GetValue(valueName);
+            int currentValue = current is int i ? i : 0;
+            return (currentValue & servicesBit) == servicesBit;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Sends a real Secure Attention Sequence (Ctrl+Alt+Del). Returns
+    /// whether the policy that makes SendSAS actually do anything is
+    /// currently in place - SendSAS itself is a void Win32 call with no
+    /// success/failure signal, so this registry check is the only real
+    /// answer available, and it's the one that actually matters (a
+    /// pending-reboot machine will report false here even though the call
+    /// "succeeds" every time).
+    /// </summary>
+    public bool SendCtrlAltDel()
     {
         // AsUser=false: request it for the whole session, not just this
         // (Session-0, non-interactive) process's own desktop - matches how
         // every reference implementation found in field research calls it
         // for a remote-support scenario.
         NativeMethods.SendSAS(false);
-        _log.LogInformation("SendSAS called (Ctrl+Alt+Del) - if the policy wasn't set correctly this does nothing with no error, see EnsureSoftwareSasPolicy");
+        var policySet = IsSoftwareSasPolicySet();
+        if (policySet)
+        {
+            _log.LogInformation("SendSAS called (Ctrl+Alt+Del) - SoftwareSASGeneration policy is set, this should have worked");
+        }
+        else
+        {
+            _log.LogWarning("SendSAS called (Ctrl+Alt+Del) but SoftwareSASGeneration policy is NOT set - this did nothing. Likely cause: the pending reboot after this service's first-ever run on this machine hasn't happened yet");
+        }
+        return policySet;
     }
 
     /// <summary>
