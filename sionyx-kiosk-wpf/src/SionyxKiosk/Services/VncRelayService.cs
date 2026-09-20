@@ -506,7 +506,12 @@ public class VncRelayService
     {
         try
         {
-            using var pipe = new NamedPipeClientStream(".", "SionyxInputInjector", PipeDirection.Out, PipeOptions.Asynchronous);
+            // InOut (not Out): SionyxInputInjector now writes a one-line
+            // JSON result back per command (see PipeServerWorker), which is
+            // what lets this log the REAL outcome instead of just "a line
+            // was sent" - see SendCtrlAltDel's own comment for why that
+            // distinction matters most for exactly this command.
+            using var pipe = new NamedPipeClientStream(".", "SionyxInputInjector", PipeDirection.InOut, PipeOptions.Asynchronous);
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             connectCts.CancelAfter(TimeSpan.FromSeconds(2));
             await pipe.ConnectAsync(connectCts.Token);
@@ -515,12 +520,33 @@ public class VncRelayService
             await pipe.WriteAsync(bytes, ct);
             await pipe.FlushAsync(ct);
 
-            // Confirms the command actually reached SionyxInputInjector -
-            // without this, a successful send and a silently-dropped one
-            // look identical in the logs (nothing). This is what lets you
-            // confirm "I pressed Ctrl+Alt+Del and it was delivered" instead
-            // of only ever seeing failures.
-            Logger.Information("Sent to SionyxInputInjector pipe: {Command}", jsonLine.TrimEnd('\n'));
+            using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            responseCts.CancelAfter(TimeSpan.FromSeconds(2));
+            using var reader = new StreamReader(pipe, Encoding.UTF8, leaveOpen: true);
+            var responseLine = await reader.ReadLineAsync(responseCts.Token);
+            if (responseLine != null)
+            {
+                using var doc = JsonDocument.Parse(responseLine);
+                var root = doc.RootElement;
+                var type = root.TryGetProperty("type", out var t) ? t.GetString() : "unknown";
+                var ok = root.TryGetProperty("ok", out var okEl) && okEl.GetBoolean();
+                if (ok)
+                {
+                    Logger.Information("SionyxInputInjector confirmed {Type} succeeded", type);
+                }
+                else
+                {
+                    Logger.Warning("SionyxInputInjector reported {Type} did NOT succeed - see its own logs (Windows Event Log, source SionyxInputInjector) on this kiosk for why", type);
+                }
+            }
+            else
+            {
+                // Older SionyxInputInjector build (pre-response-protocol) or
+                // it closed the pipe before replying - fall back to the old
+                // delivery-only confirmation rather than treating this as a
+                // failure.
+                Logger.Information("Sent to SionyxInputInjector pipe (no result line received): {Command}", jsonLine.TrimEnd('\n'));
+            }
         }
         catch (Exception ex)
         {
