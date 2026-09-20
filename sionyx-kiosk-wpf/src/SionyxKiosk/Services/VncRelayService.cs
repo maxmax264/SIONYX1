@@ -514,6 +514,13 @@ public class VncRelayService
             var bytes = Encoding.UTF8.GetBytes(jsonLine.TrimEnd('\n') + "\n");
             await pipe.WriteAsync(bytes, ct);
             await pipe.FlushAsync(ct);
+
+            // Confirms the command actually reached SionyxInputInjector -
+            // without this, a successful send and a silently-dropped one
+            // look identical in the logs (nothing). This is what lets you
+            // confirm "I pressed Ctrl+Alt+Del and it was delivered" instead
+            // of only ever seeing failures.
+            Logger.Information("Sent to SionyxInputInjector pipe: {Command}", jsonLine.TrimEnd('\n'));
         }
         catch (Exception ex)
         {
