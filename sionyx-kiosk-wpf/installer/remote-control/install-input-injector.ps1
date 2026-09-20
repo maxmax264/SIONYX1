@@ -69,7 +69,14 @@ if ($existingService) {
     Write-Host "[SIONYX] Creating $ServiceName service (LocalSystem, auto-start)."
     # sc.exe (not New-Service) so we control the exact binPath quoting -
     # New-Service mangles paths with spaces in some PowerShell versions.
-    $scArgs = @('create', $ServiceName, "binPath=`"$ExePath`"", 'start=', 'auto', 'obj=', 'LocalSystem')
+    # IMPORTANT: sc.exe requires a literal space after every "option="
+    # before its value (binPath= "path", not binPath="path") or it fails
+    # with error 87 "The parameter is incorrect" - so binPath= and the
+    # quoted path MUST be two separate array elements here, exactly like
+    # start=/auto and obj=/LocalSystem below. A single merged element
+    # ("binPath=`"$ExePath`"") looks identical when echoed but silently
+    # fails every time - which is exactly what was happening here.
+    $scArgs = @('create', $ServiceName, 'binPath=', "`"$ExePath`"", 'start=', 'auto', 'obj=', 'LocalSystem')
     $result = & sc.exe @scArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[SIONYX] ERROR: sc.exe create failed: $result"
