@@ -117,13 +117,18 @@
               Source="$(var.SourceDir)\installer\remote-control\install-tightvnc.ps1"
               KeyPath="yes" />
       </Component>
-      <!-- SionyxInputInjector: SYSTEM-service click injector for dialogs
-           that ignore normal-privilege input (AeroAdmin's approval popup,
-           UAC/Secure-Desktop prompts). Wired into InstallExecuteSequence
-           below (2026-09-14) so it rides the same silent fleet-update
-           pipeline as everything else - see
-           src\SionyxInputInjector\README.md for what's still unverified
-           on real hardware. -->
+      <!-- SionyxInputInjector's service registration itself is now done
+           natively below (InputInjectorExe component's ServiceInstall/
+           ServiceControl) - this script is kept only as a manual-recovery
+           tool (see its own header), it is NOT invoked by the installer
+           anymore. It used to be wired in as CA_InstallInputInjector, but
+           that ran sc.exe by hand and had a spacing bug (fixed, then still
+           risky) plus Return="ignore" meant any future failure would again
+           be invisible. WiX's own ServiceInstall/ServiceControl map directly
+           onto the MSI ServiceInstall/ServiceControl tables, which Windows
+           Installer itself executes as standard actions (InstallServices/
+           StartServices/StopServices/DeleteServices) - no custom scripting,
+           no silently-ignored return code. -->
       <Component Id="InputInjectorInstallScript" Guid="*">
         <File Id="InstallInputInjectorPs1"
               Source="$(var.SourceDir)\installer\remote-control\install-input-injector.ps1"
@@ -136,24 +141,45 @@
          at build time. Separate ComponentGroup (own Directory) from
          RemoteControlFiles above because that group is anchored to
          RemoteControlDir itself, not the InputInjectorDir subfolder this
-         needs to land in - install-input-injector.ps1 expects the exe at
-         a "SionyxInputInjector" subfolder next to itself. PublishSingleFile
-         means this should just be the one exe; if a future change to the
-         csproj produces companion files, they need adding here too (see
-         PublishFiles.wxs for the same static-list pattern on the main app).
+         needs to land in. PublishSingleFile means this should just be the
+         one exe; if a future change to the csproj produces companion files,
+         they need adding here too (see PublishFiles.wxs for the same
+         static-list pattern on the main app).
 
          Wrapped in this conditional (build.ps1 passes HasInputInjector
          based on whether Invoke-PublishInputInjector actually produced the
          exe) because a WiX <File Source=...> pointing at a file that
          doesn't exist fails the ENTIRE MSI compile, not just this feature -
          this is what keeps a broken/skipped injector publish from taking
-         down the main kiosk app's build too. -->
+         down the main kiosk app's build too.
+
+         ServiceInstall/ServiceControl on this component register and
+         start/stop/remove the service as a native part of the MSI itself -
+         Windows Installer creates it as LocalSystem/auto-start on install,
+         restarts it in place on upgrade (same component, new file, same
+         service name), and removes it cleanly on uninstall. This replaced
+         the old CA_InstallInputInjector CustomAction (hand-rolled sc.exe
+         call) on 2026-09-19. -->
     <?if $(var.HasInputInjector) = "true" ?>
     <ComponentGroup Id="InputInjectorFiles" Directory="InputInjectorDir">
       <Component Id="InputInjectorExe" Guid="*">
         <File Id="SionyxInputInjectorExe"
               Source="$(var.SourceDir)\installer\remote-control\SionyxInputInjector\SionyxInputInjector.exe"
               KeyPath="yes" />
+        <ServiceInstall Id="SionyxInputInjectorServiceInstall"
+                         Name="SionyxInputInjector"
+                         DisplayName="SIONYX Input Injector"
+                         Description="SIONYX: injects mouse clicks and Ctrl+Alt+Del for the VNC-relay elevated-input feature."
+                         Type="ownProcess"
+                         Start="auto"
+                         ErrorControl="normal"
+                         Account="LocalSystem" />
+        <ServiceControl Id="SionyxInputInjectorServiceControl"
+                         Name="SionyxInputInjector"
+                         Start="install"
+                         Stop="both"
+                         Remove="uninstall"
+                         Wait="yes" />
       </Component>
     </ComponentGroup>
     <?endif?>
@@ -313,18 +339,9 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
-    <!-- SYSTEM-service click injector - see install-input-injector.ps1 and
-         src\SionyxInputInjector\README.md. Wired into
-         InstallExecuteSequence below (2026-09-14) so it deploys through
-         the same silent, no-UI fleet update pipeline as everything else -
-         still unverified on real hardware, Return="ignore" so a failure
-         here can't block the rest of a silent install/update. -->
-    <CustomAction Id="CA_InstallInputInjector"
-                  Directory="RemoteControlDir"
-                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-input-injector.ps1&quot;"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="ignore" />
+    <!-- SionyxInputInjector's service is now installed/started/stopped/removed
+         natively via ServiceInstall/ServiceControl on the InputInjectorExe
+         component above - no CustomAction needed for it anymore. -->
 
     <!-- INSTALL -->
     <SetProperty Id="CA_SetupAutoStart"     Before="CA_SetupAutoStart"     Sequence="execute" Value="INSTALLDIR=[INSTALLFOLDER]" />
@@ -362,14 +379,12 @@
       <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
       <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
       <Custom Action="CA_InstallTightVnc"    After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
-      <!-- 2026-09-14: now active - the fleet update pipeline (AutoUpdateService
-           + SIONYX_Update scheduled task, both already SYSTEM/silent/no-UI)
-           installs every MSI update the same way, so this rides along with
-           no extra manual step per kiosk. Still unverified on real hardware
-           per src\SionyxInputInjector\README.md - Return="ignore" above
-           means a failure here can't block the rest of a silent install. -->
-      <Custom Action="CA_InstallInputInjector" After="CA_InstallTightVnc" Condition="NOT REMOVE" />
-      <Custom Action="CA_SetupAutoStart"     After="CA_InstallInputInjector"   Condition="NOT REMOVE" />
+      <!-- CA_InstallInputInjector removed 2026-09-19 - SionyxInputInjector's
+           service is now installed via native ServiceInstall/ServiceControl
+           on the InputInjectorExe component, which Windows Installer runs
+           itself as part of its own standard InstallServices/StartServices
+           actions - no explicit sequencing entry needed for it here. -->
+      <Custom Action="CA_SetupAutoStart"     After="CA_InstallTightVnc"   Condition="NOT REMOVE" />
       <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
