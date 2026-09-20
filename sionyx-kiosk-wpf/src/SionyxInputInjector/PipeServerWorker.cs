@@ -122,42 +122,48 @@ internal sealed class PipeServerWorker : BackgroundService
             PipeAccessRights.FullControl,
             AccessControlType.Allow));
 
+        // InOut (not In): the server now writes a one-line JSON result back
+        // per command (see HandleClientAsync) so the caller can learn the
+        // real outcome, not just that a line was sent.
         return NamedPipeServerStreamAcl.Create(
             PipeName,
-            PipeDirection.In,
+            PipeDirection.InOut,
             1,
             PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous,
             inBufferSize: 4096,
-            outBufferSize: 0,
+            outBufferSize: 4096,
             pipeSecurity: security);
     }
 
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
         using var reader = new StreamReader(pipe, Encoding.UTF8, leaveOpen: true);
+        using var writer = new StreamWriter(pipe, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
         string? line;
         while ((line = await reader.ReadLineAsync(ct)) != null)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
+            bool ok = false;
+            string type = "unknown";
             try
             {
                 using var doc = JsonDocument.Parse(line);
                 var root = doc.RootElement;
-                var type = root.TryGetProperty("type", out var t) ? t.GetString() : null;
+                type = root.TryGetProperty("type", out var t) ? t.GetString() ?? "unknown" : "unknown";
                 if (type == "click"
                     && root.TryGetProperty("xFrac", out var xEl)
                     && root.TryGetProperty("yFrac", out var yEl))
                 {
-                    _injector.TryClick(xEl.GetDouble(), yEl.GetDouble());
+                    ok = _injector.TryClick(xEl.GetDouble(), yEl.GetDouble());
                 }
                 else if (type == "ctrlaltdel")
                 {
-                    _injector.SendCtrlAltDel();
+                    ok = _injector.SendCtrlAltDel();
                 }
                 else if (type == "typeText" && root.TryGetProperty("text", out var textEl))
                 {
-                    _injector.TryTypeText(textEl.GetString() ?? string.Empty);
+                    ok = _injector.TryTypeText(textEl.GetString() ?? string.Empty);
                 }
                 else
                 {
@@ -167,6 +173,21 @@ internal sealed class PipeServerWorker : BackgroundService
             catch (JsonException ex)
             {
                 _log.LogWarning(ex, "Ignoring malformed line: {Line}", line);
+            }
+
+            // Written back so the caller (VncRelayService, running inside
+            // SionyxKiosk.exe which already has its own Firebase-connected
+            // logger) can report the REAL outcome on the dashboard instead
+            // of only ever seeing "command sent" with no way to tell
+            // whether it actually did anything - see SendCtrlAltDel's own
+            // comment for why this matters most for that specific command.
+            try
+            {
+                await writer.WriteLineAsync(JsonSerializer.Serialize(new { type, ok }));
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Could not write result back to caller (non-fatal - command itself already ran)");
             }
         }
     }
