@@ -165,6 +165,14 @@ public class ComputerHeartbeatService
             {
                 Logger.Warning("SionyxInputInjector service is NOT running on this kiosk - Ctrl+Alt+Del and elevated-click via VNC will silently do nothing. Likely cause: the MSI's publish step for this project failed at build time, or the service crashed");
             }
+            else
+            {
+                // Explicit positive confirmation - without this, "the service
+                // is fine" only shows up as the ABSENCE of the warning above,
+                // which is easy to miss/impossible to distinguish from stale
+                // logs. This makes success just as visible as failure.
+                Logger.Information("SionyxInputInjector service is running on this kiosk - Ctrl+Alt+Del and elevated-click via VNC are available");
+            }
             ChannelLogSink.Current?.ReportStatus("inputInjector", inputInjectorRunning,
                 inputInjectorRunning ? null : "SionyxInputInjector service missing or not running");
 
