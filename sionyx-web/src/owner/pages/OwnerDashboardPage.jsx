@@ -13,6 +13,7 @@ import { formatTimeHebrewCompact } from "../../utils/timeFormatter";
 import dayjs from "dayjs";
 import OrgRegistrationModal from "../components/OrgRegistrationModal";
 import OwnerLogsTab from "../components/OwnerLogsTab";
+import FailoverSettings from "../components/FailoverSettings";
 
 const { Title, Text } = Typography;
 
@@ -465,6 +466,11 @@ const OwnerDashboardPage = () => {
               key: "logs",
               label: "לוגים",
               children: <OwnerLogsTab />,
+            },
+            {
+              key: "failover",
+              label: "Failover (רנדר / מחשב ראשי)",
+              children: <FailoverSettings />,
             },
           ]}
         />

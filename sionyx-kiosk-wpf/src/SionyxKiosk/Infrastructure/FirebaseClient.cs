@@ -278,6 +278,36 @@ public sealed class FirebaseClient : IFirebaseClient
         }
     }
 
+    /// <summary>
+    /// Reads an ABSOLUTE database path (not prefixed with organizations/{OrgId} -
+    /// see DbGetAsync for the normal org-scoped read). Used for the handful of
+    /// paths that are intentionally shared across every org, e.g.
+    /// systemSettings/* (see ServerResolver, which reads systemSettings/failover).
+    /// </summary>
+    public async Task<FirebaseResult> DbGetRawAsync(string absolutePath)
+    {
+        if (!await EnsureValidTokenAsync())
+            return FirebaseResult.Fail("Not authenticated");
+
+        var path = absolutePath.Trim('/');
+        var url = $"{_databaseUrl}/{path}.json?auth={_idToken}";
+
+        try
+        {
+            var response = await _http.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JsonSerializer.Deserialize<JsonElement>(json);
+            Logger.Debug("DB raw read: {Path}", path);
+            return FirebaseResult.Ok(data);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "DB raw read failed: {Path}", path);
+            return FirebaseResult.Fail(ex.Message);
+        }
+    }
+
     public async Task<FirebaseResult> DbGetAsync(string path)
     {
         if (!await EnsureValidTokenAsync())
@@ -404,9 +434,14 @@ public sealed class FirebaseClient : IFirebaseClient
         if (!await EnsureValidTokenAsync())
             return FirebaseResult.Fail("Not authenticated");
 
-        var url = string.IsNullOrEmpty(_functionsBaseUrl)
+        // ServerResolver returns null whenever it has no opinion (not started,
+        // Firebase unreachable, or the local PC just isn't currently healthy) -
+        // in every one of those cases this falls back to the exact URL that
+        // was used before failover existed, unchanged.
+        var effectiveBaseUrl = ServerResolver.GetUnderstoodBaseUrl() ?? _functionsBaseUrl;
+        var url = string.IsNullOrEmpty(effectiveBaseUrl)
             ? $"https://us-central1-{_projectId}.cloudfunctions.net/{functionName}"
-            : $"{_functionsBaseUrl}/{functionName}";
+            : $"{effectiveBaseUrl}/{functionName}";
         var body = JsonSerializer.Serialize(new { data = payload }, JsonOptions);
 
         try

@@ -1,14 +1,18 @@
 ﻿import { ownerAuth } from "../../config/firebase";
+import { getUnderstoodBase } from "../../services/serverResolver";
 
-const BRIDGE_BASE_URL = (
-  import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-n5ok.onrender.com"
-).replace(/\/$/, "");
+// getUnderstoodBase() returns the local PC's address when failover has
+// switched to it, or null (falling back to this same Render URL, unchanged)
+// otherwise - see services/serverResolver.js.
+const getBridgeBaseUrl = () =>
+  getUnderstoodBase() ||
+  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-n5ok.onrender.com").replace(/\/$/, "");
 
 const authedFetch = async (path, options = {}) => {
   const currentUser = ownerAuth.currentUser;
   if (!currentUser) return { success: false, error: "לא מחובר" };
   const idToken = await currentUser.getIdToken();
-  const response = await fetch(`${BRIDGE_BASE_URL}${path}`, {
+  const response = await fetch(`${getBridgeBaseUrl()}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

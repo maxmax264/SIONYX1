@@ -374,9 +374,22 @@ public class VncRelayService
 
     private async Task RunSessionAsync(string token, CancellationToken ct)
     {
-        var relayHost = RegistryConfig.ReadValue("VncRelayUrl", DefaultRelayHost)!.Trim().TrimEnd('/');
-        relayHost = relayHost.Replace("https://", "").Replace("wss://", "").Replace("http://", "");
-        var relayUri = new Uri($"wss://{relayHost}/agent/{Uri.EscapeDataString(token)}");
+        // ServerResolver.GetVncRelayBaseUrl() returns a full scheme+host
+        // (e.g. "ws://83.229.22.45:3002" when the local PC is active) or
+        // null to keep today's Render/Registry behavior exactly as-is.
+        var localBase = ServerResolver.GetVncRelayBaseUrl();
+        string relayBaseUrl;
+        if (localBase != null)
+        {
+            relayBaseUrl = localBase;
+        }
+        else
+        {
+            var relayHost = RegistryConfig.ReadValue("VncRelayUrl", DefaultRelayHost)!.Trim().TrimEnd('/');
+            relayHost = relayHost.Replace("https://", "").Replace("wss://", "").Replace("http://", "");
+            relayBaseUrl = $"wss://{relayHost}";
+        }
+        var relayUri = new Uri($"{relayBaseUrl}/agent/{Uri.EscapeDataString(token)}");
 
         using var ws = new ClientWebSocket();
         using var tcp = new TcpClient();
@@ -386,7 +399,7 @@ public class VncRelayService
         try
         {
             await ws.ConnectAsync(relayUri, ct);
-            Logger.Information("VNC relay WebSocket connected to {Host}", relayHost);
+            Logger.Information("VNC relay WebSocket connected to {Host}", relayBaseUrl);
 
             await tcp.ConnectAsync(VncHost, VncPort, ct);
             Logger.Information("Connected to local VNC server on {Host}:{Port}", VncHost, VncPort);
@@ -404,7 +417,7 @@ public class VncRelayService
             // real hardware). If it fails to connect or errors mid-session
             // that must never end the actual VNC session, which is the
             // part that's already proven to work.
-            _ = RunControlChannelAsync(token, relayHost, ct);
+            _ = RunControlChannelAsync(token, relayBaseUrl, ct);
             await Task.WhenAny(wsToTcp, tcpToWs);
         }
         catch (SocketException ex)
@@ -464,11 +477,11 @@ public class VncRelayService
     // them separate means a bug in this method can, at worst, make the
     // elevated-click button silently do nothing - it can't touch the VNC
     // session that's already proven to work.
-    private static async Task RunControlChannelAsync(string token, string relayHost, CancellationToken ct)
+    private static async Task RunControlChannelAsync(string token, string relayBaseUrl, CancellationToken ct)
     {
         try
         {
-            var controlUri = new Uri($"wss://{relayHost}/controlAgent/{Uri.EscapeDataString(token)}");
+            var controlUri = new Uri($"{relayBaseUrl}/controlAgent/{Uri.EscapeDataString(token)}");
             using var controlWs = new ClientWebSocket();
             await controlWs.ConnectAsync(controlUri, ct);
             Logger.Information("VNC elevated-click control channel connected");

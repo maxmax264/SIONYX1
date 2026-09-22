@@ -7,6 +7,7 @@ import { ref, get, set, update, remove } from 'firebase/database';
 import { database } from '../config/firebase';
 import { getOrgId } from '../hooks/useOrgId';
 import { logger } from '../utils/logger';
+import { getVncBase } from './serverResolver';
 
 /**
  * Get all computers in the organization
@@ -469,8 +470,17 @@ export const requestPowerCommand = async (computerId, type) => {
  *
  * VNC_RELAY_BASE_URL below must point at the deployed sionyx-vnc-relay
  * Render service (separate repo, separate Render service from this app
- * and from the Understood payment bridge). */
+ * and from the Understood payment bridge). getVncBase() (serverResolver.js)
+ * returns the local PC's ws://... address when failover has switched to
+ * it - converted to http(s):// here since this builds a normal page URL
+ * (noVNC's vnc.html) to open in a new tab, not a WebSocket URL itself -
+ * or null (falling back to this same Render URL, unchanged) otherwise. */
 const VNC_RELAY_BASE_URL = 'https://sionyx-vnc-relay.onrender.com'; // TODO: update after deploying sionyx-vnc-relay on Render
+
+const getVncRelayBaseUrl = () => {
+  const localWsBase = getVncBase();
+  return localWsBase ? localWsBase.replace(/^ws/, 'http') : VNC_RELAY_BASE_URL;
+};
 
 export const requestVncSession = async computerId => {
   try {
@@ -480,7 +490,7 @@ export const requestVncSession = async computerId => {
       token,
       requestedAt: Date.now(),
     });
-    return { success: true, viewerUrl: `${VNC_RELAY_BASE_URL}/vnc.html?token=${token}` };
+    return { success: true, viewerUrl: `${getVncRelayBaseUrl()}/vnc.html?token=${token}` };
   } catch (error) {
     logger.error('Error requesting VNC session:', error);
     return { success: false, error: 'Failed to start VNC session' };

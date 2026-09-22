@@ -1,9 +1,13 @@
 ﻿import { ref, get, update, push, set } from "firebase/database";
 import { ownerDatabase as database, ownerAuth } from "../../config/firebase";
+import { getUnderstoodBase } from "../../services/serverResolver";
 
-const BRIDGE_BASE_URL = (
-  import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-n5ok.onrender.com"
-).replace(/\/$/, "");
+// getUnderstoodBase() returns the local PC's address when failover has
+// switched to it, or null (falling back to this same Render URL, unchanged)
+// otherwise - see services/serverResolver.js.
+const getBridgeBaseUrl = () =>
+  getUnderstoodBase() ||
+  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-n5ok.onrender.com").replace(/\/$/, "");
 
 /**
  * Flattens users across every organization into a single list, each
@@ -94,7 +98,7 @@ export const getOrgUserPassword = async (orgId, userId) => {
     if (!currentUser) return { success: false, error: "לא מחובר" };
     const idToken = await currentUser.getIdToken();
 
-    const response = await fetch(`${BRIDGE_BASE_URL}/getOrgUserPassword`, {
+    const response = await fetch(`${getBridgeBaseUrl()}/getOrgUserPassword`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
       body: JSON.stringify({ data: { orgId, userId } }),

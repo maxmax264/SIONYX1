@@ -1,5 +1,6 @@
 using System.Windows;
 using Serilog;
+using SionyxKiosk.Infrastructure;
 using SionyxKiosk.Views.Controls;
 using SionyxKiosk.Views.Dialogs;
 
@@ -26,6 +27,7 @@ public class SystemServicesManager
     private readonly LogShippingControlService _logShipping;
     private readonly RemoteCommandService _remoteCommand;
     private readonly VncRelayService _vncRelay;
+    private readonly FirebaseConfig _firebaseConfig;
 
     private Action<string>? _forceLogoutHandler;
     private Action? _adminExitHandler;
@@ -42,7 +44,8 @@ public class SystemServicesManager
         ComputerHeartbeatService heartbeat,
         LogShippingControlService logShipping,
         RemoteCommandService remoteCommand,
-        VncRelayService vncRelay)
+        VncRelayService vncRelay,
+        FirebaseConfig firebaseConfig)
     {
         _forceLogout = forceLogout;
         _chat = chat;
@@ -56,6 +59,7 @@ public class SystemServicesManager
         _logShipping = logShipping;
         _remoteCommand = remoteCommand;
         _vncRelay = vncRelay;
+        _firebaseConfig = firebaseConfig;
     }
 
     /// <summary>Raised when a force-logout is received from the server.</summary>
@@ -130,6 +134,9 @@ public class SystemServicesManager
 
         try { _vncRelay.Start(); }
         catch (Exception ex) { Logger.Warning(ex, "VNC relay listener failed to start (non-fatal)"); }
+
+        try { ServerResolver.Start(_firebaseConfig); }
+        catch (Exception ex) { Logger.Warning(ex, "ServerResolver failed to start (non-fatal - payment/VNC calls simply keep using their existing Render URL)"); }
     }
 
     /// <summary>Stop all system services and unsubscribe event handlers.</summary>

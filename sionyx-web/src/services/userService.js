@@ -2,17 +2,20 @@ import { ref, get, update, remove, getDatabase, push, set } from 'firebase/datab
 import { httpsCallable } from 'firebase/functions';
 import { database, functions, auth } from '../config/firebase';
 import { logger } from '../utils/logger';
+import { getUnderstoodBase } from './serverResolver';
 
 /**
- * Base URL of the Render bridge server that now hosts resetUserPassword
- * (moved off Firebase Cloud Functions, which require the Blaze plan -
- * same reasoning as registerOrganization in organizationService.js).
- * This is the same server chargeWithSavedCard/confirmPayment/
- * nedarimCallback/registerOrganization already use.
+ * Base URL of the bridge server that hosts resetUserPassword (moved off
+ * Firebase Cloud Functions, which require the Blaze plan - same reasoning
+ * as registerOrganization in organizationService.js). This is the same
+ * server chargeWithSavedCard/confirmPayment/nedarimCallback/
+ * registerOrganization already use. getUnderstoodBase() returns the local
+ * PC's address when failover has switched to it, or null (falling back to
+ * this same Render URL, unchanged) otherwise - see serverResolver.js.
  */
-const BRIDGE_BASE_URL = (
-  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com'
-).replace(/\/$/, '');
+const getBridgeBaseUrl = () =>
+  getUnderstoodBase() ||
+  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com').replace(/\/$/, '');
 
 /**
  * Get all users in an organization
@@ -254,7 +257,7 @@ export const resetUserPassword = async (orgId, userId, newPassword) => {
     }
     const idToken = await currentUser.getIdToken();
 
-    const response = await fetch(`${BRIDGE_BASE_URL}/resetUserPassword`, {
+    const response = await fetch(`${getBridgeBaseUrl()}/resetUserPassword`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

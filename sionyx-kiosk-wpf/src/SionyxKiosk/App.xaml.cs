@@ -209,7 +209,8 @@ public partial class App : Application
                     sp.GetRequiredService<ComputerHeartbeatService>(),
                     sp.GetRequiredService<LogShippingControlService>(),
                     sp.GetRequiredService<RemoteCommandService>(),
-                    sp.GetRequiredService<VncRelayService>()));
+                    sp.GetRequiredService<VncRelayService>(),
+                    sp.GetRequiredService<FirebaseConfig>()));
                 services.AddSingleton<IdleTimeoutService>();
                 services.AddSingleton(sp => new SessionCoordinator(
                     sp.GetRequiredService<SessionService>(),

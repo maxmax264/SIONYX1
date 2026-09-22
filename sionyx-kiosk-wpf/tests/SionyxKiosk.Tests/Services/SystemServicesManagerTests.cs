@@ -50,7 +50,8 @@ public class SystemServicesManagerTests : IDisposable
 
         _manager = new SystemServicesManager(
             _forceLogout, _chat, _printMonitor, _operatingHours,
-            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat, _logShipping, _remoteCommand, _vncRelay);
+            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat, _logShipping, _remoteCommand, _vncRelay,
+            TestFirebaseFactory.CreateConfig());
     }
 
     public void Dispose() => _firebase.Dispose();

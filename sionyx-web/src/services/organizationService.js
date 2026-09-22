@@ -1,18 +1,21 @@
 import { database } from '../config/firebase';
 import { ref, get } from 'firebase/database';
 import { logger } from '../utils/logger';
+import { getUnderstoodBase } from './serverResolver';
 
 /**
- * Base URL of the Render bridge server that now hosts registerOrganization
- * (moved off Firebase Cloud Functions, which require the Blaze plan).
- * This is the same server chargeWithSavedCard/confirmPayment/
- * nedarimCallback already use - understood-n5ok.onrender.com, not
- * sionyx-payment-bridge.onrender.com (a wrong URL that snuck in from a
- * parallel edit - that hostname isn't a real deployed service).
+ * Base URL of the bridge server that hosts registerOrganization (moved off
+ * Firebase Cloud Functions, which require the Blaze plan). This is the same
+ * server chargeWithSavedCard/confirmPayment/nedarimCallback already use -
+ * understood-n5ok.onrender.com, not sionyx-payment-bridge.onrender.com (a
+ * wrong URL that snuck in from a parallel edit - that hostname isn't a real
+ * deployed service). getUnderstoodBase() returns the local PC's address
+ * when failover has switched to it, or null (falling back to this same
+ * Render URL, unchanged) otherwise - see serverResolver.js.
  */
-const BRIDGE_BASE_URL = (
-  import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com'
-).replace(/\/$/, '');
+const getBridgeBaseUrl = () =>
+  getUnderstoodBase() ||
+  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com').replace(/\/$/, '');
 
 /**
  * Organization Service
@@ -60,7 +63,7 @@ export const registerOrganization = async organizationData => {
       hasData: !!organizationData,
     });
 
-    const response = await fetch(`${BRIDGE_BASE_URL}/registerOrganization`, {
+    const response = await fetch(`${getBridgeBaseUrl()}/registerOrganization`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: organizationData }),
