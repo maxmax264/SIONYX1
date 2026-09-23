@@ -6,7 +6,7 @@ import { getUnderstoodBase } from "../../services/serverResolver";
 // otherwise - see services/serverResolver.js.
 const getBridgeBaseUrl = () =>
   getUnderstoodBase() ||
-  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-n5ok.onrender.com").replace(/\/$/, "");
+  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || "https://understood-main.onrender.com").replace(/\/$/, "");
 
 const authedFetch = async (path, options = {}) => {
   const currentUser = ownerAuth.currentUser;

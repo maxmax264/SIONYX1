@@ -15,7 +15,7 @@ import { getUnderstoodBase } from './serverResolver';
  */
 const getBridgeBaseUrl = () =>
   getUnderstoodBase() ||
-  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-n5ok.onrender.com').replace(/\/$/, '');
+  (import.meta.env.VITE_PAYMENT_BRIDGE_URL || 'https://understood-main.onrender.com').replace(/\/$/, '');
 
 /**
  * Get all users in an organization

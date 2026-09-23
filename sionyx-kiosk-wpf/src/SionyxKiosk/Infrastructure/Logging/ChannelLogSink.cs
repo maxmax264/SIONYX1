@@ -40,7 +40,7 @@ public sealed class ChannelLogSink : ILogEventSink
     // Redis list capped at N lines + a TTL per computer, so it cannot refill
     // the same way. Logs are read/deleted only from the owner dashboard
     // (pc-sion.web.app/owner) - there is no public viewer page anymore.
-    private const string DefaultChannelUrl = "https://understood-n5ok.onrender.com";
+    private const string DefaultChannelUrl = "https://understood-main.onrender.com";
     private const string DefaultApiKey = "k9f2sh392zh32_secure_random_key";
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
