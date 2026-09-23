@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.ServiceProcess;
@@ -410,14 +412,14 @@ public class VncRelayService
         }
         var relayUri = new Uri($"{relayBaseUrl}/agent/{Uri.EscapeDataString(token)}");
 
-        using var ws = new ClientWebSocket();
+        WebSocket? ws = null;
         using var tcp = new TcpClient();
 
         EnsureTightVncRunning(); // safety net in case it wasn't running at Start()
 
         try
         {
-            await ws.ConnectAsync(relayUri, ct);
+            ws = await ConnectRelayWebSocketAsync(relayUri, ct);
             Logger.Information("VNC relay WebSocket connected to {Host}", relayBaseUrl);
 
             await tcp.ConnectAsync(VncHost, VncPort, ct);
@@ -456,13 +458,155 @@ public class VncRelayService
         finally
         {
             IsSessionActive = false;
-            try { if (ws.State == WebSocketState.Open) await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None); }
+            try { if (ws?.State == WebSocketState.Open) await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None); }
             catch { /* best effort */ }
+            ws?.Dispose();
             await ReportResultAsync("ended");
         }
     }
 
-    private static async Task PumpWebSocketToTcpAsync(ClientWebSocket ws, Stream tcp, CancellationToken ct)
+    // Connects to the relay's WebSocket endpoint, trying the standard
+    // .NET ClientWebSocket handshake first and falling back to a raw,
+    // hand-built HTTP Upgrade request (mimicking PowerShell 5.1's
+    // Invoke-WebRequest header shape) if that fails.
+    //
+    // Added 2026-09-23, after RelayProbe (a standalone diagnostic tool)
+    // proved on a real affected kiosk that ClientWebSocket.ConnectAsync
+    // gets back HTTP 418 instead of 101 Switching Protocols on networks
+    // running NetFree (or a similar TLS-intercepting content filter) -
+    // that status code is the filter actively fingerprinting and blocking
+    // .NET's default request shape (header order/casing, no manually-set
+    // Connection value, ALPN offered, etc.), not the relay server itself
+    // rejecting the connection. The exact same request sent with
+    // PowerShell-style headers (Connection: Upgrade, Keep-Alive as one
+    // value; Host header last; no ALPN) sailed through with a real 101 on
+    // the same network - that's the "manual:ps" variant reproduced below.
+    // Used for both the main /agent byte-pipe and the /controlAgent
+    // elevated-click channel, since both are blocked by the same filter.
+    private static async Task<WebSocket> ConnectRelayWebSocketAsync(Uri relayUri, CancellationToken ct)
+    {
+        try
+        {
+            var ws = new ClientWebSocket();
+            await ws.ConnectAsync(relayUri, ct);
+            return ws;
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // real cancellation/timeout - never mask this as a handshake problem
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex,
+                "Standard WebSocket handshake to {Uri} failed (likely NetFree/a filtering proxy fingerprinting .NET's default request shape) - falling back to manual PowerShell-style handshake",
+                relayUri);
+            return await ConnectViaManualHandshakeAsync(relayUri, ct);
+        }
+    }
+
+    private static async Task<WebSocket> ConnectViaManualHandshakeAsync(Uri relayUri, CancellationToken ct)
+    {
+        var host = relayUri.Host;
+        var isSecure = relayUri.Scheme == "wss";
+        var port = relayUri.Port != -1 ? relayUri.Port : (isSecure ? 443 : 80);
+
+        var tcpClient = new TcpClient();
+        await tcpClient.ConnectAsync(host, port, ct);
+
+        Stream stream = tcpClient.GetStream();
+        if (isSecure)
+        {
+            var sslStream = new SslStream(stream, leaveInnerStreamOpen: false);
+            // No ALPN - matches PowerShell's default TLS ClientHello shape,
+            // which is what got a real 101 through the filtering proxy in
+            // RelayProbe. Offering ALPN (as ClientWebSocket does by
+            // default) is part of what makes .NET's ClientHello fingerprint
+            // differently and get blocked.
+            var sslOptions = new SslClientAuthenticationOptions
+            {
+                TargetHost = host,
+                ApplicationProtocols = null,
+            };
+            await sslStream.AuthenticateAsClientAsync(sslOptions, ct);
+            stream = sslStream;
+        }
+
+        var key = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
+        // Header order/casing deliberately mimics PowerShell 5.1's
+        // Invoke-WebRequest shape: Connection is a single comma-joined
+        // "Upgrade, Keep-Alive" value, and Host is sent LAST - this exact
+        // shape is what RelayProbe's manual:ps variant proved gets a real
+        // 101 Switching Protocols through the filtering proxy, unlike
+        // ClientWebSocket's default request.
+        var sb = new StringBuilder();
+        sb.Append("GET ").Append(relayUri.PathAndQuery).Append(" HTTP/1.1\r\n");
+        sb.Append("Pragma: no-cache\r\n");
+        sb.Append("Upgrade: websocket\r\n");
+        sb.Append("Connection: Upgrade, Keep-Alive\r\n");
+        sb.Append("Sec-WebSocket-Key: ").Append(key).Append("\r\n");
+        sb.Append("Sec-WebSocket-Version: 13\r\n");
+        sb.Append("Cache-Control: no-cache\r\n");
+        sb.Append("Host: ").Append(host).Append("\r\n\r\n");
+
+        var requestBytes = Encoding.ASCII.GetBytes(sb.ToString());
+        await stream.WriteAsync(requestBytes, ct);
+        await stream.FlushAsync(ct);
+
+        var statusLine = await ReadHttpResponseHeadersAsync(stream, ct);
+        if (!statusLine.Contains(" 101 "))
+        {
+            throw new WebSocketException(
+                $"Manual handshake to {relayUri} failed: server returned '{statusLine.Trim()}' instead of 101 Switching Protocols");
+        }
+
+        Logger.Information("Manual handshake succeeded ({StatusLine}) - relay connected via fallback path", statusLine.Trim());
+
+        // Hand the already-upgraded stream to a standard WebSocket object
+        // so the rest of this file's pump methods (PumpWebSocketToTcpAsync
+        // / PumpTcpToWebSocketAsync) can keep working with it exactly like
+        // the ClientWebSocket path - no separate frame-parsing code needed,
+        // and no risk of double-buffering bytes that belong to the WS frame
+        // stream.
+        return WebSocket.CreateFromStream(stream, isServer: false, subProtocol: null, keepAliveInterval: TimeSpan.FromSeconds(30));
+    }
+
+    // Reads HTTP response headers byte-by-byte until the blank line that
+    // ends them, and returns just the status line. Only ever reads a few
+    // hundred bytes at handshake time, so the per-byte overhead here
+    // doesn't matter - what does matter is not buffering ahead past the
+    // header block, since anything read past it would actually be the
+    // start of the raw WebSocket frame stream that WebSocket.CreateFromStream
+    // needs to see untouched.
+    private static async Task<string> ReadHttpResponseHeadersAsync(Stream stream, CancellationToken ct)
+    {
+        var lineBuffer = new StringBuilder();
+        var singleByte = new byte[1];
+
+        async Task<string> ReadLineAsync()
+        {
+            lineBuffer.Clear();
+            while (true)
+            {
+                var read = await stream.ReadAsync(singleByte, ct);
+                if (read == 0) break; // connection closed mid-handshake
+                var c = (char)singleByte[0];
+                if (c == '\n') break;
+                if (c != '\r') lineBuffer.Append(c);
+            }
+            return lineBuffer.ToString();
+        }
+
+        var statusLine = await ReadLineAsync();
+        while (true)
+        {
+            var line = await ReadLineAsync();
+            if (string.IsNullOrEmpty(line)) break; // blank line = end of headers
+        }
+        return statusLine;
+    }
+
+    private static async Task PumpWebSocketToTcpAsync(WebSocket ws, Stream tcp, CancellationToken ct)
     {
         var buffer = new byte[16 * 1024];
         while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
@@ -473,7 +617,7 @@ public class VncRelayService
         }
     }
 
-    private static async Task PumpTcpToWebSocketAsync(Stream tcp, ClientWebSocket ws, CancellationToken ct)
+    private static async Task PumpTcpToWebSocketAsync(Stream tcp, WebSocket ws, CancellationToken ct)
     {
         var buffer = new byte[16 * 1024];
         while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
@@ -498,11 +642,11 @@ public class VncRelayService
     // session that's already proven to work.
     private static async Task RunControlChannelAsync(string token, string relayBaseUrl, CancellationToken ct)
     {
+        WebSocket? controlWs = null;
         try
         {
             var controlUri = new Uri($"{relayBaseUrl}/controlAgent/{Uri.EscapeDataString(token)}");
-            using var controlWs = new ClientWebSocket();
-            await controlWs.ConnectAsync(controlUri, ct);
+            controlWs = await ConnectRelayWebSocketAsync(controlUri, ct);
             Logger.Information("VNC elevated-click control channel connected");
 
             var buffer = new byte[4 * 1024];
@@ -526,6 +670,10 @@ public class VncRelayService
             // failure - the elevated-click button is a bonus feature, not
             // part of the core VNC session's success/failure reporting.
             Logger.Warning(ex, "VNC elevated-click control channel error (non-fatal - normal VNC session is unaffected)");
+        }
+        finally
+        {
+            controlWs?.Dispose();
         }
     }
 
