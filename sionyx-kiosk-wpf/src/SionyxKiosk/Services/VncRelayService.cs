@@ -399,6 +399,11 @@ public class VncRelayService
         // (e.g. "ws://83.229.22.45:3002" when the local PC is active) or
         // null to keep today's Render/Registry behavior exactly as-is.
         var localBase = ServerResolver.GetVncRelayBaseUrl();
+        // The WebSocket-probe / HTTP-fallback logic only applies to the
+        // Render relay (that's the one NetFree interferes with, and the one
+        // whose server.js has the /rt/ endpoints). A local relay keeps the
+        // exact previous behaviour.
+        var allowHttpFallback = localBase == null;
         string relayBaseUrl;
         if (localBase != null)
         {
@@ -410,7 +415,6 @@ public class VncRelayService
             relayHost = relayHost.Replace("https://", "").Replace("wss://", "").Replace("http://", "");
             relayBaseUrl = $"wss://{relayHost}";
         }
-        var relayUri = new Uri($"{relayBaseUrl}/agent/{Uri.EscapeDataString(token)}");
 
         WebSocket? ws = null;
         using var tcp = new TcpClient();
@@ -419,8 +423,9 @@ public class VncRelayService
 
         try
         {
-            ws = await ConnectRelayWebSocketAsync(relayUri, ct);
-            Logger.Information("VNC relay WebSocket connected to {Host}", relayBaseUrl);
+            ws = await ConnectRelayAsync(relayBaseUrl, "agent", token, allowHttpFallback, ct);
+            Logger.Information("VNC relay connected to {Host} via {Transport}", relayBaseUrl,
+                ws is HttpRelayWebSocket ? "HTTP long-poll (WebSocket unusable on this network)" : "WebSocket");
 
             await tcp.ConnectAsync(VncHost, VncPort, ct);
             Logger.Information("Connected to local VNC server on {Host}:{Port}", VncHost, VncPort);
@@ -438,7 +443,7 @@ public class VncRelayService
             // real hardware). If it fails to connect or errors mid-session
             // that must never end the actual VNC session, which is the
             // part that's already proven to work.
-            _ = RunControlChannelAsync(token, relayBaseUrl, ct);
+            _ = RunControlChannelAsync(token, relayBaseUrl, allowHttpFallback, ct);
             await Task.WhenAny(wsToTcp, tcpToWs);
         }
         catch (SocketException ex)
@@ -465,6 +470,113 @@ public class VncRelayService
         }
     }
 
+    // ---- Transport selection (added 2026-09-23) --------------------------
+    //
+    // Field diagnosis (see vnc-relay-summary): behind NetFree, wss upgrades to
+    // the relay get "418 Blocked by NetFree" even though the relay answered
+    // 101 - and connections that DO open sometimes never deliver a byte
+    // (relay saw msgsIn=0). Plain HTTPS requests (POST + long-poll) to the
+    // same host always passed. So: try WebSocket, PROVE it works with a probe
+    // round trip, and otherwise carry the same session over HTTP
+    // (HttpRelayWebSocket). Both look like a WebSocket to the pump code.
+    //
+    // Registry "VncRelayTransport": "auto" (default) | "ws" | "http" - to
+    // force one transport when debugging a specific kiosk.
+    private const string ProbeMessage = "__relay_probe__";
+    private const string ProbeAck = "__relay_probe_ack__";
+    private static readonly TimeSpan WsConnectTimeout = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
+    // After WebSocket proved unusable, skip straight to HTTP for a while so
+    // the control channel (and quick reconnects) don't each re-pay the wait.
+    private static readonly TimeSpan WsBlockedMemory = TimeSpan.FromMinutes(15);
+    private static DateTime _wsBlockedUntilUtc = DateTime.MinValue;
+
+    private static async Task<WebSocket> ConnectRelayAsync(string relayBaseUrl, string role, string token, bool allowHttpFallback, CancellationToken ct)
+    {
+        var path = $"/{role}/{Uri.EscapeDataString(token)}";
+
+        if (!allowHttpFallback)
+        {
+            // Local relay: unchanged behaviour (no probe, no HTTP fallback).
+            return await ConnectRelayWebSocketAsync(new Uri(relayBaseUrl + path), Timeout.InfiniteTimeSpan, ct);
+        }
+
+        var mode = (RegistryConfig.ReadValue("VncRelayTransport", "auto") ?? "auto").Trim().ToLowerInvariant();
+        var tryWs = mode == "ws" || (mode != "http" && DateTime.UtcNow >= _wsBlockedUntilUtc);
+
+        if (tryWs)
+        {
+            WebSocket? ws = null;
+            try
+            {
+                // ?probe=1 tells the relay not to route or flush anything to
+                // this socket until it has answered our probe (so a "ghost"
+                // connection NetFree ate can't swallow data meant for the
+                // HTTP path we may fall back to).
+                ws = await ConnectRelayWebSocketAsync(new Uri($"{relayBaseUrl}{path}?probe=1"), WsConnectTimeout, ct);
+                if (await ProbeAsync(ws, ct))
+                {
+                    return ws;
+                }
+                Logger.Warning("WebSocket to relay ({Role}) connected but did not answer the liveness probe within {Seconds}s - NetFree is likely swallowing its traffic; using HTTP transport",
+                    role, ProbeTimeout.TotalSeconds);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                ws?.Dispose();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "WebSocket to relay ({Role}) could not be established - using HTTP transport", role);
+            }
+            ws?.Dispose();
+
+            if (mode == "ws")
+                throw new WebSocketException("WebSocket to relay unusable and VncRelayTransport=ws forbids the HTTP fallback");
+
+            _wsBlockedUntilUtc = DateTime.UtcNow + WsBlockedMemory;
+        }
+
+        var httpBase = relayBaseUrl.Replace("wss://", "https://").Replace("ws://", "http://");
+        return await HttpRelayWebSocket.ConnectAsync(httpBase, role, token, ct);
+    }
+
+    // Sends the probe and waits (briefly) for the relay's ack. Anything else
+    // arriving first is ignored: a probing socket is not flushed any data
+    // until the relay has seen our probe, so nothing real can precede the ack.
+    private static async Task<bool> ProbeAsync(WebSocket ws, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ProbeTimeout);
+        try
+        {
+            await ws.SendAsync(new ArraySegment<byte>(Encoding.ASCII.GetBytes(ProbeMessage)),
+                WebSocketMessageType.Text, true, cts.Token);
+
+            var buf = new byte[256];
+            while (true)
+            {
+                var r = await ws.ReceiveAsync(new ArraySegment<byte>(buf), cts.Token);
+                if (r.MessageType == WebSocketMessageType.Close) return false;
+                if (r.MessageType == WebSocketMessageType.Text && r.EndOfMessage
+                    && Encoding.ASCII.GetString(buf, 0, r.Count) == ProbeAck)
+                {
+                    return true;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (ct.IsCancellationRequested) throw; // real cancellation
+            return false;                          // probe timed out
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     // Connects to the relay's WebSocket endpoint, trying the standard
     // .NET ClientWebSocket handshake first and falling back to a raw,
     // hand-built HTTP Upgrade request (mimicking PowerShell 5.1's
@@ -483,24 +595,40 @@ public class VncRelayService
     // the same network - that's the "manual:ps" variant reproduced below.
     // Used for both the main /agent byte-pipe and the /controlAgent
     // elevated-click channel, since both are blocked by the same filter.
-    private static async Task<WebSocket> ConnectRelayWebSocketAsync(Uri relayUri, CancellationToken ct)
+    //
+    // handshakeTimeout bounds EACH attempt (standard and manual) so a filter
+    // that just stalls the handshake can't hold the session hostage; pass
+    // Timeout.InfiniteTimeSpan to keep the old unbounded behaviour.
+    private static async Task<WebSocket> ConnectRelayWebSocketAsync(Uri relayUri, TimeSpan handshakeTimeout, CancellationToken ct)
     {
         try
         {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (handshakeTimeout != Timeout.InfiniteTimeSpan) cts.CancelAfter(handshakeTimeout);
             var ws = new ClientWebSocket();
-            await ws.ConnectAsync(relayUri, ct);
+            try
+            {
+                await ws.ConnectAsync(relayUri, cts.Token);
+            }
+            catch
+            {
+                ws.Dispose();
+                throw;
+            }
             return ws;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw; // real cancellation/timeout - never mask this as a handshake problem
+            throw; // real cancellation - never mask this as a handshake problem
         }
         catch (Exception ex)
         {
             Logger.Warning(ex,
                 "Standard WebSocket handshake to {Uri} failed (likely NetFree/a filtering proxy fingerprinting .NET's default request shape) - falling back to manual PowerShell-style handshake",
                 relayUri);
-            return await ConnectViaManualHandshakeAsync(relayUri, ct);
+            using var manualCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (handshakeTimeout != Timeout.InfiniteTimeSpan) manualCts.CancelAfter(handshakeTimeout);
+            return await ConnectViaManualHandshakeAsync(relayUri, manualCts.Token);
         }
     }
 
@@ -511,6 +639,19 @@ public class VncRelayService
         var port = relayUri.Port != -1 ? relayUri.Port : (isSecure ? 443 : 80);
 
         var tcpClient = new TcpClient();
+        try
+        {
+            return await ConnectViaManualHandshakeCoreAsync(tcpClient, relayUri, host, port, isSecure, ct);
+        }
+        catch
+        {
+            tcpClient.Dispose(); // don't leak the socket when the handshake fails/times out
+            throw;
+        }
+    }
+
+    private static async Task<WebSocket> ConnectViaManualHandshakeCoreAsync(TcpClient tcpClient, Uri relayUri, string host, int port, bool isSecure, CancellationToken ct)
+    {
         await tcpClient.ConnectAsync(host, port, ct);
 
         Stream stream = tcpClient.GetStream();
@@ -640,14 +781,14 @@ public class VncRelayService
     // them separate means a bug in this method can, at worst, make the
     // elevated-click button silently do nothing - it can't touch the VNC
     // session that's already proven to work.
-    private static async Task RunControlChannelAsync(string token, string relayBaseUrl, CancellationToken ct)
+    private static async Task RunControlChannelAsync(string token, string relayBaseUrl, bool allowHttpFallback, CancellationToken ct)
     {
         WebSocket? controlWs = null;
         try
         {
-            var controlUri = new Uri($"{relayBaseUrl}/controlAgent/{Uri.EscapeDataString(token)}");
-            controlWs = await ConnectRelayWebSocketAsync(controlUri, ct);
-            Logger.Information("VNC elevated-click control channel connected");
+            controlWs = await ConnectRelayAsync(relayBaseUrl, "controlAgent", token, allowHttpFallback, ct);
+            Logger.Information("VNC elevated-click control channel connected via {Transport}",
+                controlWs is HttpRelayWebSocket ? "HTTP long-poll" : "WebSocket");
 
             var buffer = new byte[4 * 1024];
             while (controlWs.State == WebSocketState.Open && !ct.IsCancellationRequested)
