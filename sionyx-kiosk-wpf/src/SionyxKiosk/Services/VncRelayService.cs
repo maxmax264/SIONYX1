@@ -183,8 +183,10 @@ public class VncRelayService
             return;
         }
 
+        Logger.Warning("DIAG CheckListenerHealth: stopping old listener + recreating (activeListenersBefore={ActiveListeners}) at {Utc:O}", SseListener.ActiveCount, DateTime.UtcNow);
         listener.Stop();
         RecreateListener();
+        Logger.Warning("DIAG CheckListenerHealth: recreate call returned (activeListenersAfter={ActiveListeners}) at {Utc:O}", SseListener.ActiveCount, DateTime.UtcNow);
     }
 
     public void Stop()
@@ -352,10 +354,27 @@ public class VncRelayService
         var requestedAt = obj.TryGetProperty("requestedAt", out var r) && r.TryGetInt64(out var ra) ? ra : 0;
 
         if (string.IsNullOrWhiteSpace(token) || requestedAt == 0) return;
+
+        // DIAG (temporary, added 2026-09-23) - logged BEFORE the dedup
+        // check/write, on purpose: if two SseListener deliveries ever race
+        // each other here, both DIAG lines below should appear with the
+        // same requestedAt, close timestamps, and (usually) different
+        // thread ids - proving the race independently of whether the dedup
+        // check happened to catch it. Cross-reference with the
+        // "DIAG SseListener#N delivering" lines to see which listener(s)
+        // fired it, and with SseListener.ActiveCount to see if two
+        // listeners were alive when it happened.
+        Logger.Warning(
+            "DIAG OnSessionRequested ENTER token={TokenPrefix}... requestedAt={RequestedAt} lastHandled={LastHandled} activeListeners={ActiveListeners} at {Utc:O} thread={ThreadId}",
+            token[..Math.Min(6, token.Length)], requestedAt, _lastHandledRequestedAt, SseListener.ActiveCount, DateTime.UtcNow, Environment.CurrentManagedThreadId);
+
         if (requestedAt == _lastHandledRequestedAt) return; // SSE replay of the same request
         _lastHandledRequestedAt = requestedAt;
 
         Logger.Warning("VNC session requested from dashboard (token {Token}...)", token[..Math.Min(6, token.Length)]);
+        Logger.Warning(
+            "DIAG OnSessionRequested PROCEEDING (won dedup) token={TokenPrefix}... requestedAt={RequestedAt} activeSessionCtsWasNull={WasNull} at {Utc:O} thread={ThreadId}",
+            token[..Math.Min(6, token.Length)], requestedAt, _activeSessionCts == null, DateTime.UtcNow, Environment.CurrentManagedThreadId);
 
         // A new request replaces any session still running.
         _activeSessionCts?.Cancel();

@@ -23,6 +23,18 @@ public sealed class SseListener
     private int _reconnectDelay = 1;
     private const int MaxReconnectDelay = 60;
 
+    // DIAGNOSTIC ONLY (added 2026-09-23) - to confirm/rule out a theory
+    // that two SseListener instances for the same path can be alive
+    // concurrently for a moment around RecreateListener() (Stop() does
+    // not block on the old listen loop actually exiting). Does not
+    // change any behavior - purely adds an instance id + a live-count so
+    // the logs can show it directly if/when it happens. Safe to remove
+    // once confirmed either way.
+    private static int s_nextId;
+    private static int s_activeCount;
+    public static int ActiveCount => s_activeCount;
+    private readonly int _id = Interlocked.Increment(ref s_nextId);
+
     // Fixed, quiet retry pace while there is no signed-in session at all
     // (e.g. an idle kiosk waiting for a customer). This is a normal,
     // expected state - not a failure - so it deliberately does NOT use the
@@ -96,6 +108,10 @@ public sealed class SseListener
 
     private async Task ListenLoopAsync(CancellationToken ct)
     {
+        var nowActive = Interlocked.Increment(ref s_activeCount);
+        Logger.Warning("DIAG SseListener#{ListenerId} loop STARTED for {Path} (active listeners for this process: {ActiveCount})", _id, _path, nowActive);
+        try
+        {
         while (!ct.IsCancellationRequested)
         {
             // No signed-in session yet - normal for an idle kiosk, not a
@@ -158,6 +174,12 @@ public sealed class SseListener
 
                 _reconnectDelay = Math.Min(_reconnectDelay * 2, MaxReconnectDelay);
             }
+        }
+        }
+        finally
+        {
+            var stillActive = Interlocked.Decrement(ref s_activeCount);
+            Logger.Warning("DIAG SseListener#{ListenerId} loop ENDED for {Path} (active listeners for this process: {ActiveCount})", _id, _path, stillActive);
         }
     }
 
@@ -254,6 +276,8 @@ public sealed class SseListener
                 var data = envelope.ValueKind == JsonValueKind.Object && envelope.TryGetProperty("data", out var inner)
                     ? inner
                     : envelope;
+                // DIAG (temporary, see other DIAG lines in this file)
+                Logger.Warning("DIAG SseListener#{ListenerId} delivering {EventType} for {Path} at {Utc:O} (thread {ThreadId})", _id, eventType, _path, DateTime.UtcNow, Environment.CurrentManagedThreadId);
                 _callback(eventType, data);
             }
             else
