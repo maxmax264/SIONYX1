@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [3.16.17] - 2026-09-24
+
+### Other
+- add missing using System.IO (8705e864)
+
+
 ## [3.16.16] - 2026-09-23
 
 
