@@ -210,7 +210,7 @@ function Invoke-PublishInputInjector {
         /p:IncludeNativeLibrariesForSelfExtract=true `
         /p:DebugType=none `
         /p:DebugSymbols=false `
-        -o $injectorOutDir
+        -o $injectorOutDir 2>&1 | Out-Host   # Out-Host: otherwise dotnet's output becomes part of this function's return value
 
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $injectorOutDir "SionyxInputInjector.exe"))) {
         Write-Warn "SionyxInputInjector publish failed - continuing without it (main kiosk app is unaffected)"
@@ -439,7 +439,8 @@ if (-not (Invoke-Publish)) {
     Write-Err "Publish failed"
     exit 1
 }
-$hasInputInjector = Invoke-PublishInputInjector
+# Only the LAST value is the real result; stray pipeline output must not make this truthy (it made the WiX build reference a missing exe).
+$hasInputInjector = (@(Invoke-PublishInputInjector) | Select-Object -Last 1) -eq $true
 
 # Create installer
 $installerPath = New-Installer $newVersion
