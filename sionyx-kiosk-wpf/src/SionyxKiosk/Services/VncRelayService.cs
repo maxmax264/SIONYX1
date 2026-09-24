@@ -44,7 +44,7 @@ public class VncRelayService
 
     // Override via registry value "VncRelayUrl" if the Render service
     // ends up on a different subdomain than this default.
-    private const string DefaultRelayHost = "sionyx-vnc-relaymain.onrender.com";
+    private const string DefaultRelayHost = "sionyx-vnc-relaymain-1.onrender.com";
     private const string VncHost = "127.0.0.1";
     private const int VncPort = 5900;
     private const string TightVncExePath = @"C:\Program Files\TightVNC\tvnserver.exe";

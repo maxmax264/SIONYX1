@@ -475,7 +475,7 @@ export const requestPowerCommand = async (computerId, type) => {
  * it - converted to http(s):// here since this builds a normal page URL
  * (noVNC's vnc.html) to open in a new tab, not a WebSocket URL itself -
  * or null (falling back to this same Render URL, unchanged) otherwise. */
-const VNC_RELAY_BASE_URL = 'https://sionyx-vnc-relaymain.onrender.com'; // TODO: update after deploying sionyx-vnc-relay on Render
+const VNC_RELAY_BASE_URL = 'https://sionyx-vnc-relaymain-1.onrender.com'; // TODO: update after deploying sionyx-vnc-relay on Render
 
 const getVncRelayBaseUrl = () => {
   const localWsBase = getVncBase();
