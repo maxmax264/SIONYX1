@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.WebSockets;
@@ -24,6 +25,16 @@ namespace SionyxKiosk.Services;
 ///   GET  /rt/&lt;role&gt;/&lt;token&gt;/recv?wait=N    -> { messages:[{data:b64,binary}], closed? }
 ///   POST /rt/&lt;role&gt;/&lt;token&gt;/close
 ///
+/// Acknowledged delivery (added 2026-09-24) for the VNC byte-stream role
+/// ("agent"): behind NetFree a /recv response can be blocked (418), truncated
+/// or altered AFTER the relay answered it, which used to lose bytes and shift
+/// the whole stream. Now every GET carries &amp;ack=&lt;bytes accepted so far&gt;
+/// and the relay answers with the bytes starting exactly there (same ack =
+/// same bytes, so a lost response is simply asked for again); every message
+/// is accepted only if offset, length and CRC32 match. POSTs carry
+/// ?off=&lt;bytes sent so far&gt; so a retried POST is never applied twice.
+/// The control channel (JSON) is unchanged.
+///
 /// Ordering guarantees the VNC byte stream depends on: exactly one recv poll
 /// is in flight at a time, and outgoing messages are POSTed strictly one at a
 /// time, in order. Consecutive binary messages are merged into one POST (one
@@ -41,8 +52,8 @@ internal sealed class HttpRelayWebSocket : WebSocket
     private const int RecvWaitMs = 20000;
     private static readonly TimeSpan RecvRequestTimeout = TimeSpan.FromSeconds(35);
     private static readonly TimeSpan SendRequestTimeout = TimeSpan.FromSeconds(30);
-    private const int MaxRecvFailures = 6;
-    private const int MaxSendAttempts = 4;
+    private const int MaxRecvFailures = 12;
+    private const int MaxSendAttempts = 6;
     private const int MaxBatchBytes = 1024 * 1024;
     // 64 x 16KB reads = 1MB of unsent data at most: when the uplink can't
     // keep up, SendAsync blocks and the TCP->relay pump stops reading from
@@ -53,6 +64,10 @@ internal sealed class HttpRelayWebSocket : WebSocket
 
     private readonly string _base;
     private readonly string _role;
+    // Acknowledged byte-stream mode (see class remarks): only the raw VNC stream.
+    private readonly bool _streamMode;
+    private long _rxAck;   // bytes of the relay->kiosk stream accepted so far
+    private long _txOff;   // bytes of the kiosk->relay stream the relay has confirmed
     private readonly CancellationTokenSource _cts;
     private readonly Channel<Message> _inbound = Channel.CreateUnbounded<Message>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
@@ -71,7 +86,34 @@ internal sealed class HttpRelayWebSocket : WebSocket
     {
         _base = $"{httpBaseUrl.TrimEnd('/')}/rt/{role}/{Uri.EscapeDataString(token)}";
         _role = role;
+        _streamMode = role == "agent";
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    }
+
+    /// <summary>Relay says the stream position is inconsistent - retrying can't help.</summary>
+    private sealed class RelayStreamException : Exception
+    {
+        public RelayStreamException(string message) : base(message) { }
+    }
+
+    // CRC32 (zlib polynomial) - the relay sends one per message.
+    private static readonly uint[] CrcTable = BuildCrcTable();
+    private static uint[] BuildCrcTable()
+    {
+        var t = new uint[256];
+        for (uint n = 0; n < 256; n++)
+        {
+            var c = n;
+            for (var k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            t[n] = c;
+        }
+        return t;
+    }
+    private static uint Crc32(byte[] data)
+    {
+        var c = 0xFFFFFFFFu;
+        foreach (var b in data) c = CrcTable[(c ^ b) & 0xFF] ^ (c >> 8);
+        return c ^ 0xFFFFFFFFu;
     }
 
     /// <summary>
@@ -84,12 +126,27 @@ internal sealed class HttpRelayWebSocket : WebSocket
         var ws = new HttpRelayWebSocket(httpBaseUrl, role, token, ct);
         try
         {
-            using var checkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            checkCts.CancelAfter(RecvRequestTimeout);
-            using var resp = await Http.GetAsync($"{ws._base}/recv?wait=0", checkCts.Token);
-            resp.EnsureSuccessStatusCode();
-            var json = await resp.Content.ReadAsStringAsync(checkCts.Token);
-            ws.HandleRecvPayload(json);
+            // Reachability check. NetFree can block a single request, so try a
+            // few times before giving up on this transport.
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    using var checkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    checkCts.CancelAfter(RecvRequestTimeout);
+                    using var resp = await Http.GetAsync($"{ws._base}/recv?wait=0{ws.AckQuery()}", checkCts.Token);
+                    resp.EnsureSuccessStatusCode();
+                    var json = await resp.Content.ReadAsStringAsync(checkCts.Token);
+                    // In acknowledged mode nothing is consumed here: the ack is still 0,
+                    // so the receive loop asks for the same bytes again.
+                    if (!ws._streamMode) ws.HandleRecvPayload(json);
+                    break;
+                }
+                catch (Exception) when (attempt < 3 && !ct.IsCancellationRequested)
+                {
+                    await Task.Delay(300 * attempt, ct);
+                }
+            }
         }
         catch
         {
@@ -237,7 +294,10 @@ internal sealed class HttpRelayWebSocket : WebSocket
                     body = ms.ToArray();
                 }
 
-                await PostWithRetryAsync(isText ? "send?t=1" : "send", body, isText, ct);
+                // ?off= makes a retry after a lost/blocked response idempotent.
+                long? off = _streamMode && !isText ? _txOff : null;
+                await PostWithRetryAsync(isText ? "send?t=1" : (off is null ? "send" : $"send?off={off}"), body, isText, ct);
+                if (off is not null) _txOff += body.Length;
             }
         }
         catch (OperationCanceledException) { /* closed/disposed */ }
@@ -255,6 +315,8 @@ internal sealed class HttpRelayWebSocket : WebSocket
                 using var content = new ByteArrayContent(body);
                 content.Headers.ContentType = new MediaTypeHeaderValue(isText ? "text/plain" : "application/octet-stream");
                 using var resp = await Http.PostAsync($"{_base}/{relativeUrl}", content, reqCts.Token);
+                if (resp.StatusCode == HttpStatusCode.Conflict)
+                    throw new RelayStreamException("relay reports a gap in the kiosk->relay stream (409)");
                 resp.EnsureSuccessStatusCode();
                 return;
             }
@@ -262,7 +324,7 @@ internal sealed class HttpRelayWebSocket : WebSocket
             {
                 throw;
             }
-            catch (Exception) when (attempt < MaxSendAttempts)
+            catch (Exception ex) when (attempt < MaxSendAttempts && ex is not RelayStreamException)
             {
                 // Never skip a chunk: dropping bytes would corrupt the VNC stream.
                 await Task.Delay(300 * attempt, ct);
@@ -280,11 +342,16 @@ internal sealed class HttpRelayWebSocket : WebSocket
             {
                 using var reqCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 reqCts.CancelAfter(RecvRequestTimeout);
-                using var resp = await Http.GetAsync($"{_base}/recv?wait={RecvWaitMs}", reqCts.Token);
+                using var resp = await Http.GetAsync($"{_base}/recv?wait={RecvWaitMs}{AckQuery()}", reqCts.Token);
+                if (resp.StatusCode == HttpStatusCode.Conflict)
+                    throw new RelayStreamException("relay lost track of the stream (bad ack, 409) - a new session is needed");
                 resp.EnsureSuccessStatusCode();
                 var json = await resp.Content.ReadAsStringAsync(reqCts.Token);
+                // A blocked (418), truncated or altered response throws here or
+                // in HandleRecvPayload; the SAME ack is then requested again.
+                var peerClosed = HandleRecvPayload(json);
                 failures = 0;
-                if (HandleRecvPayload(json))
+                if (peerClosed)
                 {
                     // Peer said it's gone: end of stream (normal close).
                     _inbound.Writer.TryComplete();
@@ -295,8 +362,14 @@ internal sealed class HttpRelayWebSocket : WebSocket
             {
                 return;
             }
+            catch (RelayStreamException ex)
+            {
+                Fail(ex);
+                return;
+            }
             catch (Exception ex)
             {
+                Logger.Debug(ex, "HTTP relay recv ({Role}) failed, asking again from offset {Ack}", _role, _rxAck);
                 if (++failures >= MaxRecvFailures)
                 {
                     Fail(ex);
@@ -319,6 +392,18 @@ internal sealed class HttpRelayWebSocket : WebSocket
             {
                 var data = Convert.FromBase64String(m.GetProperty("data").GetString() ?? "");
                 var binary = m.TryGetProperty("binary", out var b) && b.GetBoolean();
+                if (_streamMode && binary)
+                {
+                    // Accept ONLY exactly the next bytes, intact. Anything else is
+                    // discarded (never reaches TightVNC) and requested again.
+                    if (!m.TryGetProperty("off", out var offEl) || !offEl.TryGetInt64(out var off) || off != _rxAck)
+                        throw new InvalidDataException($"unexpected offset in /recv (want {_rxAck})");
+                    if (!m.TryGetProperty("len", out var lenEl) || !lenEl.TryGetInt32(out var len) || len != data.Length)
+                        throw new InvalidDataException($"length mismatch in /recv at {off}");
+                    if (m.TryGetProperty("crc", out var crcEl) && crcEl.TryGetUInt32(out var crc) && Crc32(data) != crc)
+                        throw new InvalidDataException($"crc mismatch in /recv at {off}");
+                    _rxAck += data.Length;
+                }
                 _inbound.Writer.TryWrite(new Message(data, binary));
             }
         }
@@ -334,6 +419,8 @@ internal sealed class HttpRelayWebSocket : WebSocket
         _inbound.Writer.TryComplete(new WebSocketException(WebSocketError.ConnectionClosedPrematurely,
             "HTTP relay transport failed: " + ex.Message, ex));
     }
+
+    private string AckQuery() => _streamMode ? $"&ack={_rxAck}" : "";
 
     private void NotifyClosedBestEffort()
     {
