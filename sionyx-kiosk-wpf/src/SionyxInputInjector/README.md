@@ -43,3 +43,22 @@ If step 2-3 don't work, the fallback is a physical input device at the
 kiosk (e.g. a small USB HID dongle) for the rare case an elevated dialog
 needs a real human click - genuinely bypassing software injection entirely
 rather than continuing to fight UIPI/Secure Desktop from software.
+
+## VNC host before login (added 2026-09-24)
+
+`VncHostWorker` runs the same `VncRelayService` source as the kiosk app
+(linked in the csproj, not copied) inside this LocalSystem service, so the
+dashboard's VNC button works after a reboot / power outage while the machine
+is still at the Windows login screen (SionyxKiosk.exe only starts after login).
+
+- TightVNC runs as a real Windows service (`tvnserver`, HKLM settings,
+  loopback only) - the only mode that captures the login screen, Ctrl+Alt+Del
+  and UAC. The service is (re)configured and started by the worker every ~60s.
+- Heartbeat: `HKLM\SOFTWARE\SIONYX\VncHostHeartbeat`. While it is fresh the
+  kiosk app does NOT start its own bridge/`tvnserver -run`; if the service is
+  missing the kiosk falls back to the old behaviour.
+- Listens under the primary computer id plus the other local adapters' ids
+  (adapter order can differ at boot vs. after login).
+- Logs: `C:\ProgramData\SIONYX\logs\host-YYYYMMDD.log`.
+- Still UNVERIFIED on real hardware - written without a Windows machine.
+  Field test: reboot a kiosk, don't log in, press the dashboard VNC button.

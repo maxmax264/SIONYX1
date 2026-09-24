@@ -9,6 +9,27 @@ using SionyxInputInjector;
 // this exists to avoid.
 NativeMethods.SetProcessDpiAwarenessContext(NativeMethods.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+// The shared VNC bridge code (VncRelayService & co, linked from SionyxKiosk)
+// logs through Serilog's static Log.Logger; without this it would be silent.
+// Daily files under C:\ProgramData\SIONYX\logs\host-YYYYMMDD.log.
+try
+{
+    var logDir = @"C:\ProgramData\SIONYX\logs";
+    Directory.CreateDirectory(logDir);
+    Serilog.Log.Logger = new Serilog.LoggerConfiguration()
+        .MinimumLevel.Information()
+        .WriteTo.File(
+            Path.Combine(logDir, "host-.log"),
+            rollingInterval: Serilog.RollingInterval.Day,
+            retainedFileCountLimit: 7,
+            shared: true)
+        .CreateLogger();
+}
+catch
+{
+    // logging is best effort - never stop the service from starting
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // Registers under the "SionyxInputInjector" Windows Event Log source when
@@ -23,6 +44,7 @@ builder.Services.AddWindowsService(options =>
 builder.Services.AddSingleton<InputInjector>();
 builder.Services.AddSingleton<TightVncInstaller>();
 builder.Services.AddHostedService<PipeServerWorker>();
+builder.Services.AddHostedService<VncHostWorker>();
 
 var host = builder.Build();
 host.Run();

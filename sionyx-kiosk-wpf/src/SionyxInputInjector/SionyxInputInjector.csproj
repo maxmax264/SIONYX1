@@ -30,6 +30,34 @@
          and build.ps1's Invoke-PublishInputInjector for why that failure was
          never visible. -->
     <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
+    <!-- VncHostWorker runs the kiosk's VNC bridge (VncRelayService) inside this
+         service so it works at the Windows login screen. The shared files
+         below use Serilog and ServiceController. -->
+    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Worker SDK's implicit "using Microsoft.Extensions.Logging" makes the
+         shared kiosk files' "ILogger" ambiguous with Serilog.ILogger (CS0104).
+         Every injector file that needs MEL has its own explicit using. -->
+    <Using Remove="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same source files as SionyxKiosk.exe (no copy to keep in sync). -->
+    <Compile Include="..\SionyxKiosk\Infrastructure\FirebaseClient.cs" Link="Shared\FirebaseClient.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\IFirebaseClient.cs" Link="Shared\IFirebaseClient.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\FirebaseConfig.cs" Link="Shared\FirebaseConfig.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\SseListener.cs" Link="Shared\SseListener.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\DeviceInfo.cs" Link="Shared\DeviceInfo.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\RegistryConfig.cs" Link="Shared\RegistryConfig.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\ServerResolver.cs" Link="Shared\ServerResolver.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\DotEnvLoader.cs" Link="Shared\DotEnvLoader.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\ErrorTranslations.cs" Link="Shared\ErrorTranslations.cs" />
+    <Compile Include="..\SionyxKiosk\Services\HttpRelayWebSocket.cs" Link="Shared\HttpRelayWebSocket.cs" />
+    <Compile Include="..\SionyxKiosk\Services\VncRelayService.cs" Link="Shared\VncRelayService.cs" />
   </ItemGroup>
 
 </Project>

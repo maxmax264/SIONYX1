@@ -113,8 +113,12 @@ try {
     $existingService = Get-Service -Name "tvnserver" -ErrorAction SilentlyContinue
     if ($existingService -ne $null) {
         Write-Host "[SIONYX] Found tvnserver registered as a Windows service from a previous install - disabling it (session-mode only from now on)."
-        Stop-Service -Name "tvnserver" -Force -ErrorAction SilentlyContinue
-        Set-Service -Name "tvnserver" -StartupType Disabled -ErrorAction SilentlyContinue
+        # 2026-09-24: when the SionyxInputInjector service exists it now runs TightVNC
+        # AS a service (so the login screen works after a reboot) - leave it alone.
+        if (-not (Get-Service -Name "SionyxInputInjector" -ErrorAction SilentlyContinue)) {
+            Stop-Service -Name "tvnserver" -Force -ErrorAction SilentlyContinue
+            Set-Service -Name "tvnserver" -StartupType Disabled -ErrorAction SilentlyContinue
+        }
     }
 } catch {
     Write-Warning "[SIONYX] Could not disable a pre-existing tvnserver service (non-fatal): $_"
@@ -149,7 +153,7 @@ try {
 # רק בעלייה, לא live).
 try {
     $running = Get-Process -Name "tvnserver" -ErrorAction SilentlyContinue
-    if ($running) {
+    if ($running -and -not (Get-Service -Name "SionyxInputInjector" -ErrorAction SilentlyContinue)) {
         Write-Host "[SIONYX] Restarting tvnserver.exe so the auth-disabled setting takes effect..."
         Stop-Process -Name "tvnserver" -Force -ErrorAction SilentlyContinue
     }

@@ -85,10 +85,27 @@ public class VncRelayService
     private long _lastHandledRequestedAt;
     private bool _starting;
     private bool _signedIn;
+    private int _startRequested;
 
-    public VncRelayService(FirebaseConfig config)
+    // True when this instance runs inside the SionyxInputInjector Windows
+    // service (LocalSystem, starts with the machine, before any login). In
+    // that mode TightVNC runs as a real Windows service (it follows the
+    // active console session, so it shows the login screen, the lock screen
+    // and the UAC secure desktop), and settings live in HKLM. In the kiosk
+    // app (false) the old behaviour is kept as a fallback for machines where
+    // the service is missing.
+    private readonly bool _hostMode;
+
+    // Host mode only: listen under this computer id instead of
+    // DeviceInfo.GetDeviceId() (see VncHostWorker for why).
+    private readonly string? _deviceIdOverride;
+
+    public VncRelayService(FirebaseConfig config, bool systemHostMode = false, string? deviceIdOverride = null)
     {
         _firebase = new FirebaseClient(config);
+        _hostMode = systemHostMode;
+        _deviceIdOverride = deviceIdOverride;
+        if (systemHostMode) _hostModeProcess = true;
     }
 
     /// <summary>Call once at startup - does not need the kiosk to be authenticated
@@ -96,13 +113,37 @@ public class VncRelayService
     public void Start()
     {
         if (_starting || _signedIn) return;
-        _computerId = DeviceInfo.GetDeviceId();
+        if (Interlocked.Exchange(ref _startRequested, 1) == 1) return;
+        _computerId = _deviceIdOverride ?? DeviceInfo.GetDeviceId();
 
-        // Launch tvnserver in THIS session (the kiosk's own interactive
-        // session) rather than relying on a Windows service - a service
-        // runs in Session 0 and would only ever see a black screen, not
-        // the actual kiosk desktop. install-tightvnc.ps1 deliberately
-        // does not register tvnserver as a service for this reason.
+        if (_hostMode)
+        {
+            BeginListening();
+            return;
+        }
+
+        // Kiosk-app mode: if the SionyxInputInjector service is running it
+        // owns the VNC bridge (it works before anyone logs in, which the
+        // kiosk app cannot) - stay out of its way, otherwise both would
+        // answer the same dashboard request and fight over TightVNC.
+        // Waiting happens off the caller's thread (this runs at app startup).
+        _ = Task.Run(() =>
+        {
+            if (WaitForSystemHost())
+            {
+                Logger.Information("VNC bridge is hosted by the SionyxInputInjector service on this machine - the kiosk app will not start its own");
+                return;
+            }
+            BeginListening();
+        });
+    }
+
+    private void BeginListening()
+    {
+        // Kiosk-app mode: launch tvnserver in THIS session (the kiosk's own
+        // interactive session) rather than as a Windows service - this is
+        // the legacy path, used only when the SYSTEM host is not available.
+        // Host mode: make sure the real TightVNC Windows service is up.
         EnsureTightVncRunning();
 
         _ = Task.Run(async () =>
@@ -201,6 +242,12 @@ public class VncRelayService
     {
         try
         {
+            if (_hostMode)
+            {
+                EnsureTightVncService();
+                return;
+            }
+
             DisableLegacyTvnServerService();
             EnsureNoAuthRegistry();
             EnsureTightVncDpiCompatibility();
@@ -290,18 +337,34 @@ public class VncRelayService
     // that already have a stale/empty HKCU key from before this fix - the
     // very next time tvnserver isn't already running (next kiosk login or
     // reboot) it will pick up the correct value.
-    private static void EnsureNoAuthRegistry()
+    //
+    // machineWide=true (SYSTEM host): TightVNC runs as a Windows service and
+    // reads HKLM, and LoopbackOnly=1 keeps port 5900 unreachable from the
+    // LAN (only the local relay bridge connects). Returns true if any value
+    // was actually changed (a running service must be restarted to see it).
+    private static bool EnsureNoAuthRegistry(bool machineWide = false)
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\TightVNC\Server");
-            key.SetValue("UseVncAuthentication", 0, RegistryValueKind.DWord);
-            key.SetValue("AllowLoopback", 1, RegistryValueKind.DWord);
+            using var key = (machineWide ? Registry.LocalMachine : Registry.CurrentUser)
+                .CreateSubKey(@"SOFTWARE\TightVNC\Server");
+            var changed = SetDwordIfDifferent(key, "UseVncAuthentication", 0);
+            changed |= SetDwordIfDifferent(key, "AllowLoopback", 1);
+            if (machineWide) changed |= SetDwordIfDifferent(key, "LoopbackOnly", 1);
+            return changed;
         }
         catch (Exception ex)
         {
-            Logger.Warning(ex, "Failed to set TightVNC no-auth/loopback registry values under HKCU (non-fatal - VNC connections will fail until this is set)");
+            Logger.Warning(ex, "Failed to set TightVNC no-auth/loopback registry values (non-fatal - VNC connections will fail until this is set)");
+            return false;
         }
+    }
+
+    private static bool SetDwordIfDifferent(RegistryKey key, string name, int value)
+    {
+        if (key.GetValue(name) is int current && current == value) return false;
+        key.SetValue(name, value, RegistryValueKind.DWord);
+        return true;
     }
 
     // Added 2026-09-14, after community research turned up an exact match
@@ -333,16 +396,229 @@ public class VncRelayService
     // runs at a higher Windows integrity level (still relevant for real
     // UAC/Secure-Desktop prompts). Test this fix first; it's the simpler,
     // fully-automatic one.
-    private static void EnsureTightVncDpiCompatibility()
+    private static void EnsureTightVncDpiCompatibility(bool machineWide = false)
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers");
+            using var key = (machineWide ? Registry.LocalMachine : Registry.CurrentUser).CreateSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers");
             key.SetValue(TightVncExePath, "~ GDIDPISCALING DPIUNAWARE", RegistryValueKind.String);
         }
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to set TightVNC DPI-compatibility registry flag (non-fatal - clicks may be offset on a scaled display until this is set)");
+        }
+    }
+
+    // ---- SYSTEM host support (added 2026-09-24) ---------------------------
+    //
+    // Goal: from the dashboard, reach a kiosk that just rebooted (power
+    // outage) and is sitting at the Windows login screen, and type the
+    // password. SionyxKiosk.exe only starts after a login, so the VNC bridge
+    // (this class) also runs inside the SionyxInputInjector service.
+
+    private const string HostRegistryKey = @"SOFTWARE\SIONYX";
+    private const string HostHeartbeatValue = "VncHostHeartbeat";
+    private const string HostSessionValue = "VncSessionActive";
+    private const string InjectorServiceName = "SionyxInputInjector";
+    private const string TightVncServiceName = "tvnserver";
+    private static readonly TimeSpan HostHeartbeatMaxAge = TimeSpan.FromSeconds(90);
+
+    /// <summary>Called by the SYSTEM host every ~30s so the kiosk app can tell it is alive.</summary>
+    public static void WriteHostHeartbeat(bool alive = true)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(HostRegistryKey, writable: true);
+            key.SetValue(HostHeartbeatValue, alive ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() : 0L, RegistryValueKind.QWord);
+            if (!alive) key.SetValue(HostSessionValue, 0, RegistryValueKind.DWord);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to write VNC host heartbeat (non-fatal)");
+        }
+    }
+
+    public static bool IsSystemHostActive()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(HostRegistryKey);
+            if (key?.GetValue(HostHeartbeatValue) is long secs && secs > 0)
+            {
+                // Math.Abs: a clock step (NTP after a power outage) must not flip the answer.
+                var age = Math.Abs((DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(secs)).TotalSeconds);
+                return age < HostHeartbeatMaxAge.TotalSeconds;
+            }
+        }
+        catch
+        {
+            // treated as "no host"
+        }
+        return false;
+    }
+
+    private static bool ReadHostSessionFlag()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(HostRegistryKey);
+            return key?.GetValue(HostSessionValue) is int v && v == 1 && IsSystemHostActive();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void WriteHostSessionFlag(bool active)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(HostRegistryKey, writable: true);
+            key.SetValue(HostSessionValue, active ? 1 : 0, RegistryValueKind.DWord);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to write VNC session flag (non-fatal)");
+        }
+    }
+
+    // True only if the injector service is running AND its host worker is
+    // heartbeating (an older injector build without the host worker is
+    // running too, but never heartbeats - the kiosk then keeps its own bridge).
+    private static bool WaitForSystemHost()
+    {
+        try
+        {
+            using var sc = new ServiceController(InjectorServiceName);
+            var status = sc.Status; // InvalidOperationException if the service is not installed
+            if (status != ServiceControllerStatus.Running && status != ServiceControllerStatus.StartPending) return false;
+        }
+        catch
+        {
+            return false;
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (IsSystemHostActive()) return true;
+            Thread.Sleep(2000);
+        }
+        return IsSystemHostActive();
+    }
+
+    /// <summary>Host-mode maintenance hook: keeps the TightVNC Windows service configured and running.</summary>
+    public static void EnsureHostTightVncService() => EnsureTightVncService();
+
+    // TightVNC as a real Windows service: unlike "tvnserver -run" inside the
+    // user session, the service follows the active console session, so it
+    // sees the login screen, lock screen, Ctrl+Alt+Del and UAC prompts.
+    private static void EnsureTightVncService()
+    {
+        try
+        {
+            if (!File.Exists(TightVncExePath))
+            {
+                Logger.Warning("TightVNC not found at {Path} - the injector's installer loop will retry", TightVncExePath);
+                return;
+            }
+
+            var changed = EnsureNoAuthRegistry(machineWide: true);
+            EnsureTightVncDpiCompatibility(machineWide: true);
+
+            // The kiosk app used to disable this service on every launch
+            // (DisableLegacyTvnServerService) - undo that (Start=2 is Automatic).
+            using (var svcKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\" + TightVncServiceName, writable: true))
+            {
+                if (svcKey != null && svcKey.GetValue("Start") is int start && start != 2)
+                    svcKey.SetValue("Start", 2, RegistryValueKind.DWord);
+            }
+
+            var status = GetServiceStatus(TightVncServiceName);
+            if (status == null || status == ServiceControllerStatus.Stopped)
+            {
+                // Nothing of the service is running, so any tvnserver process
+                // is a leftover "-run" instance from the old kiosk-app mode -
+                // it would hold port 5900 and stop the service from listening.
+                foreach (var p in Process.GetProcessesByName("tvnserver"))
+                {
+                    try { p.Kill(); } catch { /* best effort */ }
+                    p.Dispose();
+                }
+            }
+
+            if (status == null)
+            {
+                RunTvnserver("-install -silent");
+                Logger.Information("Registered TightVNC as a Windows service");
+            }
+
+            using var sc = new ServiceController(TightVncServiceName);
+            sc.Refresh();
+            if (sc.Status == ServiceControllerStatus.Stopped)
+            {
+                sc.Start();
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
+                Logger.Information("Started the TightVNC Windows service");
+            }
+            else if (changed && sc.Status == ServiceControllerStatus.Running)
+            {
+                // Settings only take effect on (re)start.
+                sc.Stop();
+                sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(20));
+                sc.Start();
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
+                Logger.Information("Restarted the TightVNC Windows service to apply changed settings");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to ensure the TightVNC Windows service is running (will retry)");
+        }
+    }
+
+    private static ServiceControllerStatus? GetServiceStatus(string name)
+    {
+        try
+        {
+            using var sc = new ServiceController(name);
+            return sc.Status;
+        }
+        catch (InvalidOperationException)
+        {
+            return null; // not installed
+        }
+    }
+
+    private static void RunTvnserver(string arguments)
+    {
+        using var p = Process.Start(new ProcessStartInfo
+        {
+            FileName = TightVncExePath,
+            Arguments = arguments,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        });
+        p?.WaitForExit(20000);
+    }
+
+    // Right after boot the TightVNC service may not be listening yet when
+    // the first dashboard request arrives - wait a little instead of failing.
+    private static async Task WaitForLocalVncPortAsync(CancellationToken ct)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            try
+            {
+                using var probe = new TcpClient();
+                await probe.ConnectAsync(VncHost, VncPort, ct);
+                return;
+            }
+            catch (SocketException)
+            {
+                await Task.Delay(1500, ct);
+            }
         }
     }
 
@@ -391,7 +667,21 @@ public class VncRelayService
     // needs to stop yanking away a real incoming-connection dialog while
     // someone is trying to click it, without giving up on suppressing
     // AeroAdmin's own noise (EULA popups etc.) the rest of the time.
-    public static bool IsSessionActive { get; private set; }
+    //
+    // When the session runs inside the SYSTEM host (another process), the
+    // host publishes the flag in HKLM and this getter reads it back, so the
+    // kiosk app's callers keep working unchanged.
+    private static bool _localSessionActive;
+    private static bool _hostModeProcess;
+    public static bool IsSessionActive
+    {
+        get => _localSessionActive || (!_hostModeProcess && ReadHostSessionFlag());
+        private set
+        {
+            _localSessionActive = value;
+            if (_hostModeProcess) WriteHostSessionFlag(value);
+        }
+    }
 
     private async Task RunSessionAsync(string token, CancellationToken ct)
     {
@@ -427,6 +717,7 @@ public class VncRelayService
             Logger.Information("VNC relay connected to {Host} via {Transport}", relayBaseUrl,
                 ws is HttpRelayWebSocket ? "HTTP long-poll (WebSocket unusable on this network)" : "WebSocket");
 
+            if (_hostMode) await WaitForLocalVncPortAsync(ct); // service may still be starting right after boot
             await tcp.ConnectAsync(VncHost, VncPort, ct);
             Logger.Information("Connected to local VNC server on {Host}:{Port}", VncHost, VncPort);
 
