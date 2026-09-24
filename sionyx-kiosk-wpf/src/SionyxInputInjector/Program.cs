@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog; // brings the WriteTo.File(...) extension method into scope
 using SionyxInputInjector;
 
 // Must happen before any GetSystemMetrics/SendInput call anywhere in this
