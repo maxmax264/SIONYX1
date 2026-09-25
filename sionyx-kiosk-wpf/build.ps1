@@ -228,7 +228,7 @@ function Test-InstallerSecrets {
     # $env:FUNCTIONS_BASE_URL explicitly from the repo secret before this
     # script runs, and that assignment is untouched by this default.
     if (-not $env:FUNCTIONS_BASE_URL) {
-        $env:FUNCTIONS_BASE_URL = "https://understood-n5ok.onrender.com"
+        $env:FUNCTIONS_BASE_URL = "https://understood-main.onrender.com"
         Write-Warn "FUNCTIONS_BASE_URL not set - defaulting to $($env:FUNCTIONS_BASE_URL). Override with `$env:FUNCTIONS_BASE_URL if this ever changes."
     }
 
