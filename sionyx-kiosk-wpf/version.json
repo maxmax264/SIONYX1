@@ -1,8 +1,17 @@
 {
+<<<<<<< HEAD
   "version": "3.16.21",
   "major": 3,
   "minor": 16,
   "patch": 21,
   "buildNumber": 629,
   "lastBuildDate": "2026-09-25T11:22:18.8833614+00:00"
+=======
+    "version":  "3.18.22",
+    "major":  3,
+    "minor":  18,
+    "patch":  22,
+    "buildNumber":  629,
+    "lastBuildDate":  "2026-09-25T14:18:08.4516041+03:00"
+>>>>>>> 925a22d (Bump version to 3.18.22 + fixes)
 }

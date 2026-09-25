@@ -34,18 +34,28 @@ public static class DeviceInfo
             if (mac != null)
                 return mac.Replace(":", "").ToLowerInvariant();
 
-            // Fallback: hash of computer name + OS
-            var computerName = GetComputerName();
-            var platformInfo = $"{Environment.OSVersion.Platform}-{Environment.Is64BitOperatingSystem}";
-            var combined = $"{computerName}-{platformInfo}";
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
-            return Convert.ToHexString(hash)[..16].ToLowerInvariant();
+            // Fallback (no MAC yet): network-independent hash id
+            return GetFallbackDeviceId();
         }
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to generate device ID");
             return Guid.NewGuid().ToString("N")[..16];
         }
+    }
+
+    /// <summary>
+    /// Network-independent id (hash of machine name + OS). GetDeviceId() returns this
+    /// when no MAC is available yet, so a machine can be registered under it;
+    /// exposed so the SYSTEM host service can also listen under it.
+    /// </summary>
+    public static string GetFallbackDeviceId()
+    {
+        var computerName = GetComputerName();
+        var platformInfo = $"{Environment.OSVersion.Platform}-{Environment.Is64BitOperatingSystem}";
+        var combined = $"{computerName}-{platformInfo}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(combined));
+        return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
 
     /// <summary>

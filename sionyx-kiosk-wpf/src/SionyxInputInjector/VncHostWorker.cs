@@ -70,6 +70,8 @@ internal sealed class VncHostWorker : BackgroundService
                     // dashboard actually writes to.
                     var primaryId = DeviceInfo.GetDeviceId();
                     var ids = new List<string> { primaryId };
+                    var fallbackId = DeviceInfo.GetFallbackDeviceId();
+                    if (!ids.Contains(fallbackId)) ids.Add(fallbackId);
                     foreach (var id in LocalAdapterIds())
                     {
                         if (!ids.Contains(id) && ids.Count < 6) ids.Add(id);
