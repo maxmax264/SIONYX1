@@ -36,6 +36,17 @@ public sealed class FirebaseClient : IFirebaseClient
     private string? _userId;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
 
+    // Backoff for transient RefreshTokenAsync failures (e.g. NetFree/network
+    // blocking securetoken.googleapis.com). Without this, EnsureValidTokenAsync
+    // re-attempts the refresh (and logs an Error) on every single call - once
+    // per heartbeat/DB write, every 20-40s per affected kiosk - which floods
+    // the Render log-ingest endpoint from every kiosk behind the same
+    // block simultaneously. Exponential, capped at 10 minutes; reset on the
+    // next successful refresh.
+    private int _refreshFailureCount;
+    private DateTime _nextRefreshAttempt = DateTime.MinValue;
+    private static readonly TimeSpan MaxRefreshBackoff = TimeSpan.FromMinutes(10);
+
     public string? UserId => _userId;
     public string? RefreshToken => _refreshToken;
     public string OrgId => _orgId;
@@ -148,6 +159,8 @@ public sealed class FirebaseClient : IFirebaseClient
             var expiresIn = int.Parse(GetString(response, "expires_in") ?? "3600");
             _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);
 
+            _refreshFailureCount = 0;
+            _nextRefreshAttempt = DateTime.MinValue;
             Logger.Information("Token refreshed successfully");
             return true;
         }
@@ -166,10 +179,24 @@ public sealed class FirebaseClient : IFirebaseClient
         }
         catch (Exception ex)
         {
-            // Transient failure (network blip, timeout, Firebase 5xx) - leave
-            // the existing tokens in place so the next attempt can still
-            // succeed once things recover.
-            Logger.Error(ex, "Token refresh failed");
+            // Transient failure (network blip, timeout, Firebase 5xx, or a
+            // network-level block like NetFree returning 418) - leave the
+            // existing tokens in place so the next attempt can still succeed
+            // once things recover. Back off exponentially so a
+            // permanently-blocked kiosk doesn't hammer this endpoint (and
+            // the log-shipping pipeline) every 20-40s forever.
+            _refreshFailureCount++;
+            var backoffSeconds = Math.Min(MaxRefreshBackoff.TotalSeconds, 15 * Math.Pow(2, _refreshFailureCount - 1));
+            _nextRefreshAttempt = DateTime.UtcNow.AddSeconds(backoffSeconds);
+
+            // Only log the full error on the first few failures - after that,
+            // it's the same known condition repeating, and EnsureValidTokenAsync
+            // won't even call back in here again until the backoff elapses.
+            if (_refreshFailureCount <= 3)
+                Logger.Error(ex, "Token refresh failed (attempt {Count}, next retry in {Seconds}s)", _refreshFailureCount, backoffSeconds);
+            else
+                Logger.Warning("Token refresh still failing (attempt {Count}, next retry in {Seconds}s): {Message}", _refreshFailureCount, backoffSeconds, ex.Message);
+
             return false;
         }
     }
@@ -204,11 +231,19 @@ public sealed class FirebaseClient : IFirebaseClient
         // Refresh if expiring within 5 minutes
         if (DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
         {
+            // Still under backoff from a recent failure - skip the network
+            // call (and the log noise) entirely. The old, still-valid token
+            // stays in use, which is fine as long as it hasn't actually
+            // expired yet (Firebase tokens live 1h; this only fires when the
+            // real refresh itself keeps failing, e.g. blocked by NetFree).
+            if (DateTime.UtcNow < _nextRefreshAttempt)
+                return DateTime.UtcNow < _tokenExpiry;
+
             await _tokenLock.WaitAsync();
             try
             {
                 // Double-check after acquiring lock
-                if (DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5))
+                if (DateTime.UtcNow >= _tokenExpiry.AddMinutes(-5) && DateTime.UtcNow >= _nextRefreshAttempt)
                     return await RefreshTokenAsync();
             }
             finally

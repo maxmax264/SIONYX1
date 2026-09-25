@@ -72,6 +72,16 @@ public sealed class ChannelLogSink : ILogEventSink
     private readonly object _gate = new();
     private List<Destination> _destinations;
 
+    // Belt-and-suspenders guard against any repeating-error storm (whatever
+    // the cause) hammering the Render log-ingest endpoint - independent of
+    // the per-destination MinInterval throttle above, which only applies
+    // when the dashboard/registry explicitly configures one (default 0).
+    // Suppresses an exact repeat of the same level+text within this window;
+    // does not affect distinct messages.
+    private static readonly TimeSpan RepeatSuppressWindow = TimeSpan.FromSeconds(30);
+    private string? _lastText;
+    private DateTime _lastTextAt = DateTime.MinValue;
+
     static ChannelLogSink()
     {
         Http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -152,6 +162,15 @@ public sealed class ChannelLogSink : ILogEventSink
         var text = FormatText(logEvent);
         var timestamp = logEvent.Timestamp.UtcDateTime;
         var level = logEvent.Level.ToString();
+
+        lock (_gate)
+        {
+            var now = DateTime.UtcNow;
+            if (text == _lastText && now - _lastTextAt < RepeatSuppressWindow)
+                return;
+            _lastText = text;
+            _lastTextAt = now;
+        }
 
         List<Destination> snapshot;
         lock (_gate) { snapshot = _destinations; }
