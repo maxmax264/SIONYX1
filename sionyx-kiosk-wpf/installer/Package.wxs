@@ -375,7 +375,20 @@
            script is idempotent (checks Test-Path / Get-Service before doing
            any work), so running them again on every upgrade is safe and just
            a few no-op checks when nothing changed. -->
-      <Custom Action="CA_InstallAnyDesk"     After="CA_InstallRustDesk"   Condition="NOT REMOVE" />
+      <!-- Moved to run AFTER WriteRegistryValues (2026-09-27): these four each
+           download an exe over the internet with no bound on how long that
+           can take. They previously ran right after InstallFiles, BEFORE
+           WriteRegistryValues writes HKLM\SOFTWARE\SIONYX\Version - so on a
+           network that stalls one of these downloads (e.g. NetFree
+           filtering), the whole MSI would sit stuck before the version key
+           ever got written, and AutoUpdateService's registry poll would
+           time out repeatedly even though the "real" install (files, main
+           app) had already fully succeeded. Now the version key lands
+           first, so the kiosk can confirm+restart on the new version
+           regardless of what happens with these optional remote-control
+           installers (each also got a real download timeout - see
+           install-anydesk.ps1/install-teamviewer.ps1/install-aeroadmin.ps1). -->
+      <Custom Action="CA_InstallAnyDesk"     After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
       <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
       <Custom Action="CA_InstallTightVnc"    After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
@@ -385,7 +398,7 @@
            itself as part of its own standard InstallServices/StartServices
            actions - no explicit sequencing entry needed for it here. -->
       <Custom Action="CA_SetupAutoStart"     After="CA_InstallTightVnc"   Condition="NOT REMOVE" />
-      <Custom Action="CA_VerifyInstallation" After="WriteRegistryValues"  Condition="NOT REMOVE" />
+      <Custom Action="CA_VerifyInstallation" After="CA_SetupAutoStart"    Condition="NOT REMOVE" />
       <Custom Action="CA_LaunchKiosk" After="CA_VerifyInstallation" Condition="NOT REMOVE" />
       <Custom Action="CA_SetupUpdateTask"  After="CA_LaunchKiosk"          Condition="NOT REMOVE AND NOT Installed" />
 

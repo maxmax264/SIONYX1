@@ -46,7 +46,12 @@ if (Test-Path $QsExePath) {
     Write-Host "[SIONYX] TeamViewerQS.exe already staged and valid - skipping download."
 } else {
     Write-Host "[SIONYX] Downloading TeamViewerQS.exe..."
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $QsExePath
+    try {
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $QsExePath -TimeoutSec 30 -ErrorAction Stop
+    } catch {
+        Write-Warning "[SIONYX] TeamViewerQS.exe download failed/timed out: $($_.Exception.Message) - skipping for this run, will retry on next update."
+        return
+    }
 
     $downloadedSize = (Get-Item $QsExePath).Length
     if ($downloadedSize -lt $MinValidSize) {

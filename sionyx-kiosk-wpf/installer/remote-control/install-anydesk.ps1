@@ -58,7 +58,12 @@ if ($existingService -ne $null) {
 if (-Not $alreadyInstalled) {
     Write-Host "[SIONYX] Downloading AnyDesk..."
     $ExePath = "$TempDir\AnyDesk.exe"
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath
+    try {
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath -TimeoutSec 30 -ErrorAction Stop
+    } catch {
+        Write-Warning "[SIONYX] AnyDesk download failed/timed out: $($_.Exception.Message) - skipping AnyDesk for this run, will retry on next update."
+        return
+    }
 
     # התקנה שקטה כשירות (unattended access)
     Write-Host "[SIONYX] Running silent install..."

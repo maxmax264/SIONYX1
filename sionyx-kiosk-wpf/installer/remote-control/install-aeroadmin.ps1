@@ -47,7 +47,12 @@ if (Test-Path $ExePath) {
     Write-Host "[SIONYX] AeroAdmin.exe already staged and valid - skipping download."
 } else {
     Write-Host "[SIONYX] Downloading AeroAdmin.exe..."
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath
+    try {
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath -TimeoutSec 30 -ErrorAction Stop
+    } catch {
+        Write-Warning "[SIONYX] AeroAdmin.exe download failed/timed out: $($_.Exception.Message) - skipping for this run, will retry on next update."
+        return
+    }
 
     $downloadedSize = (Get-Item $ExePath).Length
     if ($downloadedSize -lt $MinValidSize) {
