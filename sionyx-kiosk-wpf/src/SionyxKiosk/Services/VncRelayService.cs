@@ -543,10 +543,39 @@ public class VncRelayService
 
             // The kiosk app used to disable this service on every launch
             // (DisableLegacyTvnServerService) - undo that (Start=2 is Automatic).
+            // Seen in the field (2026-09-27, error 1058 on Start-Service): a
+            // machine that already had SionyxInputInjector running still had
+            // tvnserver's Start value stuck on Disabled (4) - install-tightvnc.ps1
+            // or an old build had disabled it once and nothing had re-enabled
+            // it since. Logged explicitly (not just silently corrected) so a
+            // recurrence is visible on the dashboard instead of only found by
+            // Start-Service failing with 1058 during a live support session.
             using (var svcKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\" + TightVncServiceName, writable: true))
             {
                 if (svcKey != null && svcKey.GetValue("Start") is int start && start != 2)
+                {
+                    Logger.Warning("tvnserver service startup type was {Start} (not Automatic) - a previous install/run must have disabled it; resetting to Automatic now", start == 4 ? "Disabled" : start.ToString());
                     svcKey.SetValue("Start", 2, RegistryValueKind.DWord);
+                    // Belt-and-braces: also go through the official SCM API
+                    // (same call Set-Service -StartupType makes) in case the
+                    // direct registry write alone doesn't get picked up -
+                    // this is the exact fix that worked manually in the field.
+                    try
+                    {
+                        using var p = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "sc.exe",
+                            Arguments = $"config {TightVncServiceName} start= auto",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        });
+                        p?.WaitForExit(10000);
+                    }
+                    catch (Exception scEx)
+                    {
+                        Logger.Warning(scEx, "sc.exe config fallback for tvnserver start type failed (registry write above may still have worked)");
+                    }
+                }
             }
 
             var status = GetServiceStatus(TightVncServiceName);

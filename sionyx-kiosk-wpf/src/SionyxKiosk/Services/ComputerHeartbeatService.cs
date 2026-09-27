@@ -176,6 +176,32 @@ public class ComputerHeartbeatService
             ChannelLogSink.Current?.ReportStatus("inputInjector", inputInjectorRunning,
                 inputInjectorRunning ? null : "SionyxInputInjector service missing or not running");
 
+            // Seen in the field (2026-09-27): tvnserver installed as a
+            // Windows service but its startup type stuck on Disabled (a
+            // previous install/run had disabled it and nothing re-enabled
+            // it), so VNC hung on "connecting" with no visible cause until
+            // someone checked Services.msc by hand. VncRelayService.
+            // EnsureTightVncService self-heals this every ~60s while
+            // SionyxInputInjector is running, but reporting the live state
+            // here means a stuck/mid-fix machine shows up on the dashboard
+            // instead of only being found during a live support session.
+            bool tvnServiceRunning;
+            try
+            {
+                using var sc = new System.ServiceProcess.ServiceController("tvnserver");
+                tvnServiceRunning = sc.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+            }
+            catch
+            {
+                tvnServiceRunning = false; // not registered as a service yet (session-mode kiosk, or not installed)
+            }
+            if (tightVncInstalled && !tvnServiceRunning && inputInjectorRunning)
+            {
+                Logger.Warning("tvnserver is installed but its Windows service is not running on this kiosk - EnsureTightVncService (runs every ~60s) should self-heal this; if it stays false across several heartbeats, the startup type may be stuck Disabled");
+            }
+            ChannelLogSink.Current?.ReportStatus("tvnService", tvnServiceRunning,
+                tvnServiceRunning ? null : "tvnserver Windows service not running - should self-heal within ~60s if SionyxInputInjector is up");
+
             var result = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}",
                 new Dictionary<string, object>
                 {
@@ -188,6 +214,7 @@ public class ComputerHeartbeatService
                     ["autoLogonUser"] = autoLogonUser ?? "",
                     ["tightVncInstalled"] = tightVncInstalled,
                     ["inputInjectorRunning"] = inputInjectorRunning,
+                    ["tvnServiceRunning"] = tvnServiceRunning,
                 });
             if (!result.Success)
             {
