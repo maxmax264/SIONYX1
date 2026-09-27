@@ -83,6 +83,20 @@ public class VncRelayService
     private System.Timers.Timer? _watchdogTimer;
     private CancellationTokenSource? _activeSessionCts;
     private long _lastHandledRequestedAt;
+    // Guards the dedup check + _activeSessionCts swap in OnSessionRequested,
+    // which used to be two/three separate, unsynchronized reads+writes. If
+    // two SseListener deliveries ever fire concurrently on different
+    // threads (the exact "zombie stream" scenario CheckListenerHealth's
+    // periodic reconnect guards against - see its comments), both could
+    // read the old _lastHandledRequestedAt before either wrote the new
+    // value, so both would pass the dedup check and both would call
+    // RunSessionAsync for the same token - one of them then cancelling the
+    // other's CancellationTokenSource out from under it, since
+    // _activeSessionCts?.Cancel() / _activeSessionCts = cts was itself not
+    // atomic either. Confirmed live on kiosk #5 (2026-09-27): the relay log
+    // showed two separate "agent" WebSocket joins to the same room/token,
+    // racing and closing each other out (lifetimes 10078ms and 23109ms).
+    private readonly object _sessionRequestLock = new();
     private bool _starting;
     private bool _signedIn;
     private int _startRequested;
@@ -646,18 +660,29 @@ public class VncRelayService
             "DIAG OnSessionRequested ENTER token={TokenPrefix}... requestedAt={RequestedAt} lastHandled={LastHandled} activeListeners={ActiveListeners} at {Utc:O} thread={ThreadId}",
             token[..Math.Min(6, token.Length)], requestedAt, _lastHandledRequestedAt, SseListener.ActiveCount, DateTime.UtcNow, Environment.CurrentManagedThreadId);
 
-        if (requestedAt == _lastHandledRequestedAt) return; // SSE replay of the same request
-        _lastHandledRequestedAt = requestedAt;
+        CancellationTokenSource cts;
+        lock (_sessionRequestLock)
+        {
+            // Dedup check + _lastHandledRequestedAt write + _activeSessionCts
+            // cancel/swap all happen under the same lock now, so two
+            // concurrent deliveries (e.g. two live SSE listeners during a
+            // reconnect window) can no longer both pass the dedup check or
+            // both win the CTS swap - whichever thread gets here first
+            // handles the request; the other sees the updated
+            // _lastHandledRequestedAt and returns immediately below.
+            if (requestedAt == _lastHandledRequestedAt) return; // SSE replay of the same request
+            _lastHandledRequestedAt = requestedAt;
 
-        Logger.Warning("VNC session requested from dashboard (token {Token}...)", token[..Math.Min(6, token.Length)]);
-        Logger.Warning(
-            "DIAG OnSessionRequested PROCEEDING (won dedup) token={TokenPrefix}... requestedAt={RequestedAt} activeSessionCtsWasNull={WasNull} at {Utc:O} thread={ThreadId}",
-            token[..Math.Min(6, token.Length)], requestedAt, _activeSessionCts == null, DateTime.UtcNow, Environment.CurrentManagedThreadId);
+            Logger.Warning("VNC session requested from dashboard (token {Token}...)", token[..Math.Min(6, token.Length)]);
+            Logger.Warning(
+                "DIAG OnSessionRequested PROCEEDING (won dedup) token={TokenPrefix}... requestedAt={RequestedAt} activeSessionCtsWasNull={WasNull} at {Utc:O} thread={ThreadId}",
+                token[..Math.Min(6, token.Length)], requestedAt, _activeSessionCts == null, DateTime.UtcNow, Environment.CurrentManagedThreadId);
 
-        // A new request replaces any session still running.
-        _activeSessionCts?.Cancel();
-        var cts = new CancellationTokenSource(MaxSessionDuration);
-        _activeSessionCts = cts;
+            // A new request replaces any session still running.
+            _activeSessionCts?.Cancel();
+            cts = new CancellationTokenSource(MaxSessionDuration);
+            _activeSessionCts = cts;
+        }
         _ = Task.Run(() => RunSessionAsync(token, cts.Token));
     }
 
