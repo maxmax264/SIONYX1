@@ -211,6 +211,7 @@ public static class AutoUpdateService
 
     private static async Task DownloadAndInstallAsync(string downloadUrl, string newVersion, string currentVersion)
     {
+        const int MaxAttempts = 4;
         try
         {
             UpdateStarted?.Invoke(newVersion);
@@ -222,65 +223,110 @@ public static class AutoUpdateService
             using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true });
             http.Timeout = TimeSpan.FromMinutes(10);
 
-            using var response = await http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
-            var totalBytes = response.Content.Headers.ContentLength ?? 0;
-            Logger.Information("[Update] Download size: {Bytes} bytes (Content-Length={CL})", totalBytes, response.Content.Headers.ContentLength);
-            var buffer = new byte[81920];
-            var downloaded = 0L;
-            var lastReportedPercent = -1;
-
-            await using var stream = await response.Content.ReadAsStreamAsync();
-            await using var fileStream = File.Create(tempPath);
-
-            int read;
-            while ((read = await stream.ReadAsync(buffer)) > 0)
+            long totalBytes = 0;
+            for (var attempt = 1; attempt <= MaxAttempts; attempt++)
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, read));
-                downloaded += read;
-                if (totalBytes > 0)
+                var resumeFrom = File.Exists(tempPath) ? new FileInfo(tempPath).Length : 0;
+                var isResume = attempt > 1 && resumeFrom > 0 && totalBytes > 0 && resumeFrom < totalBytes;
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+                if (isResume)
                 {
-                    var percent = (int)(downloaded * 100 / totalBytes);
-                    // Only fire on an actual percent change, not on every
-                    // 80KB chunk. On a fast LAN/disk, a 96MB download can
-                    // read ~1200 chunks in a couple of seconds; each one
-                    // was synchronously blocking the UI thread (Dispatcher
-                    // .Invoke) to update TextBlock text (forcing a WPF
-                    // text re-measure) AND kick a new DoubleAnimation on
-                    // the same progress-bar property, hundreds of times
-                    // per second. That reentrant hammering of the UI
-                    // thread is the suspected cause of a native
-                    // AccessViolationException inside WPF's text
-                    // formatter (LoCreateLine) crashing SionyxKiosk.exe
-                    // moments after a download started - confirmed live
-                    // on two kiosks during the 3.15.1 rollout on
-                    // 13/09/2026. Capping updates to once per percent
-                    // point (~100 UI updates total instead of ~1200)
-                    // removes that pressure entirely.
-                    if (percent != lastReportedPercent)
+                    request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(resumeFrom, null);
+                    Logger.Warning("[Update] Attempt {Attempt}/{Max}: resuming download from byte {From} (of {Total})", attempt, MaxAttempts, resumeFrom, totalBytes);
+                }
+                else if (attempt > 1)
+                {
+                    Logger.Warning("[Update] Attempt {Attempt}/{Max}: restarting download from scratch", attempt, MaxAttempts);
+                    try { File.Delete(tempPath); } catch { }
+                    resumeFrom = 0;
+                }
+
+                using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                var serverHonoredRange = isResume && response.StatusCode == System.Net.HttpStatusCode.PartialContent;
+                if (isResume && !serverHonoredRange)
+                {
+                    // Server ignored the Range header (returned 200 with the full
+                    // body instead of 206) - can't append, must start clean.
+                    try { File.Delete(tempPath); } catch { }
+                    resumeFrom = 0;
+                }
+
+                totalBytes = serverHonoredRange
+                    ? resumeFrom + (response.Content.Headers.ContentLength ?? 0)
+                    : response.Content.Headers.ContentLength ?? totalBytes;
+                Logger.Information("[Update] Download size: {Bytes} bytes (attempt {Attempt}, resumed={Resumed})", totalBytes, attempt, serverHonoredRange);
+
+                var buffer = new byte[81920];
+                var downloaded = resumeFrom;
+                var lastReportedPercent = -1;
+
+                await using (var stream = await response.Content.ReadAsStreamAsync())
+                await using (var fileStream = new FileStream(tempPath, serverHonoredRange ? FileMode.Append : FileMode.Create, FileAccess.Write))
+                {
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer)) > 0)
                     {
-                        lastReportedPercent = percent;
-                        var mb = downloaded / 1024.0 / 1024.0;
-                        var totalMb = totalBytes / 1024.0 / 1024.0;
-                        ProgressChanged?.Invoke(percent, $"מוריד... {mb:F1} / {totalMb:F1} MB");
+                        await fileStream.WriteAsync(buffer.AsMemory(0, read));
+                        downloaded += read;
+                        if (totalBytes > 0)
+                        {
+                            var percent = (int)(downloaded * 100 / totalBytes);
+                            // Only fire on an actual percent change, not on every
+                            // 80KB chunk. On a fast LAN/disk, a 96MB download can
+                            // read ~1200 chunks in a couple of seconds; each one
+                            // was synchronously blocking the UI thread (Dispatcher
+                            // .Invoke) to update TextBlock text (forcing a WPF
+                            // text re-measure) AND kick a new DoubleAnimation on
+                            // the same progress-bar property, hundreds of times
+                            // per second. That reentrant hammering of the UI
+                            // thread is the suspected cause of a native
+                            // AccessViolationException inside WPF's text
+                            // formatter (LoCreateLine) crashing SionyxKiosk.exe
+                            // moments after a download started - confirmed live
+                            // on two kiosks during the 3.15.1 rollout on
+                            // 13/09/2026. Capping updates to once per percent
+                            // point (~100 UI updates total instead of ~1200)
+                            // removes that pressure entirely.
+                            if (percent != lastReportedPercent)
+                            {
+                                lastReportedPercent = percent;
+                                var mb = downloaded / 1024.0 / 1024.0;
+                                var totalMb = totalBytes / 1024.0 / 1024.0;
+                                ProgressChanged?.Invoke(percent, $"מוריד... {mb:F1} / {totalMb:F1} MB");
+                            }
+                        }
                     }
                 }
-            }
 
-            Logger.Information("[Update] Download complete ({MB} MB)", downloaded / 1024 / 1024);
+                Logger.Information("[Update] Download attempt {Attempt} complete ({MB} MB)", attempt, downloaded / 1024 / 1024);
 
-            // Verify downloaded file size matches expected
-            var fileInfo = new FileInfo(tempPath);
-            if (totalBytes > 0 && fileInfo.Length != totalBytes)
-            {
-                Logger.Error("[Update] Size mismatch: expected {Expected}, got {Actual} - deleting corrupt file", totalBytes, fileInfo.Length);
-                try { File.Delete(tempPath); } catch { }
-                await LogUpdateToFirebase("failed", newVersion);
+                var fileInfo = new FileInfo(tempPath);
+                if (totalBytes > 0 && fileInfo.Length != totalBytes)
+                {
+                    // Short a few KB out of ~116MB, over and over, is the
+                    // signature of a network proxy (NetFree on-site) truncating
+                    // large HTTPS transfers right near the end - not random
+                    // corruption. Resuming the missing tail instead of
+                    // restarting from zero gets past it in a couple of
+                    // attempts instead of never (each full restart has the
+                    // same chance of getting truncated again near the end).
+                    Logger.Error("[Update] Size mismatch: expected {Expected}, got {Actual} (attempt {Attempt}/{Max})", totalBytes, fileInfo.Length, attempt, MaxAttempts);
+                    if (attempt == MaxAttempts)
+                    {
+                        try { File.Delete(tempPath); } catch { }
+                        await LogUpdateToFirebase("failed", newVersion);
+                        return;
+                    }
+                    await Task.Delay(TimeSpan.FromSeconds(3));
+                    continue;
+                }
+
+                Logger.Information("[Update] Download verified OK: {Bytes} bytes", fileInfo.Length);
+                ProgressChanged?.Invoke(90, "מתקין עדכון...");
+                await InstallAsync(tempPath, newVersion);
                 return;
             }
-            Logger.Information("[Update] Download verified OK: {Bytes} bytes", fileInfo.Length);
-            ProgressChanged?.Invoke(90, "מתקין עדכון...");
-
-            await InstallAsync(tempPath, newVersion);
         }
         catch (Exception ex)
         {
