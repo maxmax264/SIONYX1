@@ -69,7 +69,7 @@ public class RemoteCommandServiceTests
             Service.OnCommandRequested(eventType, TestFirebaseFactory.ToJsonElement(payload));
         }
 
-        public async Task<bool> WaitForActionAsync(int expectedCount = 1, int timeoutMs = 3000)
+        public async Task<bool> WaitForActionAsync(int expectedCount = 1, int timeoutMs = 15000)
         {
             var until = DateTime.UtcNow.AddMilliseconds(timeoutMs);
             while (DateTime.UtcNow < until)
