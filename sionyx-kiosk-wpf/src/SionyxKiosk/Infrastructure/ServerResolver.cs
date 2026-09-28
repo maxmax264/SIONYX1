@@ -94,8 +94,8 @@ public static class ServerResolver
         {
             var signIn = await firebase.SignInAnonymouslyAsync();
             if (signIn.Success) break;
-            Logger.Warning("ServerResolver anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, SignInRetrySeconds);
-            await Task.Delay(TimeSpan.FromSeconds(SignInRetrySeconds));
+            Logger.Warning("ServerResolver anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, (int)(FirebaseClient.SignInRetryMs(SignInRetrySeconds) / 1000));
+            await Task.Delay(TimeSpan.FromMilliseconds(FirebaseClient.SignInRetryMs(SignInRetrySeconds)));
         }
 
         Logger.Information("ServerResolver started (checking local PC every {Seconds}s)", CheckInterval.TotalSeconds);

@@ -109,7 +109,7 @@ public sealed class SseListener
     private async Task ListenLoopAsync(CancellationToken ct)
     {
         var nowActive = Interlocked.Increment(ref s_activeCount);
-        Logger.Warning("DIAG SseListener#{ListenerId} loop STARTED for {Path} (active listeners for this process: {ActiveCount})", _id, _path, nowActive);
+        Logger.Debug("DIAG SseListener#{ListenerId} loop STARTED for {Path} (active listeners for this process: {ActiveCount})", _id, _path, nowActive);
         try
         {
         while (!ct.IsCancellationRequested)
@@ -179,7 +179,7 @@ public sealed class SseListener
         finally
         {
             var stillActive = Interlocked.Decrement(ref s_activeCount);
-            Logger.Warning("DIAG SseListener#{ListenerId} loop ENDED for {Path} (active listeners for this process: {ActiveCount})", _id, _path, stillActive);
+            Logger.Debug("DIAG SseListener#{ListenerId} loop ENDED for {Path} (active listeners for this process: {ActiveCount})", _id, _path, stillActive);
         }
     }
 
@@ -246,7 +246,7 @@ public sealed class SseListener
                     _callback(eventType, null);
                     return;
                 case "auth_revoked":
-                    Logger.Warning("SSE auth revoked");
+                    Logger.Warning("SSE auth revoked for {Path} - reconnecting", _path);
                     _callback(eventType, null);
                     return;
             }
@@ -277,7 +277,7 @@ public sealed class SseListener
                     ? inner
                     : envelope;
                 // DIAG (temporary, see other DIAG lines in this file)
-                Logger.Warning("DIAG SseListener#{ListenerId} delivering {EventType} for {Path} at {Utc:O} (thread {ThreadId})", _id, eventType, _path, DateTime.UtcNow, Environment.CurrentManagedThreadId);
+                Logger.Debug("DIAG SseListener#{ListenerId} delivering {EventType} for {Path} at {Utc:O} (thread {ThreadId})", _id, eventType, _path, DateTime.UtcNow, Environment.CurrentManagedThreadId);
                 _callback(eventType, data);
             }
             else

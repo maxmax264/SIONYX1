@@ -125,24 +125,120 @@ public sealed class FirebaseClient : IFirebaseClient
         }
     }
 
+    /// <summary>
+    /// How long callers should wait before retrying anonymous sign-in
+    /// (0 when not in cooldown). Lets the retry timers of all services line
+    /// up with the shared cooldown instead of polling every 30s.
+    /// </summary>
+    public static TimeSpan AnonymousSignInCooldownRemaining => AnonymousAuthCoordinator.CooldownRemaining;
+
+    private static readonly Random SignInRandom = new();
+
+    /// <summary>Retry delay for a caller's own sign-in retry loop: its base interval, or the shared cooldown if longer.</summary>
+    public static double SignInRetryMs(int baseSeconds) =>
+        Math.Max(baseSeconds, AnonymousSignInCooldownRemaining.TotalSeconds + 1) * 1000;
+
+    /// <summary>
+    /// Anonymous sign-in, shared per process: reuses the cached session,
+    /// then a persisted refresh token, and only as a last resort calls
+    /// signUp (after a one-time random jitter). See AnonymousAuthCoordinator.
+    /// </summary>
     public async Task<FirebaseResult> SignInAnonymouslyAsync()
     {
-        var url = $"{_authUrl}:signUp?key={_apiKey}";
-        var payload = new { returnSecureToken = true };
+        await AnonymousAuthCoordinator.Gate.WaitAsync();
         try
         {
-            var response = await PostJsonAsync(url, payload);
-            StoreAuthData(response);
-            Logger.Information("Anonymous sign-in: {UserId}", _userId);
-            return FirebaseResult.Ok(new { uid = _userId });
+            var now = DateTime.UtcNow;
+            if (now < AnonymousAuthCoordinator.BlockedUntilUtc)
+                return FirebaseResult.Fail(AnonymousAuthCoordinator.LastError ?? "Anonymous sign-in cooling down");
+
+            var cached = AnonymousAuthCoordinator.Cached;
+            if (cached != null && now < cached.Expiry.AddMinutes(-5))
+            {
+                AdoptSession(cached);
+                return FirebaseResult.Ok(new { uid = _userId });
+            }
+
+            var refreshToken = cached?.RefreshToken ?? AnonymousAuthCoordinator.LoadPersisted();
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                try
+                {
+                    var payload = new { grant_type = "refresh_token", refresh_token = refreshToken };
+                    var r = await PostJsonAsync($"https://securetoken.googleapis.com/v1/token?key={_apiKey}", payload);
+                    var expiresIn = int.Parse(GetString(r, "expires_in") ?? "3600");
+                    var session = new AnonymousAuthCoordinator.Session(
+                        GetString(r, "id_token") ?? "",
+                        GetString(r, "refresh_token") ?? refreshToken,
+                        GetString(r, "user_id") ?? "",
+                        DateTime.UtcNow.AddSeconds(expiresIn));
+                    AnonymousAuthCoordinator.RegisterSuccess(session);
+                    AdoptSession(session);
+                    Logger.Information("Anonymous session restored from refresh token: {UserId}", _userId);
+                    return FirebaseResult.Ok(new { uid = _userId });
+                }
+                catch (FirebaseApiException ex) when (IsPermanentAuthFailure(ex))
+                {
+                    Logger.Information("Stored anonymous refresh token rejected - signing up fresh");
+                    AnonymousAuthCoordinator.ClearPersisted();
+                }
+                catch (Exception ex)
+                {
+                    return FailAnonymous(ParseFirebaseError(ex));
+                }
+            }
+
+            // Spread signUp calls of kiosks that start at the same moment
+            // (e.g. after an auto-update) so they don't hit the shared IP's
+            // rate limit together. Only once per process.
+            if (!AnonymousAuthCoordinator.JitterDone)
+            {
+                AnonymousAuthCoordinator.JitterDone = true;
+                var jitter = AnonymousAuthCoordinator.PickStartupJitter(SignInRandom);
+                if (jitter > TimeSpan.Zero)
+                {
+                    Logger.Information("Delaying anonymous sign-up by {Seconds:F0}s (startup jitter)", jitter.TotalSeconds);
+                    await Task.Delay(jitter);
+                }
+            }
+
+            try
+            {
+                var response = await PostJsonAsync($"{_authUrl}:signUp?key={_apiKey}", new { returnSecureToken = true });
+                StoreAuthData(response);
+                var session = new AnonymousAuthCoordinator.Session(
+                    _idToken ?? "", _refreshToken ?? "", _userId ?? "", _tokenExpiry);
+                AnonymousAuthCoordinator.RegisterSuccess(session);
+                Logger.Information("Anonymous sign-in: {UserId}", _userId);
+                return FirebaseResult.Ok(new { uid = _userId });
+            }
+            catch (Exception ex)
+            {
+                return FailAnonymous(ParseFirebaseError(ex));
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            var msg = ParseFirebaseError(ex);
-            Logger.Error(ex, "Anonymous sign-in failed");
-            return FirebaseResult.Fail(msg);
+            AnonymousAuthCoordinator.Gate.Release();
         }
     }
+
+    private FirebaseResult FailAnonymous(string error)
+    {
+        AnonymousAuthCoordinator.RegisterFailure(error, SignInRandom);
+        Logger.Warning("Anonymous sign-in failed: {Error} - next attempt in {Seconds:F0}s",
+            error, AnonymousAuthCoordinator.CooldownRemaining.TotalSeconds);
+        return FirebaseResult.Fail(error);
+    }
+
+    private void AdoptSession(AnonymousAuthCoordinator.Session s)
+    {
+        _idToken = s.IdToken;
+        _refreshToken = s.RefreshToken;
+        _userId = s.UserId;
+        _tokenExpiry = s.Expiry;
+    }
+
     public async Task<bool> RefreshTokenAsync()
     {
         if (string.IsNullOrEmpty(_refreshToken)) return false;

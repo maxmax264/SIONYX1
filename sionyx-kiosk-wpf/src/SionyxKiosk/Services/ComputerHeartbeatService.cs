@@ -70,8 +70,8 @@ public class ComputerHeartbeatService
         var signIn = await _deviceFirebase.SignInAnonymouslyAsync();
         if (!signIn.Success)
         {
-            Logger.Warning("Heartbeat anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, SignInRetrySeconds);
-            var retryTimer = new System.Timers.Timer(SignInRetrySeconds * 1000) { AutoReset = false };
+            Logger.Warning("Heartbeat anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, (int)(FirebaseClient.SignInRetryMs(SignInRetrySeconds) / 1000));
+            var retryTimer = new System.Timers.Timer(FirebaseClient.SignInRetryMs(SignInRetrySeconds)) { AutoReset = false };
             retryTimer.Elapsed += async (_, _) =>
             {
                 retryTimer.Dispose();
