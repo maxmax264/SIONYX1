@@ -44,6 +44,36 @@ public class RemoteCommandService
     // round-trips.
     private long _lastHandledRequestedAt;
 
+    // A command older than this is never executed. Firebase replays the
+    // still-present "requested" node as an initial "put" on EVERY listener
+    // (re)start - including the first one after the very reboot this
+    // command caused. If the delete of the node didn't make it out before
+    // Windows went down (the kiosk network is flaky/filtered, and the old
+    // code deleted only AFTER launching shutdown.exe /t 5), the node was
+    // still there on boot, the in-memory _lastHandledRequestedAt was gone,
+    // and the kiosk would restart itself again - a reboot loop.
+    internal static readonly TimeSpan MaxCommandAge = TimeSpan.FromMinutes(10);
+    internal const string LastHandledRegistryValue = "LastPowerCommandRequestedAt";
+
+    // Seams (defaults = production behaviour; unit tests replace them so
+    // a test can NEVER really call shutdown.exe or touch the registry).
+    internal Func<long> NowMs { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    internal Func<long> LoadLastHandled { get; set; } = () =>
+        long.TryParse(RegistryConfig.ReadValueCurrentUser(LastHandledRegistryValue), out var v) ? v : 0;
+    internal Action<long> SaveLastHandled { get; set; } = v =>
+        RegistryConfig.WriteValue(LastHandledRegistryValue, v.ToString());
+    internal Action<string> RunPowerAction { get; set; } = DefaultRunPowerAction;
+
+    /// <summary>True when the command was issued too long ago (or is dated
+    /// implausibly far in the future - a badly wrong clock) to be safe to
+    /// execute now.</summary>
+    internal static bool IsStale(long requestedAtMs, long nowMs, TimeSpan maxAge)
+    {
+        var limit = (long)maxAge.TotalMilliseconds;
+        var ageMs = nowMs - requestedAtMs;
+        return ageMs > limit || ageMs < -limit;
+    }
+
     public RemoteCommandService(FirebaseConfig config)
     {
         _firebase = new FirebaseClient(config);
@@ -87,18 +117,36 @@ public class RemoteCommandService
             OnCommandRequested);
     }
 
-    private void OnCommandRequested(string eventType, JsonElement? data)
+    internal void OnCommandRequested(string eventType, JsonElement? data)
     {
         if (eventType != "put" && eventType != "patch") return;
         if (data == null || data.Value.ValueKind != JsonValueKind.Object) return;
 
         var obj = data.Value;
-        var type = obj.TryGetProperty("type", out var t) ? t.GetString() : null;
+        var type = obj.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
         var requestedAt = obj.TryGetProperty("requestedAt", out var r) && r.TryGetInt64(out var ra) ? ra : 0;
 
         if (string.IsNullOrEmpty(type) || requestedAt == 0) return;
-        if (requestedAt == _lastHandledRequestedAt) return; // already handled (SSE replay)
+
+        // Already handled: in this process (SSE replay) OR by a previous
+        // process (the persisted value survives the reboot the command
+        // itself caused). EQUALITY on purpose, not "older than": the only
+        // node that can still be sitting there is the last one we handled,
+        // and admins' PCs can have skewed clocks, so a genuinely new
+        // command may carry a smaller timestamp than the previous one.
+        if (requestedAt == _lastHandledRequestedAt || requestedAt == LoadLastHandled()) return;
+
+        // Remember it BEFORE doing anything else, so no later failure (or a
+        // crash/reboot in the middle) can ever make us run it a second time.
         _lastHandledRequestedAt = requestedAt;
+        SaveLastHandled(requestedAt);
+
+        if (IsStale(requestedAt, NowMs(), MaxCommandAge))
+        {
+            Logger.Warning("Ignoring stale power command '{Type}' (requestedAt={RequestedAt}) - older than {Minutes} min; clearing it", type, requestedAt, MaxCommandAge.TotalMinutes);
+            _ = Task.Run(ClearRequestedAsync);
+            return;
+        }
 
         if (type != "shutdown" && type != "restart")
         {
@@ -110,34 +158,44 @@ public class RemoteCommandService
         _ = Task.Run(() => ExecuteAsync(type));
     }
 
-    private async Task ExecuteAsync(string type)
+    internal async Task ExecuteAsync(string type)
     {
         try
         {
             await ReportResultAsync(type, "executing");
 
-            // /t 5 gives a few seconds for the result write above and any
-            // in-flight Firebase calls (heartbeat, etc.) to flush before
-            // Windows tears the process down.
-            var args = type == "shutdown" ? "/s /t 5" : "/r /t 5";
-            var psi = new ProcessStartInfo
-            {
-                FileName = "shutdown.exe",
-                Arguments = args,
-                UseShellExecute = true,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-            };
-            Process.Start(psi);
-
-            Logger.Warning("shutdown.exe invoked ({Args}) - machine will {Type} in 5s", args, type);
+            // Clear the request FIRST. The old order (shutdown.exe first,
+            // delete after) only left the 5-second /t window for the delete
+            // to reach Firebase; on this network that often isn't enough.
+            // Even if this delete fails now, the persisted last-handled
+            // value and the max-age check above keep it from replaying.
             await ClearRequestedAsync();
+
+            // /t 5 gives a few seconds for any in-flight Firebase calls
+            // (heartbeat, etc.) to flush before Windows tears the process down.
+            RunPowerAction(type);
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to execute power command '{Type}'", type);
             await ReportResultAsync(type, "failed: " + ex.Message);
         }
+    }
+
+    private static void DefaultRunPowerAction(string type)
+    {
+        var args = type == "shutdown" ? "/s /t 5" : "/r /t 5";
+        var psi = new ProcessStartInfo
+        {
+            FileName = "shutdown.exe",
+            Arguments = args,
+            UseShellExecute = true,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
+        };
+        Process.Start(psi);
+
+        Logger.Warning("shutdown.exe invoked ({Args}) - machine will {Type} in 5s", args, type);
     }
 
     private async Task ReportResultAsync(string type, string status)
@@ -167,7 +225,12 @@ public class RemoteCommandService
     {
         try
         {
-            await _firebase.DbDeleteAsync($"computers/{_computerId}/powerCommand/requested");
+            // DbDeleteAsync reports failure through its result, it does not
+            // throw - so the result has to be looked at, otherwise a failed
+            // delete is completely invisible.
+            var result = await _firebase.DbDeleteAsync($"computers/{_computerId}/powerCommand/requested");
+            if (!result.Success)
+                Logger.Warning("Failed to clear powerCommand/requested: {Error} (non-fatal - replay is blocked by the persisted last-handled value)", result.Error);
         }
         catch (Exception ex)
         {
