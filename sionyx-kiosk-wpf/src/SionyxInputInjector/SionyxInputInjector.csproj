@@ -48,6 +48,7 @@
   <ItemGroup>
     <!-- Same source files as SionyxKiosk.exe (no copy to keep in sync). -->
     <Compile Include="..\SionyxKiosk\Infrastructure\FirebaseClient.cs" Link="Shared\FirebaseClient.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\AnonymousAuthCoordinator.cs" Link="Shared\AnonymousAuthCoordinator.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\IFirebaseClient.cs" Link="Shared\IFirebaseClient.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\FirebaseConfig.cs" Link="Shared\FirebaseConfig.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\SseListener.cs" Link="Shared\SseListener.cs" />
