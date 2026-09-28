@@ -130,6 +130,7 @@
             "autoLogonUser": { ".write": "auth != null", ".validate": "newData.isString()" },
             "tightVncInstalled": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
             "inputInjectorRunning": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
+            "tvnServiceRunning": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
             "computerName": {
               ".write": "auth != null && (!data.exists() || root.child('organizations').child($orgId).child('users').child(auth.uid).exists())",
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
