@@ -108,6 +108,30 @@ function Step-Version($data, [string]$type, [string]$specific) {
     return $data
 }
 
+# Latest released version, read from the public releases repo (the real source
+# of truth for what kiosks can auto-update to). Returns $null on any failure,
+# in which case the local version.json is used as before.
+function Get-RemoteLatestVersion {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $headers = @{ Accept = "application/vnd.github+json"; "User-Agent" = "sionyx-build" }
+        if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "token $env:GITHUB_TOKEN" }
+        $rels = Invoke-RestMethod -Uri "https://api.github.com/repos/maxmax264/sionyx-releases/releases?per_page=100" -Headers $headers -TimeoutSec 20
+        $best = $null
+        foreach ($r in $rels) {
+            if ($r.tag_name -match '^v(\d+)\.(\d+)\.(\d+)$') {
+                $v = [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])"
+                if (-not $best -or $v -gt $best) { $best = $v }
+            }
+        }
+        return $best
+    }
+    catch {
+        Write-Info "Could not read latest release from sionyx-releases ($($_.Exception.Message)) - using local version.json"
+        return $null
+    }
+}
+
 # =============================================================================
 # BUILD STEPS
 # =============================================================================
@@ -402,6 +426,20 @@ function Invoke-Upload([string]$installerPath, $versionData) {
 Write-Header "SIONYX WPF Build System"
 
 $versionData = Get-VersionData
+
+# Unless -Version was given explicitly, base the bump on the newest release in
+# sionyx-releases when that is ahead of the local version.json, so a stale or
+# conflicted local file can never produce an already-released version number.
+if (-not $Version) {
+    $remoteLatest = Get-RemoteLatestVersion
+    if ($remoteLatest -and $remoteLatest -gt [version]$versionData.version) {
+        Write-Info "Latest release in sionyx-releases is v$remoteLatest (local version.json: v$($versionData.version)) - bumping from the release"
+        $versionData.major = $remoteLatest.Major
+        $versionData.minor = $remoteLatest.Minor
+        $versionData.patch = $remoteLatest.Build
+        $versionData.version = "$($remoteLatest.Major).$($remoteLatest.Minor).$($remoteLatest.Build)"
+    }
+}
 $currentVersion = $versionData.version
 
 # Calculate new version
