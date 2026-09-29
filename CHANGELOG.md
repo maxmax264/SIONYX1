@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [3.18.34] - 2026-09-29
+
+### Other
+- resolve computer name per send (dashboard rename -> owner logs list) (3f361c39)
+- wait up to 15s for the fire-and-forget action (flaky under parallel test load) (6b9a088b)
+
+
 ## [3.16.21] - 2026-09-25
 
 
