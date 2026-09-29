@@ -7,6 +7,7 @@ using System.Text.Json;
 using Serilog.Core;
 using Serilog.Events;
 using SionyxKiosk.Infrastructure;
+using SionyxKiosk.Services;
 
 namespace SionyxKiosk.Infrastructure.Logging;
 
@@ -67,7 +68,14 @@ public sealed class ChannelLogSink : ILogEventSink
         public bool SionyxFormat = true;
     }
 
-    private readonly string _author;
+    // Resolved on every send (not cached at construction) so a dashboard rename
+    // shows up in the owner logs list within one heartbeat, without a restart.
+    // Same priority as AuthViewModel.ComputerName: HKCU dashboard name,
+    // then HKLM install-time name, then the Windows hostname.
+    private static string _author =>
+        RegistryConfig.ReadValueCurrentUser(ComputerHeartbeatService.DashboardNameValue) is { } d && !string.IsNullOrWhiteSpace(d)
+            ? d
+            : RegistryConfig.ReadValue("ComputerName", null) ?? DeviceInfo.GetComputerName();
     private readonly string _computerId;
     private readonly object _gate = new();
     private List<Destination> _destinations;
@@ -93,7 +101,6 @@ public sealed class ChannelLogSink : ILogEventSink
         // "ComputerName", set at install time / by ComputerService) so the
         // channel's "author" matches what's already familiar from the
         // computers list - falls back to the raw hostname if that's unset.
-        _author = RegistryConfig.ReadValue("ComputerName", null) ?? DeviceInfo.GetComputerName();
         _computerId = DeviceInfo.GetDeviceId();
 
         var url = (RegistryConfig.ReadValue("LogShipUrl", DefaultChannelUrl) ?? DefaultChannelUrl).TrimEnd('/');
