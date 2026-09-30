@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Row, Col, List, Card, Tag, Button, Empty, Spin, App, Popconfirm, Typography, Space, Input } from "antd";
-import { ReloadOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, CopyOutlined } from "@ant-design/icons";
-import { getLogComputers, getComputerLogs, deleteComputerLogs, deleteAllLogs } from "../services/ownerLogService";
+import { ReloadOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, CopyOutlined, SendOutlined } from "@ant-design/icons";
+import { getLogComputers, getComputerLogs, deleteComputerLogs, deleteAllLogs, requestLogSend } from "../services/ownerLogService";
+import OwnerLogSettingsCard from "./OwnerLogSettingsCard";
 import dayjs from "dayjs";
 
 const { Text } = Typography;
@@ -78,6 +79,12 @@ const OwnerLogsTab = () => {
     !search || (c.name || c.id).toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleRequestLog = async (id) => {
+    const result = await requestLogSend(id);
+    if (result.success) message.success("בקשת הלוג נשלחה - הלוג יגיע תוך שניות (אם המחשב מקוון). לחץ רענן.");
+    else message.error(result.error || "שליחת הבקשה נכשלה");
+  };
+
   const handleCopyLog = async () => {
     const lines = detail?.lines || [];
     if (!lines.length) return;
@@ -98,6 +105,8 @@ const OwnerLogsTab = () => {
   const statusEntries = detail ? Object.entries(detail.status || {}) : [];
 
   return (
+    <>
+    <OwnerLogSettingsCard />
     <Row gutter={16}>
       <Col span={8}>
         <Card
@@ -189,6 +198,9 @@ const OwnerLogsTab = () => {
               title={`לוג גולמי (${detail?.lines?.length || 0} שורות אחרונות)`}
               extra={
                 <Space size="small">
+                  <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => handleRequestLog(selectedId)}>
+                    בקש לוג עכשיו
+                  </Button>
                   <Button
                     size="small"
                     icon={<CopyOutlined />}
@@ -221,6 +233,7 @@ const OwnerLogsTab = () => {
         )}
       </Col>
     </Row>
+    </>
   );
 };
 

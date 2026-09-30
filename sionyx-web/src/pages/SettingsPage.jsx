@@ -8,7 +8,6 @@ import DownloadsSettings from '../components/settings/DownloadsSettings';
 import KioskPasswordSettings from '../components/settings/KioskPasswordSettings';
 import PaymentSettings from '../components/settings/PaymentSettings';
 import IdleTimeoutSettings from '../components/settings/IdleTimeoutSettings';
-import LogShippingSettings from '../components/settings/LogShippingSettings';
 import { App, Input, Button, Form } from 'antd';
 import { getDisplayName, updateDisplayName } from '../services/settingsService';
 import { useOrgId } from '../hooks/useOrgId';
@@ -135,16 +134,6 @@ const SettingsPage = () => {
         </span>
       ),
       children: <IdleTimeoutSettings />,
-    },
-    {
-      key: 'logshipping',
-      label: (
-        <span>
-          <CloudUploadOutlined />
-          {' '}שילוח לוגים
-        </span>
-      ),
-      children: <LogShippingSettings />,
     },
     {
       key: 'messages',

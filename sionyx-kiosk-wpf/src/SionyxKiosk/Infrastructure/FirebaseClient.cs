@@ -631,9 +631,9 @@ public sealed class FirebaseClient : IFirebaseClient
     /// Listen to real-time changes on a database path using Server-Sent Events.
     /// Returns a SseListener that can be stopped via its CancellationTokenSource.
     /// </summary>
-    public SseListener DbListen(string path, Action<string, JsonElement?> callback, Action<string>? errorCallback = null)
+    public SseListener DbListen(string path, Action<string, JsonElement?> callback, Action<string>? errorCallback = null, bool absolutePath = false)
     {
-        var listener = new SseListener(this, path, callback, errorCallback);
+        var listener = new SseListener(this, path, callback, errorCallback, absolutePath);
         listener.Start();
         return listener;
     }

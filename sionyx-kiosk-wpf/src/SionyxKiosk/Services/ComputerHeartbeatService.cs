@@ -10,13 +10,12 @@ public class ComputerHeartbeatService
     private const int IntervalSeconds = 60;
     private const int SignInRetrySeconds = 30;
 
-    // Explicit "still alive" confirmation shipped straight to the dashboard
-    // log stream once an hour, on top of the heartbeatAt/"last seen" field
-    // the dashboard already shows. This is intentionally separate from
-    // Logger.Information/Warning/Error: it goes through ChannelLogSink's
-    // SendRaw (bypasses the Serilog level filter entirely - see
-    // App.xaml.cs's LogShipMinLevel, default Warning+) so it always ships,
-    // without having to fake a Warning severity for a healthy status line.
+    // "Still alive" line shipped to the dashboard log stream once an hour, on
+    // top of the heartbeatAt/"last seen" field the dashboard already shows.
+    // Goes through ChannelLogSink's SendRaw (bypasses the Serilog level
+    // filter - see App.xaml.cs's LogShipMinLevel), but like every automatic
+    // line it is sent ONLY while the master dashboard has automatic log
+    // shipping enabled (off by default).
     private const int AliveLogEveryNBeats = 60; // ~1 hour at IntervalSeconds=60
     private int _beatsSinceAliveLog;
 

@@ -8,44 +8,51 @@ using SionyxKiosk.Infrastructure.Logging;
 namespace SionyxKiosk.Services;
 
 /// <summary>
-/// Stages 4-6 of the log-shipping feature (see ChannelLogSink for Stage 3 -
-/// the always-on live stream). This service listens for dashboard-issued
-/// commands, same SseListener pattern as RemoteControlReportingService:
+/// Dashboard control of log shipping. Everything is driven from the MASTER
+/// dashboard (pc-sion.web.app/owner, "לוגים" tab) through root-level paths
+/// (not per-organization), same SseListener pattern as the other services:
 ///
-///   - "logShipping/triggerAllRequested" (org-wide) - master dashboard's
-///     "send logs from every kiosk now" button. Every kiosk listens on the
-///     same path, so one write fans out to the whole fleet.
-///   - "computers/{id}/logShipping/triggerRequested" (per-kiosk) - the
-///     per-computer "send log" button next to a single machine in the list.
-///   - "logShipping/intervalMs" (org-wide, legacy single-site) - dashboard's
-///     frequency control; applied live via ChannelLogSink.SetIntervalMs.
-///   - "logShipping/destinations" (org-wide, Stage 7 - multi-site) - a map
-///     of destinationId -> { url, apiKey, intervalMs, enabled } set from
-///     "הגדרות > שילוח לוגים". Applied live via ChannelLogSink.SetDestinations,
-///     replacing whichever destinations were active before (including the
-///     registry-based default from before this setting existed).
+///   - systemSettings/logShipping/config - a single object
+///       { autoEnabled, mode: "internal"|"external", intervalMs,
+///         external: { url, apiKey, format: "sionyx"|"channel" } }
+///     written whole by the bridge, applied live via ChannelLogSink.ApplyConfig.
+///     autoEnabled is false by default: nothing is shipped unless the owner
+///     turns it on or presses "send now".
+///   - systemSettings/logShipping/triggerAll - "send now" for every kiosk.
+///   - systemSettings/logShipping/triggers/{computerId} - "send now" for this
+///     kiosk only.
 ///
-/// Both triggers do the same thing: read today's current log file off disk
-/// and post its full content to the channel in chunks (a single log file
-/// can exceed the channel's per-message size), independent of whatever the
-/// live per-line stream is currently doing.
+/// Both triggers read today's log file off disk, post it to the active
+/// destination in chunks, and flush the remembered status checklist.
+///
+/// Firebase replays the still-present trigger node as an initial "put" on
+/// EVERY listener (re)start (app start, SSE re-auth every few hours). Each
+/// trigger value is therefore remembered in the registry and ignored if seen
+/// again, and a request older than MaxTriggerAge (kiosk was offline) is
+/// dropped - a dump only happens when the owner actually asks for one now.
 /// </summary>
 public class LogShippingControlService
 {
     private static readonly ILogger Logger = Log.ForContext<LogShippingControlService>();
 
-    // Conservative chunk size - the channel backend imposes its own message
-    // size limit that isn't documented; keeping well under any plausible
-    // limit is cheaper than finding it by trial and error against a live site.
+    // Conservative chunk size - the log site imposes its own message size
+    // limit that isn't documented; keeping well under any plausible limit is
+    // cheaper than finding it by trial and error against a live site.
     private const int ChunkSize = 6000;
+
+    internal static readonly TimeSpan MaxTriggerAge = TimeSpan.FromMinutes(30);
+    internal const string LastAllRegistryValue = "LastLogDumpAllRequestedAt";
+    internal const string LastMineRegistryValue = "LastLogDumpMineRequestedAt";
 
     private readonly FirebaseClient _firebase;
     private readonly string _logDir;
     private string? _computerId;
+    private SseListener? _configListener;
     private SseListener? _triggerAllListener;
     private SseListener? _triggerMineListener;
-    private SseListener? _intervalListener;
-    private SseListener? _destinationsListener;
+
+    private long _lastHandledAll;
+    private long _lastHandledMine;
 
     public LogShippingControlService(FirebaseClient firebase, string logDir)
     {
@@ -58,73 +65,93 @@ public class LogShippingControlService
     {
         _computerId = DeviceInfo.GetDeviceId();
 
+        _configListener = _firebase.DbListen(
+            "systemSettings/logShipping/config",
+            OnConfigChanged,
+            absolutePath: true);
+
         _triggerAllListener = _firebase.DbListen(
-            "logShipping/triggerAllRequested",
-            (eventType, data) => OnTriggerRequested(eventType, data, "כל הקיוסקים (כפתור מהדשבורד הראשי)"));
+            "systemSettings/logShipping/triggerAll",
+            (eventType, data) => OnTriggerRequested(eventType, data, "כל הקיוסקים", LastAllRegistryValue, ref _lastHandledAll),
+            absolutePath: true);
 
         _triggerMineListener = _firebase.DbListen(
-            $"computers/{_computerId}/logShipping/triggerRequested",
-            (eventType, data) => OnTriggerRequested(eventType, data, "קיוסק זה בלבד (כפתור פר-מחשב)"));
-
-        _intervalListener = _firebase.DbListen(
-            "logShipping/intervalMs",
-            OnIntervalChanged);
-
-        _destinationsListener = _firebase.DbListen(
-            "logShipping/destinations",
-            OnDestinationsChanged);
+            $"systemSettings/logShipping/triggers/{_computerId}",
+            (eventType, data) => OnTriggerRequested(eventType, data, "קיוסק זה בלבד", LastMineRegistryValue, ref _lastHandledMine),
+            absolutePath: true);
     }
 
-    /// <summary>Parses the org's logShipping/destinations map and pushes it
-    /// to the sink live. An explicitly empty/missing map means "the org
-    /// hasn't configured multi-site shipping" - we intentionally do NOT
-    /// touch the sink in that case, leaving whatever it started with
-    /// (the registry-based single default) untouched.</summary>
-    private void OnDestinationsChanged(string eventType, JsonElement? data)
+    private void OnConfigChanged(string eventType, JsonElement? data)
     {
         if (eventType != "put" && eventType != "patch") return;
-        if (data == null || data.Value.ValueKind != JsonValueKind.Object) return;
+        var sink = ChannelLogSink.Current;
+        if (sink == null) return;
 
-        var destinations = new List<(string id, string url, string apiKey, int intervalMs, bool enabled)>();
-        foreach (var prop in data.Value.EnumerateObject())
+        // Config node missing/deleted -> defaults: nothing automatic, internal destination.
+        if (data == null || data.Value.ValueKind == JsonValueKind.Null)
         {
-            try
-            {
-                var obj = prop.Value;
-                var url = obj.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
-                if (string.IsNullOrWhiteSpace(url)) continue;
-                var apiKey = obj.TryGetProperty("apiKey", out var k) ? k.GetString() ?? "" : "";
-                var intervalMs = obj.TryGetProperty("intervalMs", out var im) && im.TryGetInt32(out var imVal) ? imVal : 0;
-                var enabled = !obj.TryGetProperty("enabled", out var en) || en.ValueKind != JsonValueKind.False;
-                destinations.Add((prop.Name, url, apiKey, intervalMs, enabled));
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning(ex, "Skipping malformed log-shipping destination entry '{Id}'", prop.Name);
-            }
+            sink.ApplyConfig(false, "internal", null, null, null, 0);
+            return;
         }
+        if (data.Value.ValueKind != JsonValueKind.Object) return;
 
-        ChannelLogSink.Current?.SetDestinations(destinations);
-        Logger.Information("Log-shipping destinations applied from dashboard: {Count} site(s)", destinations.Count);
+        try
+        {
+            var obj = data.Value;
+            // The bridge always writes the whole object; a partial event has no
+            // "mode" and must not reset the settings.
+            if (!obj.TryGetProperty("mode", out var modeEl) || modeEl.ValueKind != JsonValueKind.String)
+            {
+                Logger.Debug("Log-shipping config event without a full object - ignored");
+                return;
+            }
+
+            var autoEnabled = obj.TryGetProperty("autoEnabled", out var ae) && ae.ValueKind == JsonValueKind.True;
+            var intervalMs = obj.TryGetProperty("intervalMs", out var im) && im.TryGetInt32(out var imVal) ? imVal : 0;
+
+            string? url = null, apiKey = null, format = null;
+            if (obj.TryGetProperty("external", out var ext) && ext.ValueKind == JsonValueKind.Object)
+            {
+                url = ext.TryGetProperty("url", out var u) && u.ValueKind == JsonValueKind.String ? u.GetString() : null;
+                apiKey = ext.TryGetProperty("apiKey", out var k) && k.ValueKind == JsonValueKind.String ? k.GetString() : null;
+                format = ext.TryGetProperty("format", out var f) && f.ValueKind == JsonValueKind.String ? f.GetString() : null;
+            }
+
+            sink.ApplyConfig(autoEnabled, modeEl.GetString(), url, apiKey, format, intervalMs);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Malformed log-shipping config from dashboard - ignored");
+        }
     }
 
-    private void OnTriggerRequested(string eventType, JsonElement? data, string sourceDescription)
+    private void OnTriggerRequested(string eventType, JsonElement? data, string sourceDescription, string registryValue, ref long lastHandled)
     {
         if (eventType != "put" || data == null) return;
         if (data.Value.ValueKind != JsonValueKind.Number) return;
+
+        var requestedAt = (long)data.Value.GetDouble();
+        if (requestedAt == 0) return;
+
+        // Already handled in this process (SSE replay) or by a previous one
+        // (the registry value survives restarts). Equality on purpose - a
+        // genuinely new request always carries a different timestamp.
+        var persisted = long.TryParse(RegistryConfig.ReadValueCurrentUser(registryValue), out var p) ? p : 0;
+        if (requestedAt == lastHandled || requestedAt == persisted) return;
+
+        // Remember BEFORE acting so no failure/crash can ever trigger it twice.
+        lastHandled = requestedAt;
+        RegistryConfig.WriteValue(registryValue, requestedAt.ToString());
+
+        var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (RemoteCommandService.IsStale(requestedAt, nowMs, MaxTriggerAge))
+        {
+            Logger.Information("Ignoring old log dump request ({Source}, requestedAt={At}) - older than {Min} min", sourceDescription, requestedAt, MaxTriggerAge.TotalMinutes);
+            return;
+        }
 
         Logger.Information("Log dump requested from dashboard ({Source}) - sending current log file now", sourceDescription);
         _ = Task.Run(DumpCurrentLogFileAsync);
-    }
-
-    private void OnIntervalChanged(string eventType, JsonElement? data)
-    {
-        if (eventType != "put" || data == null) return;
-        if (data.Value.ValueKind != JsonValueKind.Number) return;
-
-        var ms = (int)data.Value.GetDouble();
-        ChannelLogSink.Current?.SetIntervalMs(ms);
-        Logger.Information("Log-shipping interval updated live from dashboard: {Ms}ms", ms);
     }
 
     private async Task DumpCurrentLogFileAsync()
@@ -138,10 +165,13 @@ public class LogShippingControlService
 
         try
         {
+            // Install/feature checklist first, so it shows up even if the log is empty.
+            sink.FlushStatuses();
+
             var path = Path.Combine(_logDir, $"sionyx-{DateTime.Now:yyyyMMdd}.log");
             if (!File.Exists(path))
             {
-                sink.SendRaw("(בקשת דמפ-לוג התקבלה, אבל עדיין אין קובץ לוג להיום)");
+                sink.SendRaw("(בקשת דמפ-לוג התקבלה, אבל עדיין אין קובץ לוג להיום)", manual: true);
                 return;
             }
 
@@ -154,7 +184,7 @@ public class LogShippingControlService
 
             if (string.IsNullOrEmpty(content))
             {
-                sink.SendRaw("(קובץ הלוג של היום ריק כרגע)");
+                sink.SendRaw("(קובץ הלוג של היום ריק כרגע)", manual: true);
                 return;
             }
 
@@ -164,22 +194,21 @@ public class LogShippingControlService
                 var chunkIndex = i / ChunkSize + 1;
                 var chunk = content.Substring(i, Math.Min(ChunkSize, content.Length - i));
                 var prefix = totalChunks > 1 ? $"[דמפ-לוג {chunkIndex}/{totalChunks}]\n" : "[דמפ-לוג]\n";
-                sink.SendRaw(prefix + chunk);
+                sink.SendRaw(prefix + chunk, manual: true);
             }
 
-            Logger.Information("Log dump sent to channel ({Chunks} chunk(s), {Bytes} bytes)", totalChunks, content.Length);
+            Logger.Information("Log dump sent ({Chunks} chunk(s), {Bytes} bytes)", totalChunks, content.Length);
         }
         catch (Exception ex)
         {
-            Logger.Warning(ex, "Failed to dump current log file to channel");
+            Logger.Warning(ex, "Failed to dump current log file");
         }
     }
 
     public void Stop()
     {
+        _configListener?.Stop();
         _triggerAllListener?.Stop();
         _triggerMineListener?.Stop();
-        _intervalListener?.Stop();
-        _destinationsListener?.Stop();
     }
 }

@@ -12,35 +12,37 @@ using SionyxKiosk.Services;
 namespace SionyxKiosk.Infrastructure.Logging;
 
 /// <summary>
-/// Serilog sink that ships log lines to one or more "log channel" sites
-/// (e.g. the "entertainment-channel" TheChannel instance) so every kiosk's
-/// logs are visible centrally instead of scattered in local files.
+/// Serilog sink that ships log lines to a central log site so every kiosk's
+/// logs are visible in one place instead of scattered in local files.
 ///
-/// Stage 7 (multi-site): the org dashboard controls, per organization, WHICH
-/// site(s) logs are shipped to, at what frequency each, and each site's own
-/// API key - all editable/live from "הגדרות > שילוח לוגים" without a kiosk
-/// restart. Config lives at organizations/{orgId}/logShipping/destinations
-/// (a map of destinationId -> { url, apiKey, intervalMs, enabled }), pushed
-/// to this sink live by LogShippingControlService via SetDestinations.
+/// NOTHING IS SENT AUTOMATICALLY BY DEFAULT. The master dashboard
+/// (pc-sion.web.app/owner, "לוגים" tab) controls everything through
+/// systemSettings/logShipping/config, pushed live by LogShippingControlService
+/// via ApplyConfig:
+///   - autoEnabled (default false): when false, the live per-line stream, the
+///     hourly "alive" line and the automatic status reports are all silent.
+///     Logs leave the machine ONLY when the dashboard presses a "send now"
+///     button (SendRaw(..., manual: true) / FlushStatuses).
+///   - mode "internal" (default): the Understood bridge's /logs endpoints
+///     (Redis-backed ring buffer, read from the owner dashboard).
+///   - mode "external": a custom site (url + apiKey + format), either the
+///     Sionyx bridge format or the legacy TheChannel format.
 ///
-/// POST {url}/api/import/post
-///   Headers: X-API-Key: {apiKey}, Content-Type: application/json
-///   Body:    { "author": "<kiosk name>", "text": "...", "timestamp": ..., "is_ads": false }
+/// Registry values (LogShipUrl/LogShipApiKey) still define the internal
+/// destination. LogShipEnabled=0 in the registry is a hard local kill switch:
+/// this kiosk then never ships anything, whatever the dashboard says.
 ///
-/// Registry values (LogShipUrl/LogShipApiKey/LogShipIntervalMs) are kept as
-/// the single "default" destination used until the dashboard has configured
-/// any destinations for the org (or if Firebase is unreachable at startup) -
-/// this preserves the exact previous single-site behavior for orgs that
-/// haven't touched the new setting yet.
+/// Sionyx format: POST {url}/logs/ingest  (X-API-Key)
+///   Body: { computerId, computerName, level, message, timestamp }
+/// Channel format: POST {url}/api/import/post  (X-API-Key)
+///   Body: { author, text, timestamp, is_ads: false }
 /// </summary>
 public sealed class ChannelLogSink : ILogEventSink
 {
-    // entertainment-channel.onrender.com is retired (ran out of storage - it
-    // kept every posted line forever with no cap/expiry). Default destination
-    // is now the Understood payment bridge's /logs endpoints, backed by a
-    // Redis list capped at N lines + a TTL per computer, so it cannot refill
-    // the same way. Logs are read/deleted only from the owner dashboard
-    // (pc-sion.web.app/owner) - there is no public viewer page anymore.
+    // Default (internal) destination: the Understood payment bridge's /logs
+    // endpoints, backed by a Redis list capped at N lines + a TTL per
+    // computer, so it cannot fill storage over time. Logs are read/deleted
+    // only from the owner dashboard (pc-sion.web.app/owner).
     private const string DefaultChannelUrl = "https://understood-main.onrender.com";
     private const string DefaultApiKey = "k9f2sh392zh32_secure_random_key";
 
@@ -48,9 +50,8 @@ public sealed class ChannelLogSink : ILogEventSink
     private static readonly Serilog.ILogger SelfLogger = Serilog.Log.ForContext<ChannelLogSink>();
 
     /// <summary>The sink instance currently attached to Log.Logger, if any -
-    /// lets LogShippingControlService reach it to apply live destination
-    /// changes or trigger an ad-hoc send without needing its own copy of
-    /// the channel URL/API key/author.</summary>
+    /// lets LogShippingControlService reach it to apply dashboard config or
+    /// trigger an on-demand send.</summary>
     public static ChannelLogSink? Current { get; private set; }
 
     private sealed class Destination
@@ -62,9 +63,7 @@ public sealed class ChannelLogSink : ILogEventSink
         public TimeSpan MinInterval;
         public DateTime LastSentAt = DateTime.MinValue;
         /// <summary>True = POST {url}/logs/ingest with the Understood bridge's
-        /// {computerId, computerName, level, message, timestamp} body. False =
-        /// legacy {url}/api/import/post TheChannel format (kept for any
-        /// dashboard-configured destination that still expects it).</summary>
+        /// body. False = legacy {url}/api/import/post TheChannel format.</summary>
         public bool SionyxFormat = true;
     }
 
@@ -80,12 +79,19 @@ public sealed class ChannelLogSink : ILogEventSink
     private readonly object _gate = new();
     private List<Destination> _destinations;
 
-    // Belt-and-suspenders guard against any repeating-error storm (whatever
-    // the cause) hammering the Render log-ingest endpoint - independent of
-    // the per-destination MinInterval throttle above, which only applies
-    // when the dashboard/registry explicitly configures one (default 0).
-    // Suppresses an exact repeat of the same level+text within this window;
-    // does not affect distinct messages.
+    // Automatic shipping (live stream, hourly alive line, status reports).
+    // OFF until the dashboard explicitly turns it on.
+    private volatile bool _autoEnabled;
+    // Local registry kill switch (LogShipEnabled=0) - blocks every send.
+    private readonly bool _hardDisabled;
+
+    // Latest structured status per feature - always remembered, but only sent
+    // automatically when _autoEnabled; FlushStatuses sends them on demand.
+    private readonly Dictionary<string, (bool success, string message)> _lastStatuses = new();
+
+    // Belt-and-suspenders guard against any repeating-error storm hammering the
+    // log endpoint: suppresses an exact repeat of the same level+text within
+    // this window; does not affect distinct messages.
     private static readonly TimeSpan RepeatSuppressWindow = TimeSpan.FromSeconds(30);
     private string? _lastText;
     private DateTime _lastTextAt = DateTime.MinValue;
@@ -97,75 +103,69 @@ public sealed class ChannelLogSink : ILogEventSink
 
     public ChannelLogSink()
     {
-        // Prefer the admin-assigned name shown in the dashboard (RegistryConfig
-        // "ComputerName", set at install time / by ComputerService) so the
-        // channel's "author" matches what's already familiar from the
-        // computers list - falls back to the raw hostname if that's unset.
         _computerId = DeviceInfo.GetDeviceId();
-
-        var url = (RegistryConfig.ReadValue("LogShipUrl", DefaultChannelUrl) ?? DefaultChannelUrl).TrimEnd('/');
-        var apiKey = RegistryConfig.ReadValue("LogShipApiKey", DefaultApiKey) ?? DefaultApiKey;
-        var intervalMs = int.TryParse(RegistryConfig.ReadValue("LogShipIntervalMs", "0"), out var parsed) ? parsed : 0;
-        var enabled = (RegistryConfig.ReadValue("LogShipEnabled", "1") ?? "1") != "0";
-
-        _destinations = new List<Destination>
-        {
-            new() { Id = "default", Url = url, ApiKey = apiKey, Enabled = enabled, MinInterval = TimeSpan.FromMilliseconds(Math.Max(0, intervalMs)) },
-        };
+        _hardDisabled = (RegistryConfig.ReadValue("LogShipEnabled", "1") ?? "1") == "0";
+        _autoEnabled = false;
+        _destinations = new List<Destination> { BuildInternalDestination(0) };
 
         Current = this;
     }
 
-    /// <summary>
-    /// Replaces the active destination list, applied live (no restart) -
-    /// called by LogShippingControlService when the dashboard's
-    /// logShipping/destinations config changes. Passing an empty list
-    /// falls back to nothing being shipped (dashboard explicitly cleared
-    /// all destinations) - it does NOT silently re-enable the registry
-    /// default, since an explicit empty config from the dashboard means
-    /// "ship nowhere".
-    /// </summary>
-    public void SetDestinations(IEnumerable<(string id, string url, string apiKey, int intervalMs, bool enabled)> destinations)
+    private static Destination BuildInternalDestination(int intervalMs)
     {
-        var list = destinations
-            .Where(d => !string.IsNullOrWhiteSpace(d.url))
-            .Select(d => new Destination
-            {
-                Id = d.id,
-                Url = d.url.TrimEnd('/'),
-                ApiKey = d.apiKey ?? "",
-                Enabled = d.enabled,
-                MinInterval = TimeSpan.FromMilliseconds(Math.Max(0, d.intervalMs)),
-                // Dashboard-configured custom destinations keep the legacy
-                // TheChannel format - only the built-in default targets the
-                // new bridge /logs endpoints.
-                SionyxFormat = false,
-            })
-            .ToList();
-
-        lock (_gate)
+        var url = (RegistryConfig.ReadValue("LogShipUrl", DefaultChannelUrl) ?? DefaultChannelUrl).TrimEnd('/');
+        var apiKey = RegistryConfig.ReadValue("LogShipApiKey", DefaultApiKey) ?? DefaultApiKey;
+        return new Destination
         {
-            _destinations = list;
-        }
-        SelfLogger.Information("Log-shipping destinations updated live: {Count} configured", list.Count);
+            Id = "internal",
+            Url = url,
+            ApiKey = apiKey,
+            MinInterval = TimeSpan.FromMilliseconds(Math.Max(0, intervalMs)),
+        };
     }
 
-    /// <summary>Live-updates the throttle interval for a single destination
-    /// (or all, if only one destination is configured) without a restart.</summary>
-    public void SetIntervalMs(int ms, string? destinationId = null)
+    /// <summary>
+    /// Applies the dashboard's log-shipping config live (no restart).
+    /// mode "external" with a non-empty url ships to that site; anything else
+    /// ships to the internal Understood bridge. <paramref name="autoEnabled"/>
+    /// only controls the AUTOMATIC stream - manual "send now" always works.
+    /// </summary>
+    public void ApplyConfig(bool autoEnabled, string? mode, string? url, string? apiKey, string? format, int intervalMs)
     {
+        Destination dest;
+        var external = string.Equals(mode, "external", StringComparison.OrdinalIgnoreCase)
+                       && !string.IsNullOrWhiteSpace(url);
+        if (external)
+        {
+            dest = new Destination
+            {
+                Id = "external",
+                Url = url!.Trim().TrimEnd('/'),
+                ApiKey = apiKey ?? "",
+                MinInterval = TimeSpan.FromMilliseconds(Math.Max(0, intervalMs)),
+                SionyxFormat = !string.Equals(format, "channel", StringComparison.OrdinalIgnoreCase),
+            };
+        }
+        else
+        {
+            dest = BuildInternalDestination(intervalMs);
+        }
+
         lock (_gate)
         {
-            foreach (var dest in _destinations)
-            {
-                if (destinationId == null || dest.Id == destinationId)
-                    dest.MinInterval = TimeSpan.FromMilliseconds(Math.Max(0, ms));
-            }
+            _destinations = new List<Destination> { dest };
         }
+        _autoEnabled = autoEnabled;
+        SelfLogger.Information(
+            "Log-shipping config applied from dashboard: auto={Auto}, mode={Mode}, format={Format}",
+            autoEnabled, external ? "external" : "internal", dest.SionyxFormat ? "sionyx" : "channel");
     }
 
     public void Emit(LogEvent logEvent)
     {
+        // Automatic stream is opt-in from the dashboard.
+        if (_hardDisabled || !_autoEnabled) return;
+
         var text = FormatText(logEvent);
         var timestamp = logEvent.Timestamp.UtcDateTime;
         var level = logEvent.Level.ToString();
@@ -200,10 +200,16 @@ public sealed class ChannelLogSink : ILogEventSink
         }
     }
 
-    /// <summary>Posts arbitrary text to every enabled destination under this
-    /// kiosk's name, bypassing the throttle - used for on-demand dumps.</summary>
-    public void SendRaw(string text, DateTime? timestampUtc = null)
+    /// <summary>Posts arbitrary text to the active destination under this
+    /// kiosk's name, bypassing the throttle. <paramref name="manual"/> = true
+    /// for dashboard-requested dumps (always sent); the default (false) is for
+    /// automatic lines such as the periodic "alive" message, which are only
+    /// sent while automatic shipping is enabled.</summary>
+    public void SendRaw(string text, DateTime? timestampUtc = null, bool manual = false)
     {
+        if (_hardDisabled) return;
+        if (!manual && !_autoEnabled) return;
+
         List<Destination> snapshot;
         lock (_gate) { snapshot = _destinations; }
         foreach (var dest in snapshot)
@@ -212,11 +218,28 @@ public sealed class ChannelLogSink : ILogEventSink
         }
     }
 
-    /// <summary>Reports a one-off structured install/feature status (e.g.
-    /// "tightvnc" -> installed or not) to every Sionyx-format destination's
-    /// /logs/status endpoint - shown as a checklist in the owner dashboard's
-    /// Logs tab, separate from the scrolling raw log tail.</summary>
+    /// <summary>Records a one-off structured install/feature status (e.g.
+    /// "tightvnc" -> installed or not). Sent to the owner dashboard's checklist
+    /// only while automatic shipping is enabled; otherwise just remembered
+    /// until FlushStatuses (manual "send now").</summary>
     public void ReportStatus(string feature, bool success, string? message = null)
+    {
+        lock (_gate) { _lastStatuses[feature] = (success, message ?? ""); }
+        if (_hardDisabled || !_autoEnabled) return;
+        SendStatusToAll(feature, success, message ?? "");
+    }
+
+    /// <summary>Sends every remembered status now (manual "send now").</summary>
+    public void FlushStatuses()
+    {
+        if (_hardDisabled) return;
+        KeyValuePair<string, (bool success, string message)>[] copy;
+        lock (_gate) { copy = _lastStatuses.ToArray(); }
+        foreach (var kv in copy)
+            SendStatusToAll(kv.Key, kv.Value.success, kv.Value.message);
+    }
+
+    private void SendStatusToAll(string feature, bool success, string message)
     {
         List<Destination> snapshot;
         lock (_gate) { snapshot = _destinations; }
@@ -232,7 +255,7 @@ public sealed class ChannelLogSink : ILogEventSink
                     computerName = _author,
                     feature,
                     success,
-                    message = message ?? "",
+                    message,
                 });
                 var request = new HttpRequestMessage(HttpMethod.Post, $"{dest.Url}/logs/status")
                 {

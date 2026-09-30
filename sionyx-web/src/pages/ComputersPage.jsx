@@ -44,9 +44,6 @@ import {
   requestRemoteControlRefresh,
   setAnyDeskPassword,
   requestTeamViewerLaunch,
-  requestLogShipTriggerAll,
-  requestLogShipTrigger,
-  setLogShipIntervalMs,
   requestPowerCommand,
   requestVncSession,
 } from '../services/computerService';
@@ -99,9 +96,6 @@ const ComputersPage = () => {
   const [renameValue, setRenameValue] = useState('');
   const [renameLoading, setRenameLoading] = useState(false);
   const [, forceOnlineTick] = useState(0);
-  const [sendingAllLogs, setSendingAllLogs] = useState(false);
-  const [logShipIntervalMs, setLogShipIntervalMsState] = useState(0);
-  const [settingLogShipInterval, setSettingLogShipInterval] = useState(false);
 
   const orgId = useOrgId();
 
@@ -112,29 +106,6 @@ const ComputersPage = () => {
     const tick = setInterval(() => forceOnlineTick(n => n + 1), 30 * 1000);
     return () => clearInterval(tick);
   }, []);
-
-  const handleSendAllLogs = async () => {
-    setSendingAllLogs(true);
-    const result = await requestLogShipTriggerAll();
-    if (result.success) {
-      message.success('הבקשה נשלחה - הלוגים מכל הקיוסקים המחוברים יגיעו תוך שניות');
-    } else {
-      message.error(result.error || 'נכשל בשליחת הבקשה');
-    }
-    setSendingAllLogs(false);
-  };
-
-  const handleLogShipIntervalChange = async value => {
-    setLogShipIntervalMsState(value);
-    setSettingLogShipInterval(true);
-    const result = await setLogShipIntervalMs(value);
-    if (result.success) {
-      message.success('תדירות שליחת הלוגים עודכנה בכל הקיוסקים');
-    } else {
-      message.error(result.error || 'נכשל בעדכון התדירות');
-    }
-    setSettingLogShipInterval(false);
-  };
 
   useEffect(() => {
     if (!orgId) return;
@@ -522,20 +493,8 @@ const ComputersPage = () => {
     const [newAnyDeskPassword, setNewAnyDeskPassword] = useState('');
     const [settingAnyDeskPassword, setSettingAnyDeskPassword] = useState(false);
     const [launchingTeamViewer, setLaunchingTeamViewer] = useState(false);
-    const [sendingLog, setSendingLog] = useState(false);
     const [sendingPowerCommand, setSendingPowerCommand] = useState(false);
     const [startingVnc, setStartingVnc] = useState(false);
-
-    const handleSendLog = async () => {
-      setSendingLog(true);
-      const result = await requestLogShipTrigger(computerId);
-      if (result.success) {
-        message.success('בקשת שליחת לוג נשלחה - הלוג יגיע תוך שניות (אם המחשב מקוון)');
-      } else {
-        message.error(result.error || 'נכשל בשליחת הבקשה');
-      }
-      setSendingLog(false);
-    };
 
     const handlePowerCommand = type => {
       const isShutdown = type === 'shutdown';
@@ -673,14 +632,6 @@ const ComputersPage = () => {
               >
                 שליטה מרחוק
               </Button>
-              <Button
-                type='text'
-                size='small'
-                icon={<CloudUploadOutlined />}
-                loading={sendingLog}
-                onClick={handleSendLog}
-                title='שלח לוג של המחשב הזה לאתר'
-              />
               <Button
                 type='text'
                 size='small'
@@ -987,31 +938,6 @@ const ComputersPage = () => {
                 ניהול מחשבים
               </Title>
               <Text type='secondary'>צפה ונתח מחשבים בארגון שלך</Text>
-            </Col>
-            <Col>
-              <Space wrap>
-                <Text type='secondary'>תדירות שליחת לוגים לאתר:</Text>
-                <Select
-                  value={logShipIntervalMs}
-                  onChange={handleLogShipIntervalChange}
-                  disabled={settingLogShipInterval}
-                  style={{ width: 160 }}
-                  options={[
-                    { value: 0, label: 'מיידי (כל שורה)' },
-                    { value: 2000, label: 'כל 2 שניות' },
-                    { value: 10000, label: 'כל 10 שניות' },
-                    { value: 60000, label: 'כל דקה' },
-                  ]}
-                />
-                <Button
-                  type='primary'
-                  icon={<CloudUploadOutlined />}
-                  loading={sendingAllLogs}
-                  onClick={handleSendAllLogs}
-                >
-                  שלח לוגים מכל הקיוסקים
-                </Button>
-              </Space>
             </Col>
           </Row>
         </motion.div>

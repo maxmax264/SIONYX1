@@ -15,6 +15,9 @@ public sealed class SseListener
 
     private readonly FirebaseClient _firebase;
     private readonly string _path;
+    // True = _path is a root-level database path (e.g. systemSettings/...), not
+    // relative to organizations/{orgId}/.
+    private readonly bool _absolutePath;
     private readonly Action<string, JsonElement?> _callback;
     private readonly Action<string>? _errorCallback;
 
@@ -62,10 +65,12 @@ public sealed class SseListener
         FirebaseClient firebase,
         string path,
         Action<string, JsonElement?> callback,
-        Action<string>? errorCallback)
+        Action<string>? errorCallback,
+        bool absolutePath = false)
     {
         _firebase = firebase;
         _path = path;
+        _absolutePath = absolutePath;
         _callback = callback;
         _errorCallback = errorCallback;
     }
@@ -188,7 +193,7 @@ public sealed class SseListener
         if (!await _firebase.EnsureValidTokenAsync())
             throw new InvalidOperationException("Not authenticated");
 
-        var orgPath = _firebase.GetOrgPathInternal(_path);
+        var orgPath = _absolutePath ? _path.Trim('/') : _firebase.GetOrgPathInternal(_path);
         var url = $"{_firebase.DatabaseUrl}/{orgPath}.json?auth={_firebase.IdToken}";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);

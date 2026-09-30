@@ -39,3 +39,20 @@ export const deleteComputerLogs = (computerId) =>
 
 /** Deletes every computer's logs+status (bulk wipe). */
 export const deleteAllLogs = () => authedFetch("/logs", { method: "DELETE" });
+
+/**
+ * Log-shipping control (applied live by every kiosk):
+ * { autoEnabled, mode: "internal"|"external", intervalMs, external: { url, apiKey, format } }
+ * autoEnabled is false by default - nothing is sent unless "send now" is pressed.
+ */
+export const getLogConfig = () => authedFetch("/logs/config");
+
+export const saveLogConfig = (config) =>
+  authedFetch("/logs/config", { method: "PUT", body: JSON.stringify({ config }) });
+
+/** "Send logs now": one kiosk when computerId is given, otherwise every kiosk. */
+export const requestLogSend = (computerId) =>
+  authedFetch("/logs/trigger", {
+    method: "POST",
+    body: JSON.stringify(computerId ? { computerId } : {}),
+  });
