@@ -33,45 +33,94 @@ describe('downloadService', () => {
   });
 
   describe('getLatestRelease', () => {
-    it('should return release info from metadata', async () => {
-      const mockMetadata = {
-        version: '1.2.3',
-        downloadUrl: 'https://storage.example.com/sionyx.exe',
-        releaseDate: '2024-01-15',
-        fileSize: 50000000,
-        filename: 'sionyx-v1.2.3.exe',
-        buildNumber: 42,
-        changelog: ['Fix bug', 'Add feature'],
-      };
+    const githubRelease = {
+      tag_name: 'v3.18.36',
+      published_at: '2026-09-29T16:29:10Z',
+      body: '## Changes\n- Fix VNC relay\n* Improve self-heal\nplain text',
+      assets: [
+        { name: 'notes.txt', size: 10, browser_download_url: 'https://github.com/x/notes.txt' },
+        {
+          name: 'sionyx-v3.18.36.msi',
+          size: 121950208,
+          browser_download_url:
+            'https://github.com/maxmax264/sionyx-releases/releases/download/v3.18.36/sionyx-v3.18.36.msi',
+        },
+      ],
+    };
 
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockMetadata,
-      });
+    it('should return release info from GitHub Releases (primary)', async () => {
+      global.fetch.mockResolvedValueOnce({ ok: true, json: async () => githubRelease });
+
+      const result = await getLatestRelease();
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch.mock.calls[0][0]).toContain(
+        'api.github.com/repos/maxmax264/sionyx-releases/releases/latest'
+      );
+      expect(result.version).toBe('3.18.36');
+      expect(result.downloadUrl).toContain('/download/v3.18.36/sionyx-v3.18.36.msi');
+      expect(result.fileName).toBe('sionyx-v3.18.36.msi');
+      expect(result.fileSize).toBe(121950208);
+      expect(result.releaseDate).toBe('2026-09-29T16:29:10Z');
+      expect(result.changelog).toEqual(['Fix VNC relay', 'Improve self-heal']);
+    });
+
+    it('should fall back to RTDB when GitHub fails', async () => {
+      global.fetch
+        .mockResolvedValueOnce({ ok: false, status: 403 })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            version: '1.2.3',
+            downloadUrl: 'https://storage.example.com/sionyx.exe',
+            buildNumber: 42,
+          }),
+        });
 
       const result = await getLatestRelease();
 
       expect(result.version).toBe('1.2.3');
       expect(result.downloadUrl).toBe('https://storage.example.com/sionyx.exe');
       expect(result.buildNumber).toBe(42);
+      expect(global.fetch.mock.calls[1][0]).toContain('pc-sion-default-rtdb.firebaseio.com');
+      expect(global.fetch.mock.calls[1][0]).not.toContain('undefined');
     });
 
-    it('should throw error when metadata fetch fails', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      });
+    it('should fall back to Storage with a real bucket name when GitHub and RTDB fail', async () => {
+      global.fetch
+        .mockResolvedValueOnce({ ok: false, status: 403 })
+        .mockResolvedValueOnce({ ok: false, status: 404 })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ version: '2.0.0', downloadUrl: 'https://storage.example.com/a.exe' }),
+        });
+
+      const result = await getLatestRelease();
+
+      expect(result.version).toBe('2.0.0');
+      expect(global.fetch.mock.calls[2][0]).toContain('/b/pc-sion.appspot.com/o/');
+    });
+
+    it('should throw error when every source fails', async () => {
+      global.fetch.mockResolvedValue({ ok: false, status: 404 });
 
       await expect(getLatestRelease()).rejects.toThrow('Could not fetch release metadata');
     });
 
-    it('should throw error when downloadUrl is missing', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ version: '1.0.0' }), // No downloadUrl
-      });
+    it('should skip a GitHub release that has no installer asset', async () => {
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ tag_name: 'v1.0.0', assets: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ version: '0.9.0', downloadUrl: 'https://storage.example.com/b.exe' }),
+        });
 
-      await expect(getLatestRelease()).rejects.toThrow();
+      const result = await getLatestRelease();
+
+      expect(result.version).toBe('0.9.0');
     });
   });
 
