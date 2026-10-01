@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [3.18.35] - 2026-10-01
+
+### Other
+- IFirebaseClient.DbListen gets absolutePath param (fixes CS0535 build error) (7d031051)
+- move log management to the owner dashboard (internal bridge / external site), opt-in automatic shipping, manual send-now; kiosk dedupes replayed triggers (05e0b630)
+- download latest installer from GitHub Releases (sionyx-releases), Firebase as fallback with default config (d7b4d76e)
+- v3.18.34 (99886b57)
+- resolve computer name per send (dashboard rename -> owner logs list) (3f361c39)
+- wait up to 15s for the fire-and-forget action (flaky under parallel test load) (6b9a088b)
+
+
 ## [3.18.34] - 2026-09-29
 
 ### Other
