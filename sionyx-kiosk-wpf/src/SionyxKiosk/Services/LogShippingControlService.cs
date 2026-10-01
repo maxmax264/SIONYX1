@@ -23,6 +23,12 @@ namespace SionyxKiosk.Services;
 ///   - systemSettings/logShipping/triggers/{computerId} - "send now" for this
 ///     kiosk only.
 ///
+/// Uses its OWN anonymous Firebase identity (like RemoteCommandService), not
+/// the shared app-wide FirebaseClient: that one only holds a token while a
+/// customer is logged in, so listeners built on it sit at "idle: no signed-in
+/// session yet" on the login screen - exactly where a kiosk spends most of
+/// its time - and the dashboard's "send now" never reached the machine.
+///
 /// Both triggers read today's log file off disk, post it to the active
 /// destination in chunks, and flush the remembered status checklist.
 ///
@@ -45,8 +51,13 @@ public class LogShippingControlService
     internal const string LastAllRegistryValue = "LastLogDumpAllRequestedAt";
     internal const string LastMineRegistryValue = "LastLogDumpMineRequestedAt";
 
+    private const int SignInRetrySeconds = 30;
+
     private readonly FirebaseClient _firebase;
     private readonly string _logDir;
+    private bool _ownsIdentity;
+    private bool _starting;
+    private bool _started;
     private string? _computerId;
     private SseListener? _configListener;
     private SseListener? _triggerAllListener;
@@ -55,16 +66,66 @@ public class LogShippingControlService
     private long _lastHandledAll;
     private long _lastHandledMine;
 
+    /// <summary>Uses an already-built client as is (tests, or a caller that
+    /// manages sign-in itself).</summary>
     public LogShippingControlService(FirebaseClient firebase, string logDir)
     {
         _firebase = firebase;
         _logDir = logDir;
     }
 
-    /// <summary>Call once at startup, after the kiosk is authenticated.</summary>
+    /// <summary>Production: builds its own client and signs in anonymously, so
+    /// it works at the idle login screen too.</summary>
+    public LogShippingControlService(FirebaseConfig config, string logDir)
+        : this(new FirebaseClient(config), logDir)
+    {
+        _ownsIdentity = true;
+    }
+
+    /// <summary>Call once at startup - does not need a customer to be logged
+    /// in (see class remarks).</summary>
     public void Start()
     {
+        if (_starting || _started) return;
         _computerId = DeviceInfo.GetDeviceId();
+
+        if (!_ownsIdentity)
+        {
+            StartListeners();
+            return;
+        }
+
+        _starting = true;
+        _ = Task.Run(async () =>
+        {
+            try { await EnsureSignedInAndListeningAsync(); }
+            finally { _starting = false; }
+        });
+    }
+
+    private async Task EnsureSignedInAndListeningAsync()
+    {
+        var signIn = await _firebase.SignInAnonymouslyAsync();
+        if (!signIn.Success)
+        {
+            Logger.Warning("Log-shipping anonymous sign-in failed: {Error} - retrying in {Seconds}s", signIn.Error, (int)(FirebaseClient.SignInRetryMs(SignInRetrySeconds) / 1000));
+            var retryTimer = new System.Timers.Timer(FirebaseClient.SignInRetryMs(SignInRetrySeconds)) { AutoReset = false };
+            retryTimer.Elapsed += async (_, _) =>
+            {
+                retryTimer.Dispose();
+                await EnsureSignedInAndListeningAsync();
+            };
+            retryTimer.Start();
+            return;
+        }
+
+        StartListeners();
+    }
+
+    private void StartListeners()
+    {
+        if (_started) return;
+        _started = true;
         Logger.Information("Log-shipping control: listening on systemSettings/logShipping (config, triggerAll, triggers/{ComputerId})", _computerId);
 
         _configListener = _firebase.DbListen(
