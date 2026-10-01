@@ -1,11 +1,13 @@
 name: Release
 
+# MANUAL ONLY. The real release path is sionyx-kiosk-wpf/build.ps1, which reads
+# the newest version from the public sionyx-releases repo (the source of truth
+# the kiosks auto-update from) and uploads the MSI there. This workflow builds
+# with -NoUpload, publishes to THIS repo only, and commits version.json from
+# the bot - when it ran on every push it produced duplicate releases whose
+# numbers collided with the real ones and made version.json conflict with the
+# locally-bumped copy. Run it by hand only if you really want it.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'sionyx-kiosk-wpf/**'
-      - 'scripts/release/**'
   workflow_dispatch:
     inputs:
       override:
