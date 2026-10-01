@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Serilog;
 using SionyxKiosk.Infrastructure;
@@ -64,6 +65,7 @@ public class LogShippingControlService
     public void Start()
     {
         _computerId = DeviceInfo.GetDeviceId();
+        Logger.Information("Log-shipping control: listening on systemSettings/logShipping (config, triggerAll, triggers/{ComputerId})", _computerId);
 
         _configListener = _firebase.DbListen(
             "systemSettings/logShipping/config",
@@ -132,6 +134,7 @@ public class LogShippingControlService
 
         var requestedAt = (long)data.Value.GetDouble();
         if (requestedAt == 0) return;
+        Logger.Information("Log dump trigger event received ({Source}, requestedAt={At})", sourceDescription, requestedAt);
 
         // Already handled in this process (SSE replay) or by a previous one
         // (the registry value survives restarts). Equality on purpose - a
@@ -168,8 +171,8 @@ public class LogShippingControlService
             // Install/feature checklist first, so it shows up even if the log is empty.
             sink.FlushStatuses();
 
-            var path = Path.Combine(_logDir, $"sionyx-{DateTime.Now:yyyyMMdd}.log");
-            if (!File.Exists(path))
+            var path = FindTodayLogFile();
+            if (path == null)
             {
                 sink.SendRaw("(בקשת דמפ-לוג התקבלה, אבל עדיין אין קובץ לוג להיום)", manual: true);
                 return;
@@ -202,6 +205,28 @@ public class LogShippingControlService
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to dump current log file");
+        }
+    }
+
+    /// <summary>Today's main log (LoggingSetup writes sionyx_yyyyMMdd.log; the
+    /// separate sionyx_errors_*.log is not the one to ship). Falls back to the
+    /// newest main log if today's file is not there yet.</summary>
+    private string? FindTodayLogFile()
+    {
+        try
+        {
+            var today = Path.Combine(_logDir, $"sionyx_{DateTime.Now:yyyyMMdd}.log");
+            if (File.Exists(today)) return today;
+            if (!Directory.Exists(_logDir)) return null;
+            return Directory.GetFiles(_logDir, "sionyx_*.log")
+                .Where(f => !Path.GetFileName(f).StartsWith("sionyx_errors_", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Could not locate the current log file");
+            return null;
         }
     }
 
