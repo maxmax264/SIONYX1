@@ -47,6 +47,12 @@ public class LogShippingControlService
     // cheaper than finding it by trial and error against a live site.
     private const int ChunkSize = 6000;
 
+    private const string PublicLogDir = @"C:\Users\Public\Documents\SIONYX\logs";
+
+    // Only the tail of today's log is shipped: the file can reach 10 MB, and
+    // the bridge keeps just the last ~500 entries per computer anyway.
+    private const int MaxDumpChars = 120_000;
+
     internal static readonly TimeSpan MaxTriggerAge = TimeSpan.FromMinutes(30);
     internal const string LastAllRegistryValue = "LastLogDumpAllRequestedAt";
     internal const string LastMineRegistryValue = "LastLogDumpMineRequestedAt";
@@ -252,6 +258,14 @@ public class LogShippingControlService
                 return;
             }
 
+            if (content.Length > MaxDumpChars)
+            {
+                content = content.Substring(content.Length - MaxDumpChars);
+                var nl = content.IndexOf('\n');
+                if (nl >= 0 && nl < content.Length - 1) content = content.Substring(nl + 1);
+                content = "(...מוצג הסוף של הלוג בלבד)\n" + content;
+            }
+
             var totalChunks = (content.Length + ChunkSize - 1) / ChunkSize;
             for (var i = 0; i < content.Length; i += ChunkSize)
             {
@@ -269,18 +283,23 @@ public class LogShippingControlService
         }
     }
 
-    /// <summary>Today's main log (LoggingSetup writes sionyx_yyyyMMdd.log; the
-    /// separate sionyx_errors_*.log is not the one to ship). Falls back to the
-    /// newest main log if today's file is not there yet.</summary>
+    /// <summary>The newest main log written today. App.xaml.cs configures
+    /// Serilog to write sionyx-yyyyMMdd.log (rolling daily, plus _001 style
+    /// suffixes when a file hits its size limit) both under the user's
+    /// LocalApplicationData and under C:\Users\Public\Documents\SIONYX\logs, so
+    /// both are searched. The separate crash_*/errors logs are not matched.</summary>
     private string? FindTodayLogFile()
     {
         try
         {
-            var today = Path.Combine(_logDir, $"sionyx_{DateTime.Now:yyyyMMdd}.log");
-            if (File.Exists(today)) return today;
-            if (!Directory.Exists(_logDir)) return null;
-            return Directory.GetFiles(_logDir, "sionyx_*.log")
-                .Where(f => !Path.GetFileName(f).StartsWith("sionyx_errors_", StringComparison.OrdinalIgnoreCase))
+            var today = DateTime.Now.ToString("yyyyMMdd");
+            var dirs = new[] { _logDir, PublicLogDir }
+                .Where(d => !string.IsNullOrWhiteSpace(d) && Directory.Exists(d))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            return dirs
+                .SelectMany(d => Directory.GetFiles(d, $"sionyx*{today}*.log"))
+                .Where(f => !Path.GetFileName(f).Contains("errors", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(File.GetLastWriteTimeUtc)
                 .FirstOrDefault();
         }
