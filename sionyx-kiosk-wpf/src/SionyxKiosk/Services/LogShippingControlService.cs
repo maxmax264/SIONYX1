@@ -235,6 +235,12 @@ public class LogShippingControlService
 
         try
         {
+            // Immediate acknowledgement, so the dashboard shows at once that the
+            // request reached THIS kiosk (and on which version), whatever
+            // happens next with the file.
+            var version = RegistryConfig.ReadValue("Version") ?? "?";
+            sink.SendRaw($"[בקשת לוג התקבלה בקיוסק, גרסה {version}]", manual: true);
+
             // Install/feature checklist first, so it shows up even if the log is empty.
             sink.FlushStatuses();
 
@@ -266,6 +272,8 @@ public class LogShippingControlService
                 content = "(...מוצג הסוף של הלוג בלבד)\n" + content;
             }
 
+            sink.SendRaw($"[שולח את סוף הקובץ {Path.GetFileName(path)}, {content.Length} תווים]", manual: true);
+
             var totalChunks = (content.Length + ChunkSize - 1) / ChunkSize;
             for (var i = 0; i < content.Length; i += ChunkSize)
             {
@@ -280,6 +288,7 @@ public class LogShippingControlService
         catch (Exception ex)
         {
             Logger.Warning(ex, "Failed to dump current log file");
+            sink.SendRaw($"[שגיאה בקריאת/שליחת הלוג: {ex.GetType().Name}: {ex.Message}]", manual: true);
         }
     }
 
