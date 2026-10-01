@@ -28,5 +28,5 @@ public interface IFirebaseClient : IDisposable
     Task<FirebaseResult> DbDeleteAsync(string path);
     Task<FirebaseResult> CallFunctionAsync(string functionName, object payload);
 
-    SseListener DbListen(string path, Action<string, JsonElement?> callback, Action<string>? errorCallback = null);
+    SseListener DbListen(string path, Action<string, JsonElement?> callback, Action<string>? errorCallback = null, bool absolutePath = false);
 }
