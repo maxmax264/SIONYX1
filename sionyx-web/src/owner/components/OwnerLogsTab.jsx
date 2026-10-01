@@ -32,6 +32,7 @@ const OwnerLogsTab = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [waitingForLog, setWaitingForLog] = useState(false);
 
   const loadComputers = async () => {
     setLoadingList(true);
@@ -79,10 +80,39 @@ const OwnerLogsTab = () => {
     !search || (c.name || c.id).toLowerCase().includes(search.toLowerCase())
   );
 
+  // Changes whenever new lines arrive (also when the capped list stays at 500).
+  const logSignature = (lines = []) =>
+    `${lines.length}|${lines[0]?.timestamp ?? ""}|${lines[lines.length - 1]?.timestamp ?? ""}`;
+
+  // Sends the request, then polls the list for ~30s so the owner sees the
+  // result without pressing refresh (or learns that nothing came back).
   const handleRequestLog = async (id) => {
+    if (waitingForLog) return;
+    setWaitingForLog(true);
+    const before = logSignature(detail?.lines);
     const result = await requestLogSend(id);
-    if (result.success) message.success("בקשת הלוג נשלחה - הלוג יגיע תוך שניות (אם המחשב מקוון). לחץ רענן.");
-    else message.error(result.error || "שליחת הבקשה נכשלה");
+    if (!result.success) {
+      message.error(result.error || "שליחת הבקשה נכשלה");
+      setWaitingForLog(false);
+      return;
+    }
+    const hide = message.loading("הבקשה נשלחה - ממתין ללוג מהמחשב...", 0);
+    let arrived = false;
+    for (let i = 0; i < 10 && !arrived; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const fresh = await getComputerLogs(id);
+      if (fresh.success && logSignature(fresh.lines) !== before) {
+        setDetail(fresh);
+        arrived = true;
+      }
+    }
+    hide();
+    setWaitingForLog(false);
+    if (arrived) {
+      message.success("הלוג התקבל");
+    } else {
+      message.warning("לא התקבל לוג תוך 30 שניות - המחשב כבוי/לא מקוון, או שעדיין לא עודכן לגרסת קיוסק עם שליחה לפי בקשה");
+    }
   };
 
   const handleCopyLog = async () => {
@@ -198,7 +228,7 @@ const OwnerLogsTab = () => {
               title={`לוג גולמי (${detail?.lines?.length || 0} שורות אחרונות)`}
               extra={
                 <Space size="small">
-                  <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => handleRequestLog(selectedId)}>
+                  <Button size="small" type="primary" icon={<SendOutlined />} loading={waitingForLog} onClick={() => handleRequestLog(selectedId)}>
                     בקש לוג עכשיו
                   </Button>
                   <Button
