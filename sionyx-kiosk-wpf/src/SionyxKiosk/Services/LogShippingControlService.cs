@@ -49,9 +49,9 @@ public class LogShippingControlService
 
     private const string PublicLogDir = @"C:\Users\Public\Documents\SIONYX\logs";
 
-    // Only the tail of today's log is shipped: the file can reach 10 MB, and
-    // the bridge keeps just the last ~500 entries per computer anyway.
-    private const int MaxDumpChars = 120_000;
+    // Only the tail of today's log is shipped (the file can reach 10 MB, and
+    // the bridge keeps just the last ~500 entries per computer anyway).
+    private const int MaxDumpLines = 400;
 
     internal static readonly TimeSpan MaxTriggerAge = TimeSpan.FromMinutes(30);
     internal const string LastAllRegistryValue = "LastLogDumpAllRequestedAt";
@@ -264,24 +264,44 @@ public class LogShippingControlService
                 return;
             }
 
-            if (content.Length > MaxDumpChars)
+            // The local file is mostly [DBG] noise (SSE keep-alives, DB reads,
+            // update polls). Ship only Information and above - with the
+            // stack-trace lines that belong to a kept entry - and only the
+            // last MaxDumpLines of those, so what arrives is readable.
+            var kept = FilterDumpLines(content, MaxDumpLines);
+            if (kept.Count == 0)
             {
-                content = content.Substring(content.Length - MaxDumpChars);
-                var nl = content.IndexOf('\n');
-                if (nl >= 0 && nl < content.Length - 1) content = content.Substring(nl + 1);
-                content = "(...מוצג הסוף של הלוג בלבד)\n" + content;
+                sink.SendRaw("(בקובץ הלוג של היום אין שורות מעל רמת Debug)", manual: true);
+                return;
             }
 
-            sink.SendRaw($"[שולח את סוף הקובץ {Path.GetFileName(path)}, {content.Length} תווים]", manual: true);
-
-            var totalChunks = (content.Length + ChunkSize - 1) / ChunkSize;
-            for (var i = 0; i < content.Length; i += ChunkSize)
+            // Whole lines per chunk (never cut a line in half).
+            var chunks = new List<string>();
+            var current = new System.Text.StringBuilder();
+            foreach (var line in kept)
             {
-                var chunkIndex = i / ChunkSize + 1;
-                var chunk = content.Substring(i, Math.Min(ChunkSize, content.Length - i));
-                var prefix = totalChunks > 1 ? $"[דמפ-לוג {chunkIndex}/{totalChunks}]\n" : "[דמפ-לוג]\n";
-                sink.SendRaw(prefix + chunk, manual: true);
+                if (current.Length > 0 && current.Length + line.Length + 1 > ChunkSize)
+                {
+                    chunks.Add(current.ToString());
+                    current.Clear();
+                }
+                if (current.Length > 0) current.Append('\n');
+                current.Append(line.Length > ChunkSize ? line.Substring(0, ChunkSize) : line);
             }
+            if (current.Length > 0) chunks.Add(current.ToString());
+
+            sink.SendRaw($"[שולח {kept.Count} שורות (Information ומעלה) מ-{Path.GetFileName(path)} ב-{chunks.Count} חלקים]", manual: true);
+
+            // Sent one after another: the viewer lists newest first, and posting
+            // concurrently made the parts arrive in a random order.
+            for (var i = 0; i < chunks.Count; i++)
+            {
+                sink.SendRaw($"[דמפ-לוג {i + 1}/{chunks.Count}]\n{chunks[i]}", manual: true);
+                await Task.Delay(150);
+            }
+
+            var totalChunks = chunks.Count;
+            content = string.Join("\n", kept);
 
             Logger.Information("Log dump sent ({Chunks} chunk(s), {Bytes} bytes)", totalChunks, content.Length);
         }
@@ -290,6 +310,34 @@ public class LogShippingControlService
             Logger.Warning(ex, "Failed to dump current log file");
             sink.SendRaw($"[שגיאה בקריאת/שליחת הלוג: {ex.GetType().Name}: {ex.Message}]", manual: true);
         }
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex LogEntryStart =
+        new(@"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Drops [DBG] entries (keeping continuation lines such as stack
+    /// traces of the entries that stay) and returns the last
+    /// <paramref name="maxLines"/> lines.</summary>
+    internal static List<string> FilterDumpLines(string content, int maxLines)
+    {
+        var kept = new List<string>();
+        var keepContinuation = false;
+        foreach (var raw in content.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+            if (line.Length == 0) continue;
+
+            if (LogEntryStart.IsMatch(line))
+            {
+                keepContinuation = !line.Contains(" [DBG] ", StringComparison.Ordinal);
+                if (keepContinuation) kept.Add(line);
+            }
+            else if (keepContinuation)
+            {
+                kept.Add(line);
+            }
+        }
+        return kept.Count > maxLines ? kept.GetRange(kept.Count - maxLines, maxLines) : kept;
     }
 
     /// <summary>The newest main log written today. App.xaml.cs configures
