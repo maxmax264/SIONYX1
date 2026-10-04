@@ -79,8 +79,10 @@ public class AuthService : BaseService, IAuthService
         if (!userResult.Success || userResult.Data is not JsonElement data || data.ValueKind == JsonValueKind.Null)
             return false;
 
-        // Blocked user check
-        if (data.TryGetProperty("blocked", out var blocked) && blocked.GetBoolean())
+        // Blocked user check (user flag or supervisor phone blocklist)
+        var storedPhone = _localDb.Get("phone") ?? "";
+        if ((data.TryGetProperty("blocked", out var blocked) && blocked.GetBoolean())
+            || (storedPhone.Length > 0 && await IsPhoneBlockedAsync(storedPhone)))
         {
             Logger.Warning("Auto-login rejected: user is blocked");
             _localDb.Delete("refresh_token");
@@ -138,6 +140,12 @@ public class AuthService : BaseService, IAuthService
 
         ClearAttempts(phone);
 
+        if (await IsPhoneBlockedAsync(phone))
+        {
+            Firebase.ClearAuth();
+            return Error("החשבון שלך נחסם. פנה למנהל המערכת.");
+        }
+
         var uid = Firebase.UserId!;
         var userResult = await Firebase.DbGetAsync($"users/{uid}");
         if (!userResult.Success || userResult.Data is not JsonElement userData || userData.ValueKind == JsonValueKind.Null)
@@ -176,6 +184,12 @@ public class AuthService : BaseService, IAuthService
         var result = await Firebase.SignUpAsync(firebaseEmail, ToFirebasePassword(password));
         if (!result.Success)
             return Error(result.Error ?? "Registration failed");
+
+        if (await IsPhoneBlockedAsync(phone))
+        {
+            Firebase.ClearAuth();
+            return Error("לא ניתן להירשם עם מספר זה. פנה למנהל המערכת.");
+        }
 
         var uid = Firebase.UserId!;
         var now = DateTime.Now.ToString("o");
@@ -393,6 +407,25 @@ public class AuthService : BaseService, IAuthService
             CreatedAt = data.TryGetProperty("createdAt", out var ca) ? ca.GetString() ?? "" : "",
             UpdatedAt = data.TryGetProperty("updatedAt", out var ua) ? ua.GetString() ?? "" : "",
         };
+    }
+
+    /// <summary>Normalizes to local Israeli digits (05XXXXXXXX); must match the web supervisor normalization.</summary>
+    private static string NormalizePhone(string phone)
+    {
+        var d = new string((phone ?? "").Where(char.IsDigit).ToArray());
+        if (d.StartsWith("00972")) d = d.Substring(5);
+        else if (d.StartsWith("972")) d = d.Substring(3);
+        if ((d.Length == 8 || d.Length == 9) && !d.StartsWith("0")) d = "0" + d;
+        return d;
+    }
+
+    /// <summary>True if the phone is on the supervisor blocklist for this organization. Fails open on network errors.</summary>
+    private async Task<bool> IsPhoneBlockedAsync(string phone)
+    {
+        var key = NormalizePhone(phone);
+        if (key.Length == 0) return false;
+        var res = await Firebase.DbGetAsync($"blockedPhones/{key}");
+        return res.Success && res.Data is JsonElement el && el.ValueKind != JsonValueKind.Null;
     }
 
     private static string PhoneToEmail(string phone)
