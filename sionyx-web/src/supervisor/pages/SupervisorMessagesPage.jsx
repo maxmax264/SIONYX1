@@ -31,7 +31,7 @@ import 'dayjs/locale/he';
 import { getSupervisorOrgs, getOrgUsers } from '../services/supervisorOrgService';
 import { getOrgMessages, sendSupervisorMessage, getOrgUserReplies, deleteSupervisorMessage, deleteSupervisorReply } from '../services/supervisorMessageService';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
-import { getAuth } from 'firebase/auth';
+import { supervisorAuth } from '../../config/firebase';
 
 dayjs.extend(relativeTime);
 dayjs.locale('he');
@@ -92,7 +92,7 @@ const SupervisorMessagesPage = () => {
   const handleSend = async () => {
     if (!selectedOrgId || !selectedUserId || !newMessage.trim()) return;
     setSending(true);
-    const auth = getAuth();
+    const auth = supervisorAuth;
     const uid = auth.currentUser?.uid;
     const res = await sendSupervisorMessage(selectedOrgId, selectedUserId, newMessage, uid);
     if (res.success) {

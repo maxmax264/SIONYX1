@@ -3,7 +3,7 @@ import { Card, Descriptions, Typography, Form, Input, Button, App, Divider } fro
 import { UserOutlined, PhoneOutlined, SettingOutlined, MessageOutlined } from '@ant-design/icons';
 import { useSupervisorAuthStore } from '../store/supervisorAuthStore';
 import { getSupervisorDisplayName, updateSupervisorDisplayName } from '../services/supervisorMessageService';
-import { getAuth } from 'firebase/auth';
+import { supervisorAuth } from '../../config/firebase';
 
 const { Title } = Typography;
 
@@ -17,7 +17,7 @@ const SupervisorSettingsPage = () => {
   const orgCount = supervisor?.orgIds?.length || 0;
 
   useEffect(() => {
-    const auth = getAuth();
+    const auth = supervisorAuth;
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     setLoading(true);
@@ -28,7 +28,7 @@ const SupervisorSettingsPage = () => {
   }, [form]);
 
   const handleSave = async (values) => {
-    const auth = getAuth();
+    const auth = supervisorAuth;
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     setSaving(true);
