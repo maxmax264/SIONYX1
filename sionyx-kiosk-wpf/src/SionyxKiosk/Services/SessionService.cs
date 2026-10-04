@@ -144,6 +144,8 @@ public class SessionService : BaseService, ISessionService
         {
             isSessionActive = true,
             sessionStartTime = now,
+            lastLoginAt = DateTime.UtcNow.ToString("o"),
+            loginCount = _loginCountSnapshot + 1,
             updatedAt = now,
         });
 
@@ -372,6 +374,8 @@ public class SessionService : BaseService, ISessionService
         catch (Exception ex) { Logger.Error(ex, "OnRemainingTimeUpdated error"); }
     }
     private record UserValidationResult(bool Valid, int RemainingTime, string? ErrorMessage);
+    private int _loginCountSnapshot;
+
     private async Task<UserValidationResult> FetchAndValidateUserAsync(int fallbackTime)
     {
         try
@@ -380,6 +384,7 @@ public class SessionService : BaseService, ISessionService
             if (!result.Success || result.Data is not System.Text.Json.JsonElement data || data.ValueKind == System.Text.Json.JsonValueKind.Null)
                 return new(fallbackTime > 0, fallbackTime, fallbackTime <= 0 ? "No time remaining" : null);
             var remainingTime = fallbackTime;
+            _loginCountSnapshot = data.TryGetProperty("loginCount", out var lc) && lc.TryGetInt32(out var lcv) ? lcv : 0;
             if (data.TryGetProperty("remainingTime", out var rt) && rt.TryGetInt32(out var seconds))
             {
                 Logger.Information("Fresh remainingTime from Firebase: {Seconds}s", seconds);

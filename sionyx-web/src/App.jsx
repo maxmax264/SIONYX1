@@ -33,6 +33,7 @@ const PackagesPage = lazy(() => import('./pages/PackagesPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const ComputersPage = lazy(() => import('./pages/ComputersPage'));
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
+const ActivityPage = lazy(() => import('./pages/ActivityPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
@@ -137,6 +138,7 @@ function App() {
                 <Route path='messages' element={<MessagesPage />} />
                 <Route path='computers' element={<ComputersPage />} />
                 <Route path='announcements' element={<AnnouncementsPage />} />
+                <Route path='activity' element={<ActivityPage />} />
                 <Route path='reports' element={<ReportsPage />} />
                 <Route path='settings' element={<SettingsPage />} />
               </Route>
