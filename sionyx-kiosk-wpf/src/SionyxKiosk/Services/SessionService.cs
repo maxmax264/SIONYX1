@@ -118,26 +118,16 @@ public class SessionService : BaseService, ISessionService
         // Fetch user data from Firebase (blocking — need the result)
         var now = DateTime.Now.ToString("o");
         var fetchTask = FetchAndValidateUserAsync(initialRemainingTime);
-        // Process + browser cleanup runs in background — no reason to block session start.
-        // Also wipes browser cookies/login-data/downloads here (not just on logout), so a
-        // session that starts right after a crash/power-outage (previous user never logged
-        // out) still gets a fully clean browser — not just closed windows with the old
-        // cookies still on disk.
-        _ = Task.Run(() =>
-        {
-            try { _processCleanup.CleanupUserProcesses(); }
-            catch (Exception ex) { Logger.Warning(ex, "Process cleanup failed (non-fatal)"); }
-
-            try
-            {
-                _browserCleanup.CleanupWithBrowserClose();
-                _browserCleanup.CleanupDownloads();
-            }
-            catch (Exception ex) { Logger.Warning(ex, "Browser cleanup failed (non-fatal)"); }
-        });
+        // Full environment reset runs in parallel with the user fetch, but session start waits for it
+        // (bounded) so the customer never lands on a desktop that still has the previous user's windows,
+        // files or clipboard. Also covers crash/power-outage cases (previous user never logged out).
+        var resetTask = Task.Run(ResetEnvironment);
         var userCheck = await fetchTask;
         if (!userCheck.Valid) return Error(userCheck.ErrorMessage!);
         initialRemainingTime = userCheck.RemainingTime;
+
+        // Wait for the reset to finish (max 25s so a stuck cleanup can never block a paying customer)
+        await Task.WhenAny(resetTask, Task.Delay(TimeSpan.FromSeconds(25)));
 
         // Fire-and-forget session active update - dont block startup
         _ = Firebase.DbUpdateAsync($"users/{_userId}", new
@@ -213,19 +203,9 @@ public class SessionService : BaseService, ISessionService
 
         Logger.Information("Session ended (used: {TimeUsed}s)", TimeUsed);
 
-        // Browser cleanup runs in background (non-blocking, fire-and-forget)
-        // This can take several seconds; no reason to block the user
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                _browserCleanup.CleanupWithBrowserClose();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Browser cleanup failed (non-fatal)");
-            }
-        });
+        // Full reset runs in background so the next customer finds a fresh machine
+        // (apps closed, personal folders wiped, desktop restored to the admin layout).
+        _ = Task.Run(ResetEnvironment);
 
         return Success(new { TimeUsed, RemainingTime });
     }
@@ -375,6 +355,26 @@ public class SessionService : BaseService, ISessionService
     }
     private record UserValidationResult(bool Valid, int RemainingTime, string? ErrorMessage);
     private int _loginCountSnapshot;
+
+    /// <summary>Closes all user apps, cleans browsers/downloads, wipes personal folders and restores the desktop.</summary>
+    private void ResetEnvironment()
+    {
+        try { _processCleanup.CleanupUserProcesses(); }
+        catch (Exception ex) { Logger.Warning(ex, "Process cleanup failed (non-fatal)"); }
+
+        try { _processCleanup.CloseAllUserApps(); }
+        catch (Exception ex) { Logger.Warning(ex, "Close-all-apps failed (non-fatal)"); }
+
+        try
+        {
+            _browserCleanup.CleanupWithBrowserClose();
+            _browserCleanup.CleanupDownloads();
+        }
+        catch (Exception ex) { Logger.Warning(ex, "Browser cleanup failed (non-fatal)"); }
+
+        try { _processCleanup.WipeUserData(); }
+        catch (Exception ex) { Logger.Warning(ex, "Wipe user data failed (non-fatal)"); }
+    }
 
     private async Task<UserValidationResult> FetchAndValidateUserAsync(int fallbackTime)
     {

@@ -660,8 +660,11 @@ public partial class App : Application
                 // Only clean browser/downloads if user actually entered desktop
                 if (Services.SessionStateService.HasEnteredDesktop())
                 {
+                    var processCleanup = _host!.Services.GetRequiredService<ProcessCleanupService>();
+                    processCleanup.CloseAllUserApps();
                     browserCleanup.CleanupWithBrowserClose();
                     browserCleanup.CleanupDownloads();
+                    processCleanup.WipeUserData();
                 }
                 Services.SessionStateService.ClearSession();
             }

@@ -37,16 +37,10 @@ public class DesktopSnapshotService
                 Directory.Delete(SnapshotPath, recursive: true);
             Directory.CreateDirectory(SnapshotPath);
 
-            // Copy all desktop files
-            var copied = 0;
+            // Copy everything on the desktop (files AND folders, recursively)
             if (!Directory.Exists(DesktopPath))
                 Directory.CreateDirectory(DesktopPath);
-            foreach (var file in Directory.GetFiles(DesktopPath, "*", SearchOption.TopDirectoryOnly))
-            {
-                var dest = Path.Combine(SnapshotPath, Path.GetFileName(file));
-                File.Copy(file, dest, overwrite: true);
-                copied++;
-            }
+            var copied = CopyDirectoryContents(DesktopPath, SnapshotPath);
 
             // Save wallpaper path
             var wallpaper = Registry.CurrentUser
@@ -54,7 +48,7 @@ public class DesktopSnapshotService
                 ?.GetValue(WallpaperRegistryValue) as string ?? "";
             File.WriteAllText(Path.Combine(SnapshotPath, WallpaperSnapshotFile), wallpaper);
 
-            Logger.Information("[Snapshot] Saved {Count} files, wallpaper: {Wallpaper}", copied, wallpaper);
+            Logger.Information("[Snapshot] Saved {Count} items, wallpaper: {Wallpaper}", copied, wallpaper);
         }
         catch (Exception ex)
         {
@@ -98,17 +92,8 @@ public class DesktopSnapshotService
                 catch (Exception ex) { Logger.Warning("[Snapshot] Could not delete dir {Dir}: {Err}", dir, ex.Message); }
             }
 
-            // Restore files from snapshot (skip internal snapshot files)
-            var restored = 0;
-            foreach (var file in Directory.GetFiles(SnapshotPath, "*", SearchOption.TopDirectoryOnly))
-            {
-                var fileName = Path.GetFileName(file);
-                if (fileName == WallpaperSnapshotFile) continue;
-
-                var dest = Path.Combine(DesktopPath, fileName);
-                File.Copy(file, dest, overwrite: true);
-                restored++;
-            }
+            // Restore files AND folders from snapshot (skip internal snapshot files)
+            var restored = CopyDirectoryContents(SnapshotPath, DesktopPath, skipTopLevelName: WallpaperSnapshotFile);
 
             // Restore wallpaper
             var wallpaperFile = Path.Combine(SnapshotPath, WallpaperSnapshotFile);
@@ -127,7 +112,10 @@ public class DesktopSnapshotService
                 }
             }
 
-            Logger.Information("[Snapshot] Restored {Count} files", restored);
+            Logger.Information("[Snapshot] Restored {Count} items", restored);
+
+            // Make Explorer redraw the desktop right away (otherwise removed icons can linger until refresh)
+            SHChangeNotify(0x08000000 /* SHCNE_ASSOCCHANGED */, 0, IntPtr.Zero, IntPtr.Zero);
         }
         catch (Exception ex)
         {
@@ -136,7 +124,31 @@ public class DesktopSnapshotService
     }
 
     public bool SnapshotExists() => Directory.Exists(SnapshotPath) &&
-        Directory.GetFiles(SnapshotPath).Any(f => Path.GetFileName(f) != WallpaperSnapshotFile);
+        (Directory.GetFiles(SnapshotPath).Any(f => Path.GetFileName(f) != WallpaperSnapshotFile)
+         || Directory.GetDirectories(SnapshotPath).Length > 0);
+
+    /// <summary>Recursively copies files and folders from src into dst. Returns number of items copied.</summary>
+    private static int CopyDirectoryContents(string src, string dst, string? skipTopLevelName = null)
+    {
+        Directory.CreateDirectory(dst);
+        var count = 0;
+        foreach (var file in Directory.GetFiles(src))
+        {
+            var name = Path.GetFileName(file);
+            if (skipTopLevelName != null && name == skipTopLevelName) continue;
+            try { File.Copy(file, Path.Combine(dst, name), overwrite: true); count++; }
+            catch (Exception ex) { Logger.Warning("[Snapshot] Could not copy {File}: {Err}", file, ex.Message); }
+        }
+        foreach (var dir in Directory.GetDirectories(src))
+        {
+            try { count += 1 + CopyDirectoryContents(dir, Path.Combine(dst, Path.GetFileName(dir))); }
+            catch (Exception ex) { Logger.Warning("[Snapshot] Could not copy dir {Dir}: {Err}", dir, ex.Message); }
+        }
+        return count;
+    }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll")]
+    private static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
     private static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);

@@ -173,6 +173,166 @@ public class ProcessCleanupService
         return new Dictionary<string, object> { ["success"] = true, ["closed_count"] = closedCount };
     }
 
+    /// <summary>
+    /// Closes every app the user opened (any process in this session with a visible window),
+    /// except SIONYX itself, the shell, and remote-support tools. Also closes File Explorer windows.
+    /// </summary>
+    public Dictionary<string, object> CloseAllUserApps()
+    {
+        var closed = 0;
+        try
+        {
+            var self = Process.GetCurrentProcess();
+            var baseDir = AppContext.BaseDirectory;
+
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    using (proc)
+                    {
+                        if (proc.Id == self.Id || proc.SessionId != self.SessionId) continue;
+
+                        var exe = proc.ProcessName + ".exe";
+                        if (Whitelist.Contains(exe) || ExtraProtected.Contains(exe)) continue;
+                        if (proc.ProcessName.StartsWith("sionyx", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        // Only touch apps the user can see (background helpers stay untouched)
+                        if (proc.MainWindowHandle == IntPtr.Zero) continue;
+
+                        string? path = null;
+                        try { path = proc.MainModule?.FileName; } catch { /* access denied */ }
+                        if (path == null) continue; // can't identify it - leave it alone
+                        if (path.StartsWith(baseDir, StringComparison.OrdinalIgnoreCase)) continue;
+
+                        if (KillProcess(proc.Id, exe)) closed++;
+                    }
+                }
+                catch { /* process exited meanwhile / inaccessible */ }
+            }
+
+            CloseExplorerWindows();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("CloseAllUserApps failed: {Error}", ex.Message);
+        }
+
+        return new Dictionary<string, object> { ["success"] = true, ["closed_count"] = closed };
+    }
+
+    /// <summary>Politely closes open File Explorer windows without touching explorer.exe itself.</summary>
+    public static void CloseExplorerWindows()
+    {
+        try
+        {
+            EnumWindows((hWnd, _) =>
+            {
+                var sb = new System.Text.StringBuilder(64);
+                GetClassName(hWnd, sb, sb.Capacity);
+                var cls = sb.ToString();
+                if (cls == "CabinetWClass" || cls == "ExploreWClass")
+                    PostMessage(hWnd, 0x0010 /* WM_CLOSE */, IntPtr.Zero, IntPtr.Zero);
+                return true;
+            }, IntPtr.Zero);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning("CloseExplorerWindows failed: {Error}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Wipes personal folders (Documents, Pictures, Music, Videos, Recent, Temp), clears the clipboard
+    /// and restores the admin-configured desktop (files, folders, wallpaper).
+    /// </summary>
+    public void WipeUserData()
+    {
+        foreach (var folder in new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+            Environment.GetFolderPath(Environment.SpecialFolder.Recent),
+        })
+            EmptyFolder(folder, skipRecent: false);
+
+        EmptyFolder(Path.GetTempPath(), skipRecent: true);
+        ClearClipboard();
+
+        try { new DesktopSnapshotService().RestoreSnapshot(); }
+        catch (Exception ex) { Logger.Error("Desktop restore failed: {Error}", ex.Message); }
+    }
+
+    private static void EmptyFolder(string folder, bool skipRecent)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return;
+            // Safety: never touch cloud-synced folders or anything outside the user profile / temp
+            if (folder.Contains("OneDrive", StringComparison.OrdinalIgnoreCase)) return;
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var temp = Path.GetTempPath();
+            if (!folder.StartsWith(profile, StringComparison.OrdinalIgnoreCase) &&
+                !folder.StartsWith(temp, StringComparison.OrdinalIgnoreCase)) return;
+            if (string.Equals(folder.TrimEnd('\\'), profile.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return;
+
+            var cutoff = DateTime.Now.AddMinutes(-1);
+            foreach (var entry in new DirectoryInfo(folder).EnumerateFileSystemInfos())
+            {
+                try
+                {
+                    if (skipRecent && entry.LastWriteTime > cutoff) continue;
+                    if (entry.Name.StartsWith("sionyx", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (entry is DirectoryInfo d) d.Delete(recursive: true);
+                    else entry.Delete();
+                }
+                catch { /* in use - skip */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning("EmptyFolder {Folder} failed: {Error}", folder, ex.Message);
+        }
+    }
+
+    private static void ClearClipboard()
+    {
+        try
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null) return;
+            dispatcher.Invoke(() =>
+            {
+                for (var i = 0; i < 3; i++)
+                {
+                    try { System.Windows.Clipboard.Clear(); break; }
+                    catch { Thread.Sleep(100); }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning("ClearClipboard failed: {Error}", ex.Message);
+        }
+    }
+
+    private static readonly HashSet<string> ExtraProtected = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "anydesk.exe", "aeroadmin.exe", "tvnserver.exe", "winvnc.exe", "rustdesk.exe",
+        "osk.exe", "tabtip.exe", "searchapp.exe", "searchhost.exe", "widgets.exe", "lockapp.exe",
+        "startmenuexperiencehost.exe", "shellexperiencehost.exe", "textinputhost.exe",
+    };
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
     // ==================== PRIVATE ====================
 
     private static Dictionary<string, List<int>> GetRunningProcesses()
