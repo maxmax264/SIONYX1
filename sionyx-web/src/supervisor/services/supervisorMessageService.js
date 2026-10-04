@@ -12,7 +12,8 @@ export const getSupervisorDisplayName = async (supervisorId) => {
 
 export const updateSupervisorDisplayName = async (supervisorId, displayName) => {
   try {
-    await update(ref(database, `supervisors/${supervisorId}`), { displayName: displayName.trim() });
+    // set() on the child path: rules grant the supervisor write on displayName only, not on supervisors/{uid}
+    await set(ref(database, `supervisors/${supervisorId}/displayName`), displayName.trim());
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
