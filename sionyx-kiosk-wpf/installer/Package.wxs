@@ -67,50 +67,13 @@
       </Component>
     </ComponentGroup>
 
-    <!-- Two independent remote-control tools, installed as real files (not
-         embedded MSI Binaries) and run in place as PowerShell scripts by
-         CA_InstallRustDesk / CA_InstallAnyDesk below. RustDesk = org admin's
-         day-to-day tool (password set from the dashboard). AnyDesk = master
-         (owner) only, fully independent of RustDesk. MeshCentral was tried
-         first but is down / unreliable - dropped in favor of this pair. -->
+    <!-- Remote control: VNC only (TightVNC + relay). RustDesk/AnyDesk/TeamViewer/
+         AeroAdmin were removed. -->
     <ComponentGroup Id="RemoteControlFiles" Directory="RemoteControlDir">
-      <Component Id="RustDeskInstallScript" Guid="*">
-        <File Id="InstallRustDeskPs1"
-              Source="$(var.SourceDir)\installer\remote-control\install-rustdesk.ps1"
-              KeyPath="yes" />
-      </Component>
-      <Component Id="AnyDeskInstallScript" Guid="*">
-        <File Id="InstallAnyDeskPs1"
-              Source="$(var.SourceDir)\installer\remote-control\install-anydesk.ps1"
-              KeyPath="yes" />
-      </Component>
-      <!-- TeamViewer: fallback for sites where a NetFree-style content filter does
-           full TLS interception and rejects AnyDesk's pinned certificate (AnyDesk
-           validates against its own bundled root, TeamViewer validates against the
-           OS trust store, so it isn't affected the same way). Stages QuickSupport
-           for on-demand launch from the dashboard - see install-teamviewer.ps1
-           header for why this isn't an always-on Host install. -->
-      <!-- AeroAdmin: 4th tool, staged but NOT installed/configured by this script -
-           unlike the others, AeroAdmin has no silent/CLI mode at all, so the
-           one-time Access-rights setup + ID readout happens inside the app itself
-           (AeroAdminSetupService.cs, UI Automation) on first startup after this
-           file lands, not here. -->
-      <Component Id="AeroAdminInstallScript" Guid="*">
-        <File Id="InstallAeroAdminPs1"
-              Source="$(var.SourceDir)\installer\remote-control\install-aeroadmin.ps1"
-              KeyPath="yes" />
-      </Component>
-      <Component Id="TeamViewerInstallScript" Guid="*">
-        <File Id="InstallTeamViewerPs1"
-              Source="$(var.SourceDir)\installer\remote-control\install-teamviewer.ps1"
-              KeyPath="yes" />
-      </Component>
       <!-- TightVNC: local-only VNC server (127.0.0.1:5900, no firewall
            exception) used by VncRelayService to bridge a screen-control
-           session out over the sionyx-vnc-relay WebSocket relay. Unlike
-           RustDesk/AnyDesk/TeamViewer this isn't a remote-control app in
-           its own right - it never talks to the internet itself, so it
-           has no certificate for NetFree to reject. See
+           session out over the sionyx-vnc-relay WebSocket relay. It never talks to the internet itself, so it has no
+           certificate for NetFree to reject. See
            install-tightvnc.ps1 header. -->
       <Component Id="TightVncInstallScript" Guid="*">
         <File Id="InstallTightVncPs1"
@@ -294,44 +257,6 @@
                   Impersonate="no"
                   Return="ignore" />
 
-    <!-- RustDesk + AnyDesk: each script downloads its tool fresh, installs it
-         as a Windows service, sets a random per-machine password, and writes
-         ID+password to C:\ProgramData\SIONYX\*-info.txt for
-         RemoteControlReportingService to pick up and report to Firebase.
-         Run via powershell.exe (not FileRef+ExeCommand on the .ps1 itself -
-         .ps1 isn't directly executable). No uninstall action: both tools are
-         left in place on uninstall, same as RustDesk/AnyDesk would be if
-         removed by hand - matches how MeshCentral's uninstall was the only
-         one wired before, not a deliberate asymmetry. -->
-    <CustomAction Id="CA_InstallRustDesk"
-                  Directory="RemoteControlDir"
-                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-rustdesk.ps1&quot;"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="ignore" />
-    <CustomAction Id="CA_InstallAnyDesk"
-                  Directory="RemoteControlDir"
-                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-anydesk.ps1&quot;"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="ignore" />
-    <!-- Fallback agent for NetFree-filtered sites where AnyDesk can never get an ID
-         (see install-teamviewer.ps1). Runs unconditionally alongside AnyDesk on every
-         install - harmless on regular networks, just gives a second reporting row. -->
-    <CustomAction Id="CA_InstallTeamViewer"
-                  Directory="RemoteControlDir"
-                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-teamviewer.ps1&quot;"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="ignore" />
-    <!-- Just stages AeroAdmin.exe - no config happens here, see comment on
-         AeroAdminInstallScript component above. -->
-    <CustomAction Id="CA_InstallAeroAdmin"
-                  Directory="RemoteControlDir"
-                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;install-aeroadmin.ps1&quot;"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="ignore" />
     <!-- Local-only, never talks outbound - see install-tightvnc.ps1. -->
     <CustomAction Id="CA_InstallTightVnc"
                   Directory="RemoteControlDir"
@@ -361,37 +286,9 @@
     <InstallExecuteSequence>
       <!-- INSTALL -->
       <Custom Action="CA_InstallVCRedist"    After="InstallFiles"         Condition="NOT VCREDIST64 AND NOT REMOVE" />
-      <!-- RustDesk temporarily disabled for new installs while we focus on
-           stabilizing AnyDesk only - re-enable by restoring the Condition below
-           once AnyDesk is solid on both dashboards. Existing kiosks that already
-           have RustDesk installed are unaffected (their service keeps running). -->
-      <Custom Action="CA_InstallRustDesk"    After="CA_InstallVCRedist"   Condition="NOT REMOVE AND NOT Installed AND 0" />
-      <!-- AnyDesk/TeamViewer/AeroAdmin run on BOTH a fresh install and an
-           upgrade of an already-installed kiosk (no "NOT Installed" guard).
-           This used to be "NOT Installed"-only, which meant an upgrade never
-           re-ran these scripts at all - a kiosk that was installed before this
-           code existed would never get AeroAdmin/TeamViewer staged just by
-           receiving an auto-update, only by a full uninstall+reinstall. Each
-           script is idempotent (checks Test-Path / Get-Service before doing
-           any work), so running them again on every upgrade is safe and just
-           a few no-op checks when nothing changed. -->
-      <!-- Moved to run AFTER WriteRegistryValues (2026-09-27): these four each
-           download an exe over the internet with no bound on how long that
-           can take. They previously ran right after InstallFiles, BEFORE
-           WriteRegistryValues writes HKLM\SOFTWARE\SIONYX\Version - so on a
-           network that stalls one of these downloads (e.g. NetFree
-           filtering), the whole MSI would sit stuck before the version key
-           ever got written, and AutoUpdateService's registry poll would
-           time out repeatedly even though the "real" install (files, main
-           app) had already fully succeeded. Now the version key lands
-           first, so the kiosk can confirm+restart on the new version
-           regardless of what happens with these optional remote-control
-           installers (each also got a real download timeout - see
-           install-anydesk.ps1/install-teamviewer.ps1/install-aeroadmin.ps1). -->
-      <Custom Action="CA_InstallAnyDesk"     After="WriteRegistryValues"  Condition="NOT REMOVE" />
-      <Custom Action="CA_InstallTeamViewer"  After="CA_InstallAnyDesk"    Condition="NOT REMOVE" />
-      <Custom Action="CA_InstallAeroAdmin"   After="CA_InstallTeamViewer" Condition="NOT REMOVE" />
-      <Custom Action="CA_InstallTightVnc"    After="CA_InstallAeroAdmin"  Condition="NOT REMOVE" />
+      <!-- TightVNC runs on fresh install and upgrade, after WriteRegistryValues so a
+           stalled download can never block the Version registry key. -->
+      <Custom Action="CA_InstallTightVnc"    After="WriteRegistryValues"  Condition="NOT REMOVE" />
       <!-- CA_InstallInputInjector removed 2026-09-19 - SionyxInputInjector's
            service is now installed via native ServiceInstall/ServiceControl
            on the InputInjectorExe component, which Windows Installer runs

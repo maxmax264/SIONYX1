@@ -20,8 +20,8 @@ namespace SionyxKiosk.Services;
 /// WebSocket relay, so an admin's browser (noVNC) can view/control the
 /// kiosk screen without needing a public IP, port-forwarding, or any
 /// remote-control client that would collide with NetFree's TLS
-/// interception (see RemoteControlReportingService's RustDesk/AnyDesk
-/// findings - this deliberately avoids that whole class of problem by
+/// interception (RustDesk/AnyDesk/TeamViewer/AeroAdmin were removed for
+/// that reason - this deliberately avoids that whole class of problem by
 /// using plain WebSocket-over-TLS, same as the rest of this app's
 /// Firebase/Understood-bridge traffic).
 ///
@@ -382,7 +382,7 @@ public class VncRelayService
     }
 
     // Added 2026-09-14, after community research turned up an exact match
-    // for the reported symptom (a click on a small target - AeroAdmin's
+    // for the reported symptom (a click on a small target - a remote-tool
     // approval dialog - never registers, while a click anywhere generously
     // sized on the open desktop still roughly works): this is a
     // well-documented TightVNC/UltraVNC bug class on any display running
@@ -406,7 +406,7 @@ public class VncRelayService
     //
     // NOTE: if this turns out to be the whole story, the SionyxInputInjector
     // SYSTEM service added earlier the same day may not even be needed for
-    // the AeroAdmin case - it only actually helps if a dialog additionally
+    // that case - it only actually helps if a dialog additionally
     // runs at a higher Windows integrity level (still relevant for real
     // UAC/Secure-Desktop prompts). Test this fix first; it's the simpler,
     // fully-automatic one.
@@ -717,10 +717,8 @@ public class VncRelayService
 
     // Exposed so other services can tell "an admin is actually looking at
     // this screen right now via VNC" apart from normal unattended kiosk
-    // operation - see AeroAdminSetupService's hide-enforcement, which
-    // needs to stop yanking away a real incoming-connection dialog while
-    // someone is trying to click it, without giving up on suppressing
-    // AeroAdmin's own noise (EULA popups etc.) the rest of the time.
+    // operation, e.g. for services that shouldn't interfere while
+    // someone is trying to click it.
     //
     // When the session runs inside the SYSTEM host (another process), the
     // host publishes the flag in HKLM and this getter reads it back, so the

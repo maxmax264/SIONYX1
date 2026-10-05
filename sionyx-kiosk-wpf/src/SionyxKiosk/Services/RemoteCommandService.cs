@@ -8,7 +8,7 @@ namespace SionyxKiosk.Services;
 /// <summary>
 /// Listens for dashboard-issued power commands (shutdown / restart) on
 /// "computers/{id}/powerCommand/requested", same SseListener pattern as
-/// RemoteControlReportingService and LogShippingControlService. Runs the
+/// VncRelayService and LogShippingControlService. Runs the
 /// Windows `shutdown.exe` utility, reports the outcome to
 /// "computers/{id}/powerCommand/lastResult", then clears "requested" so
 /// the same command isn't re-applied on the next SSE reconnect (Firebase

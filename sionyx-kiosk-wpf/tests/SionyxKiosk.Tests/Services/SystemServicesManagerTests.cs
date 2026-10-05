@@ -17,7 +17,6 @@ public class SystemServicesManagerTests : IDisposable
     private readonly KeyboardRestrictionService _keyboard;
     private readonly ProcessRestrictionService _processRestriction;
     private readonly GlobalHotkeyService _globalHotkey;
-    private readonly RemoteControlReportingService _remoteControl;
     private readonly ComputerHeartbeatService _heartbeat;
     private readonly LogShippingControlService _logShipping;
     private readonly RemoteCommandService _remoteCommand;
@@ -36,7 +35,6 @@ public class SystemServicesManagerTests : IDisposable
         _keyboard = new KeyboardRestrictionService(enabled: false);
         _processRestriction = new ProcessRestrictionService(enabled: false);
         _globalHotkey = new GlobalHotkeyService();
-        _remoteControl = new RemoteControlReportingService(_firebase, new AeroAdminSetupService());
         _heartbeat = new ComputerHeartbeatService(TestFirebaseFactory.CreateConfig());
         _logShipping = new LogShippingControlService(_firebase, Path.GetTempPath());
         _remoteCommand = new RemoteCommandService(TestFirebaseFactory.CreateConfig());
@@ -50,7 +48,7 @@ public class SystemServicesManagerTests : IDisposable
 
         _manager = new SystemServicesManager(
             _forceLogout, _chat, _printMonitor, _operatingHours,
-            _keyboard, _processRestriction, _globalHotkey, _remoteControl, _heartbeat, _logShipping, _remoteCommand, _vncRelay,
+            _keyboard, _processRestriction, _globalHotkey, _heartbeat, _logShipping, _remoteCommand, _vncRelay,
             TestFirebaseFactory.CreateConfig());
     }
 

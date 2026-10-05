@@ -72,10 +72,6 @@ export const getOrgComputers = async (orgId) => {
       computerName: c.computerName || computerId,
       isActive: !!c.isActive,
       lastSeen: c.lastSeen || null,
-      rustdesk: c.remoteControl?.rustdesk || null,
-      anydesk: c.remoteControl?.anydesk || null,
-      teamviewer: c.remoteControl?.teamviewer || null,
-      aeroadmin: c.remoteControl?.aeroadmin || null,
     }));
     return { success: true, computers };
   } catch (e) {
@@ -104,10 +100,6 @@ export const subscribeToOrgComputers = (orgId, callback) => {
         computerName: c.computerName || computerId,
         isActive: !!c.isActive,
         lastSeen: c.lastSeen || null,
-        rustdesk: c.remoteControl?.rustdesk || null,
-        anydesk: c.remoteControl?.anydesk || null,
-        teamviewer: c.remoteControl?.teamviewer || null,
-        aeroadmin: c.remoteControl?.aeroadmin || null,
       }));
       callback(computers);
     },
@@ -115,51 +107,6 @@ export const subscribeToOrgComputers = (orgId, callback) => {
       console.error("subscribeToOrgComputers listener error:", error.message);
     }
   );
-};
-
-/** Owner-only: push a new AnyDesk password for a specific kiosk. Written to the
- * `setPassword` command channel (separate from `password`, which the kiosk itself
- * uses to self-report its currently-installed password - keeping them separate
- * means the kiosk's own report is never blocked by the owner-only permission on
- * commanding a change). The kiosk's RemoteControlReportingService picks this up
- * in real time (SseListener) and applies it via `AnyDesk.exe --set-password` -
- * no reboot needed. */
-export const setAnyDeskPassword = async (orgId, computerId, password) => {
-  try {
-    await waitForAuth();
-    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/setPassword`), password);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-};
-
-/** Owner-only: ask a kiosk to launch TeamViewer QuickSupport on demand and report
- * back the freshly-generated ID+password. See computerService.js's
- * requestTeamViewerLaunch for why this is on-demand rather than an always-on
- * unattended Host install. */
-export const requestTeamViewerLaunch = async (orgId, computerId) => {
-  try {
-    await waitForAuth();
-    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/teamviewer/launchRequest`), Date.now());
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-};
-
-/** Owner-only: ask a kiosk to re-report its current RustDesk/AnyDesk ID+password.
- * Covers a failed initial report or IDs that changed (e.g. reinstall). The kiosk's
- * RemoteControlReportingService listens for this in real time and re-reports within
- * seconds - no need to touch the machine. */
-export const requestRemoteControlRefresh = async (orgId, computerId) => {
-  try {
-    await waitForAuth();
-    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/refreshRequested`), Date.now());
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
 };
 
 export const getAllSupervisors = async () => {

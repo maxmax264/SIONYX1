@@ -346,57 +346,6 @@ export const deleteComputer = async computerId => {
   }
 };
 
-/** Asks a kiosk to re-report its current RustDesk ID+password to Firebase.
- * Covers a failed initial report or an ID/password that changed (e.g. reinstall).
- * The kiosk's RemoteControlReportingService listens for this in real time and
- * re-reports within seconds - no need to touch the machine. */
-export const requestRemoteControlRefresh = async computerId => {
-  try {
-    const orgId = getOrgId();
-    await update(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl`), { refreshRequested: Date.now() });
-    return { success: true };
-  } catch (error) {
-    logger.error('Error requesting remote-control refresh:', error);
-    return { success: false, error: 'Failed to request refresh' };
-  }
-};
-
-/** Push a new AnyDesk password for a specific kiosk. Written to the `setPassword`
- * command channel (separate from `password`, which the kiosk itself uses to
- * self-report its currently-installed password). The kiosk's
- * RemoteControlReportingService picks this up in real time (SseListener) and
- * applies it via `AnyDesk.exe --set-password` - no reboot needed.
- * Requires org-admin role (enforced by database.rules.json on this path). */
-export const setAnyDeskPassword = async (computerId, password) => {
-  try {
-    const orgId = getOrgId();
-    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/anydesk/setPassword`), password);
-    return { success: true };
-  } catch (error) {
-    logger.error('Error setting AnyDesk password:', error);
-    return { success: false, error: 'Failed to set AnyDesk password' };
-  }
-};
-
-/** Ask a kiosk to launch TeamViewer QuickSupport on demand (not installed as an
- * always-on unattended service - this is intentional, see install-teamviewer.ps1
- * header: a permanently-listening Host is what TeamViewer's free-tier commercial-use
- * detection flags across a fleet). The kiosk's RemoteControlReportingService listens
- * for this flag, launches the staged TeamViewerQS.exe, reads the freshly-generated
- * ID+password from tvinfo.ini, reports them back, and clears the flag. The ID is
- * normally stable per machine; the password is randomized by TeamViewer on every
- * launch, so this must be called again each time before connecting. */
-export const requestTeamViewerLaunch = async computerId => {
-  try {
-    const orgId = getOrgId();
-    await set(ref(database, `organizations/${orgId}/computers/${computerId}/remoteControl/teamviewer/launchRequest`), Date.now());
-    return { success: true };
-  } catch (error) {
-    logger.error('Error requesting TeamViewer launch:', error);
-    return { success: false, error: 'Failed to request TeamViewer launch' };
-  }
-};
-
 /** Ask a kiosk to shut down or restart now (or a graceful, delayed variant).
  * Written to `computers/{id}/powerCommand/requested` - the kiosk's new
  * RemoteCommandService listens for this in real time (SseListener, same

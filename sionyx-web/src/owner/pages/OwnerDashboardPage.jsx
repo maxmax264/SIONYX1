@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { Card, Row, Col, Typography, Statistic, Table, Tag, Button, Switch, Space, Spin, App, theme, Modal, Form, Input, InputNumber, Drawer, Tabs, Empty } from "antd";
 import { BankOutlined, UserOutlined, TeamOutlined, EyeOutlined, EyeInvisibleOutlined, LaptopOutlined, ReloadOutlined, KeyOutlined, EditOutlined, SearchOutlined, PlusOutlined, WalletOutlined, ClockCircleOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, subscribeToOrgComputers, setAnyDeskPassword, requestRemoteControlRefresh, requestTeamViewerLaunch } from "../services/ownerOrgService";
+import { getAllOrgs, getAllSupervisors, connectToSupervision, disconnectFromSupervision, subscribeToOrgComputers } from "../services/ownerOrgService";
 import { getAllUsersAcrossOrgs, ownerAdjustUserBalance, getOrgUserPassword } from "../services/ownerUserService";
 import { getOrganizationStats, registerOrganization } from "../../services/organizationService";
 import { ref, get, set } from "firebase/database";
@@ -50,10 +50,6 @@ const OwnerDashboardPage = () => {
   const [orgStats, setOrgStats] = useState(null);
   const [orgStatsLoading, setOrgStatsLoading] = useState(false);
   const [orgComputers, setOrgComputers] = useState([]);
-  const [anyDeskPwEdits, setAnyDeskPwEdits] = useState({});
-  const [anyDeskPwSaving, setAnyDeskPwSaving] = useState({});
-  const [launchingTeamViewer, setLaunchingTeamViewer] = useState({});
-  const [refreshingComputer, setRefreshingComputer] = useState({});
   const [revealedPasswords, setRevealedPasswords] = useState({});
   const [passwordLoadingUid, setPasswordLoadingUid] = useState({});
 
@@ -200,46 +196,6 @@ const OwnerDashboardPage = () => {
     setOrgDetailOrg(null);
     setOrgStats(null);
     setOrgComputers([]);
-    setAnyDeskPwEdits({});
-  };
-
-  const handleSetAnyDeskPassword = async (computerId) => {
-    const password = (anyDeskPwEdits[computerId] || "").trim();
-    if (!password) { message.warning("הזן סיסמה חדשה"); return; }
-    setAnyDeskPwSaving((prev) => ({ ...prev, [computerId]: true }));
-    const result = await setAnyDeskPassword(orgDetailOrg.orgId, computerId, password);
-    if (result.success) {
-      message.success("סיסמת AnyDesk עודכנה - הקיוסק יעדכן תוך שניות");
-      setOrgComputers((prev) => prev.map((c) => c.computerId === computerId
-        ? { ...c, anydesk: { ...(c.anydesk || {}), password } }
-        : c));
-      setAnyDeskPwEdits((prev) => ({ ...prev, [computerId]: "" }));
-    } else {
-      message.error(result.error || "נכשל בעדכון הסיסמה");
-    }
-    setAnyDeskPwSaving((prev) => ({ ...prev, [computerId]: false }));
-  };
-
-  const handleLaunchTeamViewer = async (computerId) => {
-    setLaunchingTeamViewer((prev) => ({ ...prev, [computerId]: true }));
-    const result = await requestTeamViewerLaunch(orgDetailOrg.orgId, computerId);
-    if (result.success) {
-      message.success("הופעל - סיסמה חדשה תדווח תוך כמה שניות");
-    } else {
-      message.error(result.error || "נכשל בהפעלת TeamViewer");
-    }
-    setLaunchingTeamViewer((prev) => ({ ...prev, [computerId]: false }));
-  };
-
-  const handleRefreshRemoteControl = async (computerId) => {
-    setRefreshingComputer((prev) => ({ ...prev, [computerId]: true }));
-    const result = await requestRemoteControlRefresh(orgDetailOrg.orgId, computerId);
-    if (result.success) {
-      message.success("בקשת רענון נשלחה - הקיוסק ידווח מחדש תוך שניות (רענן את המסך כדי לראות)");
-    } else {
-      message.error(result.error || "נכשל בשליחת בקשת הרענון");
-    }
-    setRefreshingComputer((prev) => ({ ...prev, [computerId]: false }));
   };
 
   const handleAddOrg = () => {
@@ -567,7 +523,7 @@ const OwnerDashboardPage = () => {
               },
               {
                 key: "remoteControl",
-                label: `מחשבים ושליטה מרחוק (${orgComputers.length})`,
+                label: `מחשבים (${orgComputers.length})`,
                 children: (
                   <Space direction="vertical" size={16} style={{ width: "100%" }}>
                     {orgComputers.length === 0 ? (
@@ -577,64 +533,7 @@ const OwnerDashboardPage = () => {
                         key={c.computerId}
                         size="small"
                         title={<Space><LaptopOutlined />{c.computerName}<Tag color={c.isActive ? "green" : "default"}>{c.isActive ? "פעיל" : "לא פעיל"}</Tag></Space>}
-                        extra={
-                          <Button
-                            size="small"
-                            icon={<ReloadOutlined />}
-                            loading={!!refreshingComputer[c.computerId]}
-                            onClick={() => handleRefreshRemoteControl(c.computerId)}
-                          >
-                            רענן סוכן
-                          </Button>
-                        }
-                      >
-                        <Row gutter={[16, 12]}>
-                          <Col span={12}>
-                            <Text type="secondary">RustDesk (סיסמת מנהל הארגון)</Text>
-                            <div>ID: <Text copyable>{c.rustdesk?.id || "—"}</Text></div>
-                            <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.rustdesk?.password || "—"}</Text></div>
-                          </Col>
-                          <Col span={12}>
-                            <Text type="secondary">AnyDesk (המסטר בלבד)</Text>
-                            <div>ID: {c.anydesk?.id && c.anydesk.id !== '0' ? <Text copyable>{c.anydesk.id}</Text> : (c.anydesk?.id === '0' ? <Text type="warning">חסום ע"י פילטר רשת</Text> : "—")}</div>
-                            <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.anydesk?.password || "—"}</Text></div>
-                          </Col>
-                          <Col span={12}>
-                            <Text type="secondary">TeamViewer (QuickSupport, לפי דרישה - המסטר בלבד)</Text>
-                            <div>ID: <Text copyable>{c.teamviewer?.id || "—"}</Text></div>
-                            <div>סיסמה נוכחית: <Text copyable style={{ fontFamily: "monospace" }}>{c.teamviewer?.password || "—"}</Text></div>
-                            <Button
-                              size="small"
-                              style={{ marginTop: 4 }}
-                              icon={<ReloadOutlined />}
-                              loading={!!launchingTeamViewer[c.computerId]}
-                              onClick={() => handleLaunchTeamViewer(c.computerId)}
-                            >
-                              הפעל וקבל סיסמה חדשה
-                            </Button>
-                          </Col>
-                          <Col span={12}>
-                            <Text type="secondary">AeroAdmin (המסטר בלבד)</Text>
-                            <div>ID: <Text copyable>{c.aeroadmin?.id || "—"}</Text></div>
-                            <div>סיסמה: <Text copyable style={{ fontFamily: "monospace" }}>{c.aeroadmin?.password || "—"}</Text></div>
-                          </Col>
-                        </Row>
-                        <Space.Compact style={{ marginTop: 12, width: "100%" }}>
-                          <Input
-                            placeholder="סיסמת AnyDesk חדשה"
-                            value={anyDeskPwEdits[c.computerId] || ""}
-                            onChange={(e) => setAnyDeskPwEdits((prev) => ({ ...prev, [c.computerId]: e.target.value }))}
-                            onPressEnter={() => handleSetAnyDeskPassword(c.computerId)}
-                          />
-                          <Button
-                            type="primary"
-                            loading={!!anyDeskPwSaving[c.computerId]}
-                            onClick={() => handleSetAnyDeskPassword(c.computerId)}
-                          >
-                            עדכן
-                          </Button>
-                        </Space.Compact>
-                      </Card>
+                      />
                     ))}
                   </Space>
                 ),

@@ -22,7 +22,6 @@ public class SystemServicesManager
     private readonly KeyboardRestrictionService _keyboard;
     private readonly ProcessRestrictionService _processRestriction;
     private readonly GlobalHotkeyService _globalHotkey;
-    private readonly RemoteControlReportingService _remoteControl;
     private readonly ComputerHeartbeatService _heartbeat;
     private readonly LogShippingControlService _logShipping;
     private readonly RemoteCommandService _remoteCommand;
@@ -40,7 +39,6 @@ public class SystemServicesManager
         KeyboardRestrictionService keyboard,
         ProcessRestrictionService processRestriction,
         GlobalHotkeyService globalHotkey,
-        RemoteControlReportingService remoteControl,
         ComputerHeartbeatService heartbeat,
         LogShippingControlService logShipping,
         RemoteCommandService remoteCommand,
@@ -54,7 +52,6 @@ public class SystemServicesManager
         _keyboard = keyboard;
         _processRestriction = processRestriction;
         _globalHotkey = globalHotkey;
-        _remoteControl = remoteControl;
         _heartbeat = heartbeat;
         _logShipping = logShipping;
         _remoteCommand = remoteCommand;
@@ -102,13 +99,6 @@ public class SystemServicesManager
         }
 
         RewireAdminExitHandler();
-
-        _remoteControl.StopListening();
-        _ = Task.Run(async () =>
-        {
-            try { await _remoteControl.InitializeAsync(); }
-            catch (Exception ex) { Logger.Warning(ex, "RemoteControl reporting init failed (non-fatal)"); }
-        });
 
         Logger.Information("System services started (kiosk={IsKiosk})", isKiosk);
     }
@@ -165,7 +155,6 @@ public class SystemServicesManager
             // customer sessions; it's only meant to be lifted temporarily via the
             // dedicated admin flow (KioskPolicyService.RunWithControlPanelAsync).
             _printMonitor.StopMonitoring();
-            _remoteControl.StopListening();
 
             if (session.IsActive)
                 await session.EndSessionAsync("logout");
@@ -186,7 +175,6 @@ public class SystemServicesManager
         _forceLogout.StopListening();
         _chat.StopListening();
         _printMonitor.StopMonitoring();
-        _remoteControl.StopListening();
     }
 
     private void WireForceLogout(string userId)

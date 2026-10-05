@@ -143,7 +143,7 @@ public class ComputerHeartbeatService
                 tightVncInstalled ? null : "tvnserver.exe missing - install-tightvnc.ps1 download likely failed");
 
             // SionyxInputInjector: the SYSTEM service behind Ctrl+Alt+Del,
-            // elevated-click, and the AeroAdmin-approval workaround. Checked
+            // and elevated-click. Checked
             // the same way as tightVncInstalled above - if the MSI's
             // CustomAction ever silently skips installing it (e.g. the
             // publish step failed at build time, see build.ps1's

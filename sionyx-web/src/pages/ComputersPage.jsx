@@ -41,9 +41,6 @@ import {
   deleteComputer,
   updateComputer,
   deriveFromComputersAndUsers,
-  requestRemoteControlRefresh,
-  setAnyDeskPassword,
-  requestTeamViewerLaunch,
   requestPowerCommand,
   requestVncSession,
 } from '../services/computerService';
@@ -483,16 +480,7 @@ const ComputersPage = () => {
     const isOnline = !!computer.heartbeatAt && (Date.now() - computer.heartbeatAt) < HEARTBEAT_ONLINE_THRESHOLD_MS;
     const status = getComputerStatus(isOnline, isActive);
     const computerId = computer.id;
-    const rustdesk = computer.remoteControl?.rustdesk;
-    const anydesk = computer.remoteControl?.anydesk;
-    const teamviewer = computer.remoteControl?.teamviewer;
-    const aeroadmin = computer.remoteControl?.aeroadmin;
-    const [showRemote, setShowRemote] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
-    const [refreshing, setRefreshing] = useState(false);
-    const [newAnyDeskPassword, setNewAnyDeskPassword] = useState('');
-    const [settingAnyDeskPassword, setSettingAnyDeskPassword] = useState(false);
-    const [launchingTeamViewer, setLaunchingTeamViewer] = useState(false);
     const [sendingPowerCommand, setSendingPowerCommand] = useState(false);
     const [startingVnc, setStartingVnc] = useState(false);
 
@@ -529,41 +517,6 @@ const ComputersPage = () => {
         message.error(result.error || 'נכשל בהתחלת חיבור VNC');
       }
       setStartingVnc(false);
-    };
-
-    const handleRefresh = async () => {
-      setRefreshing(true);
-      const result = await requestRemoteControlRefresh(computerId);
-      if (result.success) {
-        message.success('בקשת רענון נשלחה - הקיוסק ידווח מחדש תוך שניות');
-      } else {
-        message.error(result.error || 'נכשל בשליחת בקשת הרענון');
-      }
-      setRefreshing(false);
-    };
-
-    const handleLaunchTeamViewer = async () => {
-      setLaunchingTeamViewer(true);
-      const result = await requestTeamViewerLaunch(computerId);
-      if (result.success) {
-        message.success('הופעל - סיסמה חדשה תדווח תוך כמה שניות');
-      } else {
-        message.error(result.error || 'נכשל בהפעלת TeamViewer');
-      }
-      setLaunchingTeamViewer(false);
-    };
-
-    const handleSetAnyDeskPassword = async () => {
-      if (!newAnyDeskPassword.trim()) return;
-      setSettingAnyDeskPassword(true);
-      const result = await setAnyDeskPassword(computerId, newAnyDeskPassword.trim());
-      if (result.success) {
-        message.success('הסיסמה נשלחה לקיוסק ותוחל תוך שניות');
-        setNewAnyDeskPassword('');
-      } else {
-        message.error(result.error || 'נכשל בשליחת הסיסמה');
-      }
-      setSettingAnyDeskPassword(false);
     };
 
     return (
@@ -627,19 +580,12 @@ const ComputersPage = () => {
                 type='text'
                 size='small'
                 icon={<DesktopOutlined />}
-                onClick={() => setShowRemote(v => !v)}
-                title='שליטה מרחוק (RustDesk / AnyDesk)'
-              >
-                שליטה מרחוק
-              </Button>
-              <Button
-                type='text'
-                size='small'
-                icon={<DesktopOutlined />}
                 loading={startingVnc}
                 onClick={handleStartVnc}
                 title='שליטה מרחוק (VNC) במחשב הזה'
-              />
+              >
+                שליטה מרחוק
+              </Button>
               <Button
                 type='text'
                 size='small'
@@ -687,96 +633,6 @@ const ComputersPage = () => {
                   <Text type='secondary'>כתובת IP: <Text copyable>{computer.networkInfo.local_ip}</Text></Text>
                 )}
               </Space>
-            </Col>
-          </Row>
-        )}
-        {showRemote && (
-          <Row style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
-            <Col span={24}>
-              <Text strong style={{ fontSize: 12 }}>RustDesk</Text>
-              <div style={{ marginTop: 4, marginBottom: 12 }}>
-                {rustdesk?.id ? (
-                  <Space direction='vertical' size={4}>
-                    <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.id}</Text></Text>
-                    <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{rustdesk.password || '—'}</Text></Text>
-                  </Space>
-                ) : (
-                  <Text type='secondary'>עדיין לא דווח מהקיוסק</Text>
-                )}
-              </div>
-
-              <Text strong style={{ fontSize: 12 }}>AnyDesk</Text>
-              <div style={{ marginTop: 4 }}>
-                {anydesk?.id && anydesk.id !== '0' ? (
-                  <Space direction='vertical' size={4}>
-                    <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{anydesk.id}</Text></Text>
-                    <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{anydesk.password || '—'}</Text></Text>
-                  </Space>
-                ) : anydesk?.id === '0' ? (
-                  <Text type='warning'>AnyDesk מותקן אך חסום ע&quot;י פילטר רשת (NetFree וכדומה) - לא מקבל ID. הקיוסק ממשיך לנסות אוטומטית ברקע.</Text>
-                ) : (
-                  <Text type='secondary'>עדיין לא דווח מהקיוסק</Text>
-                )}
-                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                  <Input.Password
-                    size='small'
-                    placeholder='סיסמת AnyDesk חדשה'
-                    value={newAnyDeskPassword}
-                    onChange={e => setNewAnyDeskPassword(e.target.value)}
-                    style={{ maxWidth: 220 }}
-                  />
-                  <Button
-                    size='small'
-                    loading={settingAnyDeskPassword}
-                    disabled={!newAnyDeskPassword.trim()}
-                    onClick={handleSetAnyDeskPassword}
-                  >
-                    הגדר סיסמה
-                  </Button>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <Text strong style={{ fontSize: 12 }}>TeamViewer (QuickSupport, לפי דרישה)</Text>
-                <div style={{ marginTop: 4 }}>
-                  {teamviewer?.id ? (
-                    <Space direction='vertical' size={4}>
-                      <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{teamviewer.id}</Text></Text>
-                      <Text type='secondary'>
-                        סיסמה נוכחית: <Text copyable style={{ fontFamily: 'monospace' }}>{teamviewer.password || '—'}</Text>
-                        {' '}(משתנה בכל הפעלה - לחץ &quot;הפעל&quot; לפני חיבור)
-                      </Text>
-                    </Space>
-                  ) : (
-                    <Text type='secondary'>עדיין לא דווח - לחץ &quot;הפעל&quot; כדי לקבל ID+סיסמה</Text>
-                  )}
-                  <div style={{ marginTop: 8 }}>
-                    <Button size='small' icon={<ReloadOutlined />} loading={launchingTeamViewer} onClick={handleLaunchTeamViewer}>
-                      הפעל TeamViewer וקבל סיסמה חדשה
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <Text strong style={{ fontSize: 12 }}>AeroAdmin</Text>
-                <div style={{ marginTop: 4 }}>
-                  {aeroadmin?.id ? (
-                    <Space direction='vertical' size={4}>
-                      <Text type='secondary'>מזהה (ID): <Text copyable style={{ fontFamily: 'monospace' }}>{aeroadmin.id}</Text></Text>
-                      <Text type='secondary'>סיסמה: <Text copyable style={{ fontFamily: 'monospace' }}>{aeroadmin.password || '—'}</Text></Text>
-                    </Space>
-                  ) : (
-                    <Text type='secondary'>עדיין לא זמין - ההתקנה האוטומטית טרם הושלמה</Text>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 12 }}>
-                <Button size='small' icon={<ReloadOutlined />} loading={refreshing} onClick={handleRefresh}>
-                  רענן סוכני שליטה מרחוק
-                </Button>
-              </div>
             </Col>
           </Row>
         )}

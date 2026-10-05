@@ -26,10 +26,9 @@ public class ProcessRestrictionService : IDisposable
         // Remote access
         "teamviewer.exe", "ultraviewer.exe",
         "systemsettings.exe",
-        // NOTE: anydesk.exe intentionally NOT blacklisted - it is SIONYX's own
-        // controlled owner-only remote-control tool (see RemoteControlReportingService),
-        // password-gated and managed centrally via Firebase, not something a
-        // customer can connect through on their own.
+        // NOTE: anydesk.exe is intentionally NOT blacklisted - kiosks installed
+        // before the AnyDesk removal may still have it running. SIONYX's own
+        // remote control is VNC only (see VncRelayService).
     };
 
     private readonly HashSet<string> _blacklist;
