@@ -220,7 +220,9 @@ public class PrintMonitorService : BaseService, IDisposable
     private double? _cachedBudget;
     private DateTime? _budgetCacheTime;
     private const int BudgetCacheTtlSec = 30;
-    private SseListener? _budgetListener;
+    // Print balance is polled (short GET) rather than streamed: it changes rarely and
+    // each SSE stream counts against Firebase's connection cap. See DbPoller.
+    private DbPoller? _budgetListener;
 
     // Events
     public event Action<string, int, double, double>? JobAllowed;   // doc, pages, cost, remaining
@@ -236,7 +238,7 @@ public class PrintMonitorService : BaseService, IDisposable
 
     public bool IsMonitoring => _isMonitoring;
 
-    private SseListener? _idleBudgetListener;
+    private DbPoller? _idleBudgetListener;
     private volatile bool _startInProgress;
     private volatile bool _cancelStart;
 
@@ -248,9 +250,7 @@ public class PrintMonitorService : BaseService, IDisposable
         _budgetCacheTime = null;
         // Start idle listener so dashboard updates show immediately even without active session
         _idleBudgetListener?.Stop();
-        _idleBudgetListener = Firebase.DbListen(
-            $"users/{_userId}/printBalance",
-            OnPrintBalanceUpdated);
+        _idleBudgetListener = Firebase.DbPoll($"users/{_userId}/printBalance", TimeSpan.FromSeconds(15), data => OnPrintBalanceUpdated("put", data));
         Logger.Information("[SSE] Started idle printBalance listener for user {UserId}", userId);
     }
 
@@ -323,9 +323,7 @@ public class PrintMonitorService : BaseService, IDisposable
         _pollThread.Start();
 
         _budgetListener?.Stop();
-        _budgetListener = Firebase.DbListen(
-            $"users/{_userId}/printBalance",
-            OnPrintBalanceUpdated);
+        _budgetListener = Firebase.DbPoll($"users/{_userId}/printBalance", TimeSpan.FromSeconds(15), data => OnPrintBalanceUpdated("put", data));
         Logger.Information("Print monitor started");
     }
 
@@ -347,9 +345,7 @@ public class PrintMonitorService : BaseService, IDisposable
         if (!string.IsNullOrEmpty(_userId))
         {
             _idleBudgetListener?.Stop();
-            _idleBudgetListener = Firebase.DbListen(
-                $"users/{_userId}/printBalance",
-                OnPrintBalanceUpdated);
+            _idleBudgetListener = Firebase.DbPoll($"users/{_userId}/printBalance", TimeSpan.FromSeconds(15), data => OnPrintBalanceUpdated("put", data));
             Logger.Information("[SSE] Restarted idle printBalance listener for user {UserId}", _userId);
         }
 
