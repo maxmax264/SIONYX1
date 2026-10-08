@@ -3,10 +3,6 @@ import { subscribeBillingState, getBillingSummary } from '../services/billingSer
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// Kill switch: build with VITE_BILLING_ENABLED=false to turn the whole billing UI off
-// (no Firebase listeners, no bridge calls, no payments tab, no gate).
-const BILLING_ENABLED = import.meta.env.VITE_BILLING_ENABLED !== 'false';
-
 /**
  * Live billing state of the current org (see billingService.subscribeBillingState),
  * plus two housekeeping jobs: it asks the bridge to (re)compute the org's status
@@ -15,11 +11,11 @@ const BILLING_ENABLED = import.meta.env.VITE_BILLING_ENABLED !== 'false';
  * Free (exempt) orgs always come back as state 'free'.
  */
 export const useBillingState = orgId => {
-  const [raw, setRaw] = useState(BILLING_ENABLED ? { state: null, loaded: false } : { state: 'free', loaded: true });
+  const [raw, setRaw] = useState({ state: null, loaded: false });
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    if (!orgId || !BILLING_ENABLED) return undefined;
+    if (!orgId) return undefined;
     const unsub = subscribeBillingState(orgId, setRaw);
     const refresh = () => getBillingSummary(orgId).catch(() => {});
     refresh();
