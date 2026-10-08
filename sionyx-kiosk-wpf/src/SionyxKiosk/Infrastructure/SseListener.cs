@@ -25,6 +25,11 @@ public sealed class SseListener
     private Task? _listenTask;
     private int _reconnectDelay = 1;
     private const int MaxReconnectDelay = 60;
+    // A connection that stayed up at least this long counts as healthy and
+    // resets the backoff. Shorter ones (server closes the stream right away,
+    // e.g. auth_revoked or a proxy cutting it) keep backing off.
+    private static readonly TimeSpan StableConnectionThreshold = TimeSpan.FromSeconds(30);
+    private DateTime? _connectedUtc;
 
     // DIAGNOSTIC ONLY (added 2026-09-23) - to confirm/rule out a theory
     // that two SseListener instances for the same path can be alive
@@ -84,8 +89,12 @@ public sealed class SseListener
             return;
         }
 
-        _cts = new CancellationTokenSource();
-        _listenTask = Task.Run(() => ListenLoopAsync(_cts.Token), _cts.Token);
+        // Capture the token up front: Stop() can null _cts before the
+        // task body starts running, which would NRE inside the lambda.
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        var token = cts.Token;
+        _listenTask = Task.Run(() => ListenLoopAsync(token), token);
         Logger.Information("SSE listener started for: {Path}", _path);
     }
 
@@ -148,9 +157,13 @@ public sealed class SseListener
                 _idleLogged = false;
             }
 
+            _connectedUtc = null;
             try
             {
                 await ConnectAndStreamAsync(ct);
+                // Clean close by the server. Previously this looped straight
+                // back into a new connection with no delay (reconnect storm).
+                Logger.Information("SSE stream closed by server for {Path}", _path);
             }
             catch (OperationCanceledException)
             {
@@ -165,20 +178,29 @@ public sealed class SseListener
                 // still ships to the dashboard - this is genuine signal.
                 Logger.Error(ex, "SSE connection error for {Path}", _path);
                 _errorCallback?.Invoke(ex.Message);
-
-                // Exponential backoff
-                Logger.Information("SSE reconnecting in {Delay}s for {Path}", _reconnectDelay, _path);
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(_reconnectDelay), ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-
-                _reconnectDelay = Math.Min(_reconnectDelay * 2, MaxReconnectDelay);
             }
+
+            if (ct.IsCancellationRequested) break;
+
+            // Backoff after EVERY ended attempt (error or clean close). Only a
+            // connection that stayed up long enough resets it.
+            if (_connectedUtc is { } connectedAt &&
+                DateTime.UtcNow - connectedAt >= StableConnectionThreshold)
+            {
+                _reconnectDelay = 1;
+            }
+
+            Logger.Information("SSE reconnecting in {Delay}s for {Path}", _reconnectDelay, _path);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(_reconnectDelay), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            _reconnectDelay = Math.Min(_reconnectDelay * 2, MaxReconnectDelay);
         }
         }
         finally
@@ -203,7 +225,8 @@ public sealed class SseListener
         using var response = await _firebase.Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
-        _reconnectDelay = 1; // Reset backoff on successful connection
+        // Backoff is reset by the loop only after a connection proves stable.
+        _connectedUtc = DateTime.UtcNow;
         LastEventUtc = DateTime.UtcNow;
         Logger.Information("SSE stream connected: {Path}", orgPath);
 

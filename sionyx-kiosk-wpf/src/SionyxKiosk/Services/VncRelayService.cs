@@ -201,6 +201,13 @@ public class VncRelayService
 
     private void RecreateListener()
     {
+        // Always stop the previous listener first so two can never coexist
+        // on the same path (e.g. EnsureSignedInAndListeningAsync re-entered
+        // via the retry timer).
+        var old = _listener;
+        _listener = null;
+        old?.Stop();
+
         _listener = _firebase.DbListen(
             $"computers/{_computerId}/vncRelay/requested",
             OnSessionRequested);
