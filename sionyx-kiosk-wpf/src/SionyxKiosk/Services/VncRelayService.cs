@@ -80,6 +80,11 @@ public class VncRelayService
     private readonly FirebaseClient _firebase;
     private string? _computerId;
     private SseListener? _listener;
+    // Poll-only mode (extra adapter ids in host mode): a short GET every few
+    // seconds instead of a permanent SSE connection, which counts against
+    // Firebase's simultaneous-connection cap. See DbPoller.
+    private readonly bool _pollOnly;
+    private DbPoller? _poller;
     private System.Timers.Timer? _watchdogTimer;
     private CancellationTokenSource? _activeSessionCts;
     private long _lastHandledRequestedAt;
@@ -114,8 +119,9 @@ public class VncRelayService
     // DeviceInfo.GetDeviceId() (see VncHostWorker for why).
     private readonly string? _deviceIdOverride;
 
-    public VncRelayService(FirebaseConfig config, bool systemHostMode = false, string? deviceIdOverride = null)
+    public VncRelayService(FirebaseConfig config, bool systemHostMode = false, string? deviceIdOverride = null, bool pollOnly = false)
     {
+        _pollOnly = pollOnly;
         _firebase = new FirebaseClient(config);
         _hostMode = systemHostMode;
         _deviceIdOverride = deviceIdOverride;
@@ -207,6 +213,18 @@ public class VncRelayService
         var old = _listener;
         _listener = null;
         old?.Stop();
+        _poller?.Stop();
+        _poller = null;
+
+        if (_pollOnly)
+        {
+            _poller = _firebase.DbPoll(
+                $"computers/{_computerId}/vncRelay/requested",
+                TimeSpan.FromSeconds(10),
+                data => OnSessionRequested("put", data));
+            _listenerStartedUtc = DateTime.UtcNow;
+            return;
+        }
 
         _listener = _firebase.DbListen(
             $"computers/{_computerId}/vncRelay/requested",
@@ -256,6 +274,7 @@ public class VncRelayService
     public void Stop()
     {
         _listener?.Stop();
+        _poller?.Stop();
         _activeSessionCts?.Cancel();
     }
 

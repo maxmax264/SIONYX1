@@ -79,7 +79,7 @@ internal sealed class VncHostWorker : BackgroundService
 
                     foreach (var id in ids)
                     {
-                        var relay = new VncRelayService(config, systemHostMode: true, deviceIdOverride: id);
+                        var relay = new VncRelayService(config, systemHostMode: true, deviceIdOverride: id, pollOnly: id != primaryId);
                         relay.Start();
                         relays.Add(relay);
                     }
