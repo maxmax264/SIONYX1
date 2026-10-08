@@ -9,6 +9,10 @@ import { signOut } from '../services/authService';
 // Mock dependencies
 vi.mock('../store/authStore');
 vi.mock('../services/authService');
+vi.mock('../hooks/useOrgId', () => ({ useOrgId: () => 'test-org' }));
+vi.mock('../hooks/useBillingState', () => ({
+  useBillingState: () => ({ state: 'ok', loaded: true }),
+}));
 
 const mockNavigate = vi.fn();
 const mockLocation = { pathname: '/admin' };

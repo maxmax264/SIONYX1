@@ -13,6 +13,7 @@ import { formatTimeHebrewCompact } from "../../utils/timeFormatter";
 import dayjs from "dayjs";
 import OrgRegistrationModal from "../components/OrgRegistrationModal";
 import OwnerLogsTab from "../components/OwnerLogsTab";
+import OwnerBillingTab from "../components/OwnerBillingTab";
 import FailoverSettings from "../components/FailoverSettings";
 
 const { Title, Text } = Typography;
@@ -413,6 +414,10 @@ const OwnerDashboardPage = () => {
           pagination={{ pageSize: 20, showSizeChanger: false }}
           size="small"
         />
+      </Card>
+
+      <Card title="חיוב ותשלומים" size="small" style={{ marginBottom: 24 }}>
+        <OwnerBillingTab />
       </Card>
 
       <Card title="הגדרות" size="small" style={{ marginBottom: 24 }}>

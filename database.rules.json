@@ -124,7 +124,8 @@
           "$computerId": {
             ".read": "auth != null && (root.child('organizations').child($orgId).child('users').child(auth.uid).exists() || root.child('supervisors').child(auth.uid).child('organizations').child($orgId).exists())",
             ".write": "auth != null && root.child('organizations').child($orgId).child('users').child(auth.uid).exists()",
-            "heartbeatAt": { ".write": "auth != null", ".validate": "newData.isNumber()" },
+            "usageDays": { ".write": "auth != null", "$day": { ".validate": "newData.val() === true" } },
+        "heartbeatAt": { ".write": "auth != null", ".validate": "newData.isNumber()" },
             "appVersion": { ".write": "auth != null", ".validate": "newData.isString()" },
             "autoLogonConfigured": { ".write": "auth != null", ".validate": "newData.isBoolean()" },
             "autoLogonUser": { ".write": "auth != null", ".validate": "newData.isString()" },
@@ -224,6 +225,22 @@
             ".write": "auth != null && root.child('organizations').child($orgId).child('users').child(auth.uid).exists()",
             ".validate": "newData.hasChildren(['fromUserId', 'message', 'timestamp'])"
           }
+        }
+      }
+    },
+    "billing": {
+      "config": { ".read": "auth != null", ".write": false },
+      "secret": { ".read": false, ".write": false },
+      "auditGlobal": { ".read": "root.child('owners').child(auth.uid).exists()", ".write": false },
+      "orgs": {
+        ".read": "root.child('owners').child(auth.uid).exists()",
+        ".write": false,
+        "$orgId": {
+          "settings": { ".read": "auth != null && (root.child('owners').child(auth.uid).exists() || (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'))" },
+          "status": { ".read": "auth != null && (root.child('owners').child(auth.uid).exists() || (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'))" },
+          "invoices": { ".read": "auth != null && (root.child('owners').child(auth.uid).exists() || (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'))" },
+          "contract": { ".read": "auth != null && (root.child('owners').child(auth.uid).exists() || (root.child('organizations').child($orgId).child('users').child(auth.uid).child('isAdmin').val() === true || root.child('organizations').child($orgId).child('users').child(auth.uid).child('role').val() === 'admin'))" },
+          "audit": { ".read": "root.child('owners').child(auth.uid).exists()" }
         }
       }
     },

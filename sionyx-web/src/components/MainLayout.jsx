@@ -32,10 +32,14 @@ import {
   NotificationOutlined,
   BarChartOutlined,
   HistoryOutlined,
+  CreditCardOutlined,
 } from '@ant-design/icons';
 import NotificationBell from './NotificationBell';
 import { useAuthStore } from '../store/authStore';
 import { signOut } from '../services/authService';
+import { useOrgId } from '../hooks/useOrgId';
+import { useBillingState } from '../hooks/useBillingState';
+import BillingGate from './BillingGate';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -48,6 +52,7 @@ const breadcrumbMap = {
   '/admin/computers': 'מחשבים',
   '/admin/announcements': 'הודעות מערכת',
   '/admin/activity': 'פעילות לקוחות',
+  '/admin/billing': 'תשלומים',
   '/admin/reports': 'דוחות',
   '/admin/settings': 'הגדרות',
 };
@@ -65,6 +70,8 @@ const MainLayout = () => {
   const location = useLocation();
   const user = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
+  const billingOrgId = useOrgId();
+  const billing = useBillingState(billingOrgId);
   const darkMode = useAuthStore(state => state.darkMode);
   const toggleDarkMode = useAuthStore(state => state.toggleDarkMode);
 
@@ -140,6 +147,10 @@ const MainLayout = () => {
       icon: <HistoryOutlined />,
       label: 'פעילות לקוחות',
     },
+    // Free (exempt) organizations never see a payments tab.
+    ...(billing.loaded && billing.state !== 'free'
+      ? [{ key: '/admin/billing', icon: <CreditCardOutlined />, label: 'תשלומים' }]
+      : []),
     {
       key: '/admin/reports',
       icon: <BarChartOutlined />,
@@ -527,7 +538,9 @@ const MainLayout = () => {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
             >
-              <Outlet />
+              <BillingGate billing={billing}>
+                <Outlet />
+              </BillingGate>
             </motion.div>
           </AnimatePresence>
         </Content>

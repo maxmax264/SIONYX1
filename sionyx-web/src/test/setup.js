@@ -145,6 +145,7 @@ vi.mock('@ant-design/icons', () => {
     PauseCircleOutlined: createMockIcon('PauseCircleOutlined'),
     SoundOutlined: createMockIcon('SoundOutlined'),
     BarChartOutlined: createMockIcon('BarChartOutlined'),
+    CreditCardOutlined: createMockIcon('CreditCardOutlined'),
     FileExcelOutlined: createMockIcon('FileExcelOutlined'),
     FilePdfOutlined: createMockIcon('FilePdfOutlined'),
     FileTextOutlined: createMockIcon('FileTextOutlined'),
