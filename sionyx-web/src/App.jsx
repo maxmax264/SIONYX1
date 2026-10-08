@@ -35,7 +35,6 @@ const ComputersPage = lazy(() => import('./pages/ComputersPage'));
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
 const ActivityPage = lazy(() => import('./pages/ActivityPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
-const BillingPage = lazy(() => import('./pages/BillingPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 function App() {
@@ -140,7 +139,6 @@ function App() {
                 <Route path='computers' element={<ComputersPage />} />
                 <Route path='announcements' element={<AnnouncementsPage />} />
                 <Route path='activity' element={<ActivityPage />} />
-                <Route path='billing' element={<BillingPage />} />
                 <Route path='reports' element={<ReportsPage />} />
                 <Route path='settings' element={<SettingsPage />} />
               </Route>

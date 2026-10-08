@@ -229,36 +229,11 @@ public class ComputerHeartbeatService
                 ChannelLogSink.Current?.SendRaw("המחשב פעיל ותקין (בדיקה תקופתית)");
             }
 
-            await MarkUsageDayAsync();
-
             await SyncComputerNameAsync();
         }
         catch (Exception ex)
         {
             Logger.Warning(ex, "Heartbeat write threw (non-fatal)");
-        }
-    }
-
-    // Billing usage marker: one `usageDays/{yyyy-MM-dd} = true` per local day this
-    // machine was on and heartbeating. Deliberately a SEPARATE write from the
-    // heartbeat PATCH above, so a rules problem here can never make the main
-    // heartbeat fail. Written once per day (and retried next beat if it fails).
-    private string? _lastUsageDayMarked;
-
-    private async Task MarkUsageDayAsync()
-    {
-        try
-        {
-            var day = DateTime.Now.ToString("yyyy-MM-dd");
-            if (day == _lastUsageDayMarked) return;
-            var r = await _deviceFirebase.DbUpdateAsync($"computers/{_computerId}/usageDays",
-                new Dictionary<string, object> { [day] = true });
-            if (r.Success) _lastUsageDayMarked = day;
-            else Logger.Debug("Usage-day marker not written yet: {Error}", r.Error);
-        }
-        catch (Exception ex)
-        {
-            Logger.Debug(ex, "Usage-day marker threw (non-fatal)");
         }
     }
 
