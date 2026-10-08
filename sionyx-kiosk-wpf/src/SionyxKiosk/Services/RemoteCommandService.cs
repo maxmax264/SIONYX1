@@ -34,7 +34,11 @@ public class RemoteCommandService
 
     private readonly FirebaseClient _firebase;
     private string? _computerId;
-    private SseListener? _listener;
+    // Polled, not streamed: a power command does not need sub-second delivery,
+    // and a permanent SSE connection per kiosk counts against Firebase's
+    // simultaneous-connection cap. See DbPoller.
+    private DbPoller? _listener;
+    internal static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
     private bool _starting;
     private bool _signedIn;
 
@@ -112,9 +116,11 @@ public class RemoteCommandService
         }
 
         _signedIn = true;
-        _listener = _firebase.DbListen(
+        _listener?.Stop();
+        _listener = _firebase.DbPoll(
             $"computers/{_computerId}/powerCommand/requested",
-            OnCommandRequested);
+            PollInterval,
+            value => OnCommandRequested("put", value));
     }
 
     internal void OnCommandRequested(string eventType, JsonElement? data)

@@ -237,6 +237,8 @@ public class PrintMonitorService : BaseService, IDisposable
     public bool IsMonitoring => _isMonitoring;
 
     private SseListener? _idleBudgetListener;
+    private volatile bool _startInProgress;
+    private volatile bool _cancelStart;
 
     public void Reinitialize(string userId)
     {
@@ -256,11 +258,29 @@ public class PrintMonitorService : BaseService, IDisposable
 
     public void StartMonitoring()
     {
+        // _isMonitoring only flips after the awaits inside StartMonitoringAsync, so
+        // a second call in that window used to start a second budget listener
+        // (a permanent Firebase connection) plus duplicate threads - the first
+        // set was then orphaned and never stopped.
         if (_isMonitoring) return;
+        if (_startInProgress)
+        {
+            // A start is already in flight. If a Stop arrived meanwhile and a new
+            // Start follows, the in-flight one should now complete for the new
+            // login instead of being cancelled.
+            _cancelStart = false;
+            return;
+        }
+        _startInProgress = true;
+        _cancelStart = false;
 
         Logger.Information("Starting print monitor (event-driven + fallback poll, multi-PC safe)");
 
-        _ = StartMonitoringAsync();
+        // Reset the flag when the start finishes OR faults, so a failed start
+        // (e.g. pricing fetch throws) can never block every later start.
+        _ = StartMonitoringAsync().ContinueWith(
+            _ => _startInProgress = false,
+            TaskScheduler.Default);
     }
 
     private async Task StartMonitoringAsync()
@@ -269,6 +289,18 @@ public class PrintMonitorService : BaseService, IDisposable
         _idleBudgetListener?.Stop();
         _idleBudgetListener = null;
         await LoadPricingAsync();
+
+        // StopMonitoring() ran (logout) while we were still loading pricing. It
+        // returned early because _isMonitoring was not set yet, so without this
+        // the listener and threads below would start AFTER the logout and run
+        // for a user who is gone.
+        if (_cancelStart)
+        {
+            _cancelStart = false;
+            Logger.Information("Print monitor start cancelled - stopped while starting");
+            return;
+        }
+
         InitializeKnownJobs();
         _processedJobs.Clear();
         _stopRequested = false;
@@ -290,6 +322,7 @@ public class PrintMonitorService : BaseService, IDisposable
         };
         _pollThread.Start();
 
+        _budgetListener?.Stop();
         _budgetListener = Firebase.DbListen(
             $"users/{_userId}/printBalance",
             OnPrintBalanceUpdated);
@@ -298,6 +331,7 @@ public class PrintMonitorService : BaseService, IDisposable
 
     public void StopMonitoring()
     {
+        if (_startInProgress) _cancelStart = true;
         if (!_isMonitoring) return;
 
         Logger.Information("Stopping print monitor");

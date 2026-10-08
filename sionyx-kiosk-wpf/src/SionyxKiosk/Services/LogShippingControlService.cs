@@ -65,9 +65,12 @@ public class LogShippingControlService
     private bool _starting;
     private bool _started;
     private string? _computerId;
-    private SseListener? _configListener;
-    private SseListener? _triggerAllListener;
-    private SseListener? _triggerMineListener;
+    // ONE poll of systemSettings/logShipping replaces the three permanent SSE
+    // streams (config, triggerAll, triggers/{id}) this used to hold per kiosk -
+    // each SSE counts against Firebase's simultaneous-connection cap. See DbPoller.
+    private DbPoller? _poller;
+    internal static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
+    private string? _lastConfigRaw;
 
     private long _lastHandledAll;
     private long _lastHandledMine;
@@ -134,20 +137,42 @@ public class LogShippingControlService
         _started = true;
         Logger.Information("Log-shipping control: listening on systemSettings/logShipping (config, triggerAll, triggers/{ComputerId})", _computerId);
 
-        _configListener = _firebase.DbListen(
-            "systemSettings/logShipping/config",
-            OnConfigChanged,
+        _poller?.Stop();
+        _poller = _firebase.DbPoll(
+            "systemSettings/logShipping",
+            PollInterval,
+            OnLogShippingPolled,
             absolutePath: true);
+    }
 
-        _triggerAllListener = _firebase.DbListen(
-            "systemSettings/logShipping/triggerAll",
-            (eventType, data) => OnTriggerRequested(eventType, data, "כל הקיוסקים", LastAllRegistryValue, ref _lastHandledAll),
-            absolutePath: true);
+    /// <summary>Splits the polled logShipping node into the three pieces the
+    /// old SSE listeners used to deliver separately. Each handler already
+    /// ignores values it has handled before.</summary>
+    internal void OnLogShippingPolled(JsonElement? root)
+    {
+        JsonElement? config = null, triggerAll = null, triggerMine = null;
+        if (root is { ValueKind: JsonValueKind.Object } obj)
+        {
+            if (obj.TryGetProperty("config", out var c)) config = c;
+            if (obj.TryGetProperty("triggerAll", out var ta)) triggerAll = ta;
+            if (!string.IsNullOrEmpty(_computerId) &&
+                obj.TryGetProperty("triggers", out var triggers) &&
+                triggers.ValueKind == JsonValueKind.Object &&
+                triggers.TryGetProperty(_computerId, out var tm))
+                triggerMine = tm;
+        }
 
-        _triggerMineListener = _firebase.DbListen(
-            $"systemSettings/logShipping/triggers/{_computerId}",
-            (eventType, data) => OnTriggerRequested(eventType, data, "קיוסק זה בלבד", LastMineRegistryValue, ref _lastHandledMine),
-            absolutePath: true);
+        // Config: only re-apply when it actually changed (a missing node means
+        // "defaults", which must not be re-applied every poll).
+        var configRaw = config?.GetRawText() ?? "null";
+        if (configRaw != _lastConfigRaw)
+        {
+            _lastConfigRaw = configRaw;
+            OnConfigChanged("put", config);
+        }
+
+        OnTriggerRequested("put", triggerAll, "כל הקיוסקים", LastAllRegistryValue, ref _lastHandledAll);
+        OnTriggerRequested("put", triggerMine, "קיוסק זה בלבד", LastMineRegistryValue, ref _lastHandledMine);
     }
 
     private void OnConfigChanged(string eventType, JsonElement? data)
@@ -369,8 +394,6 @@ public class LogShippingControlService
 
     public void Stop()
     {
-        _configListener?.Stop();
-        _triggerAllListener?.Stop();
-        _triggerMineListener?.Stop();
+        _poller?.Stop();
     }
 }

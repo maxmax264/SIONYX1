@@ -439,6 +439,42 @@ public sealed class FirebaseClient : IFirebaseClient
         }
     }
 
+    /// <summary>
+    /// Quiet one-shot read used by <see cref="DbPoller"/>: returns the raw JSON
+    /// text of the node ("null" when it does not exist) or null on ANY failure
+    /// (no session, network, 4xx/5xx). Failures are logged at Debug only - a
+    /// poll that fails every 30s on a filtered network must not turn into an
+    /// Error-level log stream that ships to the dashboard.
+    /// </summary>
+    internal async Task<string?> DbReadRawJsonQuietAsync(string path, bool absolutePath, CancellationToken ct = default)
+    {
+        if (!IsAuthenticated) return null;
+        try
+        {
+            if (!await EnsureValidTokenAsync()) return null;
+
+            var dbPath = absolutePath ? path.Trim('/') : GetOrgPath(path);
+            var url = $"{_databaseUrl}/{dbPath}.json?auth={_idToken}";
+
+            using var response = await _http.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.Debug("DB quiet read {Path} returned {Status}", dbPath, (int)response.StatusCode);
+                return null;
+            }
+            return await response.Content.ReadAsStringAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "DB quiet read failed: {Path}", path);
+            return null;
+        }
+    }
+
     public async Task<FirebaseResult> DbGetAsync(string path)
     {
         if (!await EnsureValidTokenAsync())
@@ -636,6 +672,19 @@ public sealed class FirebaseClient : IFirebaseClient
         var listener = new SseListener(this, path, callback, errorCallback, absolutePath);
         listener.Start();
         return listener;
+    }
+
+    /// <summary>
+    /// Watches a node by short periodic GETs instead of a permanent SSE
+    /// connection (see <see cref="DbPoller"/> for when this is appropriate).
+    /// Not part of IFirebaseClient on purpose - only the services that run
+    /// their own concrete client use it.
+    /// </summary>
+    public DbPoller DbPoll(string path, TimeSpan interval, Action<JsonElement?> onChange, bool absolutePath = false)
+    {
+        var poller = new DbPoller(this, path, absolutePath, interval, onChange);
+        poller.Start();
+        return poller;
     }
 
     // Expose internals needed by SseListener

@@ -102,6 +102,10 @@ public class SessionService : BaseService, ISessionService
         Logger.Information("Session service re-initialized for user: {UserId}", userId);
         // Start idle listener so dashboard updates show immediately even without active session
         _idleRemainingTimeListener?.Stop();
+        // A session listener left over from a session that never ended cleanly
+        // (crash path, forced re-login) would otherwise stay connected forever.
+        _remainingTimeListener?.Stop();
+        _remainingTimeListener = null;
         _isFirstRemainingTimeEvent = true;
         _isIdleListener = true;
         _idleRemainingTimeListener = Firebase.DbListen(
@@ -186,6 +190,7 @@ public class SessionService : BaseService, ISessionService
         _remainingTimeListener?.Stop();
         _remainingTimeListener = null;
         // Restart idle listener so dashboard updates show after session ends
+        _idleRemainingTimeListener?.Stop();
         _isFirstRemainingTimeEvent = true;
         _idleRemainingTimeListener = Firebase.DbListen(
             $"users/{_userId}/remainingTime",
