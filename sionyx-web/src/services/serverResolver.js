@@ -79,10 +79,6 @@ const checkHealth = async () => {
 /** Starts the background watcher. Safe to call more than once - only the first call does anything. */
 export const startServerResolver = () => {
   if (started) return;
-  // Disabled on https pages: the local PC is plain http:// (no TLS), so every probe
-  // is blocked as mixed content and just spams the console. Leaving `started` false
-  // makes every getter return null, i.e. the dashboard always uses Render.
-  if (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') return;
   started = true;
 
   const tick = async () => {
