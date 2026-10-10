@@ -6,7 +6,7 @@ namespace SionyxKiosk.Infrastructure;
 
 /// <summary>
 /// Sends a small heartbeat every 15s to the SIONYX monitor service on Render
-/// (see /monitor-server) so the live number of open Firebase streams per
+/// (the separate sionyx-monitor project) so the live number of open Firebase streams per
 /// machine and process can be watched on a dashboard that does not depend on
 /// Firebase.
 ///
@@ -55,6 +55,23 @@ public static class ConnectionReporter
         }
     }
 
+    // SIONYX name of this computer as shown on the dashboard (e.g. "09", "com1").
+    // The kiosk keeps the dashboard name in HKCU; the injector (SYSTEM) falls back
+    // to the install-time name in HKLM. Never throws.
+    private static string ResolveComputerName()
+    {
+        try
+        {
+            var dash = RegistryConfig.ReadValueCurrentUser("DashboardComputerName");
+            if (!string.IsNullOrWhiteSpace(dash)) return dash!;
+            return RegistryConfig.ReadValue("ComputerName") ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
     private static async Task SendAsync(string endpoint, string key, string version)
     {
         try
@@ -62,6 +79,7 @@ public static class ConnectionReporter
             var payload = JsonSerializer.Serialize(new
             {
                 machine = Environment.MachineName,
+                computerName = ResolveComputerName(),
                 process = _process,
                 version,
                 state = State,
