@@ -41,6 +41,15 @@ public sealed class SseListener
     private static int s_nextId;
     private static int s_activeCount;
     public static int ActiveCount => s_activeCount;
+
+    // True open streams (response received, stream being read) as opposed to
+    // ActiveCount, which also counts loops waiting to connect. Used by
+    // ConnectionReporter for the live connection dashboard.
+    private static int s_attempts;
+    public static int Attempts => s_attempts;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, string> s_connected = new();
+    public static int ConnectedCount => s_connected.Count;
+    public static string[] ConnectedPaths() => new List<string>(s_connected.Values).ToArray();
     private readonly int _id = Interlocked.Increment(ref s_nextId);
 
     // Fixed, quiet retry pace while there is no signed-in session at all
@@ -160,7 +169,7 @@ public sealed class SseListener
             _connectedUtc = null;
             try
             {
-                await ConnectAndStreamAsync(ct);
+                await ConnectTrackedAsync(ct);
                 // Clean close by the server. Previously this looped straight
                 // back into a new connection with no delay (reconnect storm).
                 Logger.Information("SSE stream closed by server for {Path}", _path);
@@ -210,6 +219,18 @@ public sealed class SseListener
         }
     }
 
+    private async Task ConnectTrackedAsync(CancellationToken ct)
+    {
+        try
+        {
+            await ConnectAndStreamAsync(ct);
+        }
+        finally
+        {
+            s_connected.TryRemove(_id, out _);
+        }
+    }
+
     private async Task ConnectAndStreamAsync(CancellationToken ct)
     {
         if (!await _firebase.EnsureValidTokenAsync())
@@ -222,6 +243,7 @@ public sealed class SseListener
         request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
         request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
 
+        Interlocked.Increment(ref s_attempts);
         using var response = await _firebase.Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
@@ -229,6 +251,7 @@ public sealed class SseListener
         _connectedUtc = DateTime.UtcNow;
         LastEventUtc = DateTime.UtcNow;
         Logger.Information("SSE stream connected: {Path}", orgPath);
+        s_connected[_id] = orgPath;
 
         using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);

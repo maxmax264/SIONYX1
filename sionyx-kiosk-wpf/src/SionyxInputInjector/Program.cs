@@ -31,6 +31,8 @@ catch
     // logging is best effort - never stop the service from starting
 }
 
+SionyxKiosk.Infrastructure.ConnectionReporter.Start("injector");
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // Registers under the "SionyxInputInjector" Windows Event Log source when

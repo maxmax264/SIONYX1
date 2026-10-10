@@ -6,7 +6,10 @@ public class ForceLogoutService
 {
     private static readonly ILogger Log = Serilog.Log.ForContext<ForceLogoutService>();
     private readonly FirebaseClient _firebase;
-    private SseListener? _listener;
+    // Polled (short GET every few seconds) instead of a permanent SSE stream:
+    // a force-logout does not need sub-second delivery, and every open stream
+    // counts against Firebase's simultaneous-connection cap. See DbPoller.
+    private DbPoller? _listener;
     private string? _userId;
     private bool _isFirstEvent;
     private volatile bool _isPaused;
@@ -40,7 +43,7 @@ public class ForceLogoutService
         if (version != _listenerVersion) return;
         _isFirstEvent = true;
         var path = $"users/{userId}/forceLogout";
-        _listener = _firebase.DbListen(path, OnEvent);
+        _listener = _firebase.DbPoll(path, TimeSpan.FromSeconds(5), data => OnEvent("put", data));
         Log.Information("ForceLogoutService: listening on {Path}", path);
     }
     public void Pause() { _isPaused = true; _pausedAt = DateTime.UtcNow; }
