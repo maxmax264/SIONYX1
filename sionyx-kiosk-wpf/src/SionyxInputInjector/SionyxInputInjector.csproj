@@ -53,6 +53,7 @@
     <Compile Include="..\SionyxKiosk\Infrastructure\FirebaseConfig.cs" Link="Shared\FirebaseConfig.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\SseListener.cs" Link="Shared\SseListener.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\DbPoller.cs" Link="Shared\DbPoller.cs" />
+    <Compile Include="..\SionyxKiosk\Infrastructure\ConnectionReporter.cs" Link="Shared\ConnectionReporter.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\DeviceInfo.cs" Link="Shared\DeviceInfo.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\RegistryConfig.cs" Link="Shared\RegistryConfig.cs" />
     <Compile Include="..\SionyxKiosk\Infrastructure\ServerResolver.cs" Link="Shared\ServerResolver.cs" />
