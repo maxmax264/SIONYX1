@@ -2,6 +2,9 @@
 <?ifndef HasInputInjector?>
   <?define HasInputInjector="false"?>
 <?endif?>
+<?ifndef HasGuard?>
+  <?define HasGuard="false"?>
+<?endif?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
@@ -43,6 +46,7 @@
         <Directory Id="AssetsDir" Name="Assets">
           <Directory Id="TemplatesDir" Name="templates" />
         </Directory>
+        <Directory Id="GuardDir" Name="Guard" />
         <Directory Id="RemoteControlDir" Name="RemoteControl">
           <Directory Id="InputInjectorDir" Name="SionyxInputInjector" />
         </Directory>
@@ -147,6 +151,40 @@
     </ComponentGroup>
     <?endif?>
 
+    <!-- SionyxGuard: SYSTEM service that detects a crashed/frozen SionyxKiosk.exe, covers the
+         screen at once (same exe re-run with --lock in the user session), relaunches the app
+         and forces a logoff if recovery fails. See docs/CRASH-GUARD.md. Same conditional
+         pattern as the injector: a missing publish output must not break the whole MSI. -->
+    <?if $(var.HasGuard) = "true" ?>
+    <ComponentGroup Id="GuardFiles" Directory="GuardDir">
+      <Component Id="GuardExe" Guid="*">
+        <File Id="SionyxGuardExe"
+              Source="$(var.SourceDir)\installer\guard\SionyxGuard\SionyxGuard.exe"
+              KeyPath="yes" />
+        <ServiceInstall Id="SionyxGuardServiceInstall"
+                         Name="SionyxGuard"
+                         DisplayName="SIONYX Guard"
+                         Description="SIONYX: locks the screen and recovers the kiosk if the kiosk app crashes or freezes."
+                         Type="ownProcess"
+                         Start="auto"
+                         ErrorControl="normal"
+                         Account="LocalSystem" />
+        <ServiceControl Id="SionyxGuardServiceControl"
+                         Name="SionyxGuard"
+                         Start="install"
+                         Stop="both"
+                         Remove="uninstall"
+                         Wait="yes" />
+        <util:ServiceConfig ServiceName="SionyxGuard"
+                            FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="5"
+                            ResetPeriodInDays="1" />
+      </Component>
+    </ComponentGroup>
+    <?endif?>
+
     <ComponentGroup Id="TemplateFiles" Directory="TemplatesDir">
       <!-- Every file under Assets\templates must be listed here individually -
            there is no wildcard harvesting. A file missed here silently never
@@ -215,6 +253,9 @@
       <ComponentGroupRef Id="RemoteControlFiles" />
       <?if $(var.HasInputInjector) = "true" ?>
       <ComponentGroupRef Id="InputInjectorFiles" />
+      <?endif?>
+      <?if $(var.HasGuard) = "true" ?>
+      <ComponentGroupRef Id="GuardFiles" />
       <?endif?>
       <ComponentGroupRef Id="TemplateFiles" />
       
