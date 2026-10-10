@@ -23,8 +23,8 @@ public static class ConnectionReporter
 {
     // Fill in after deploying monitor-server on Render, e.g.
     // "https://sionyx-monitor.onrender.com". Empty = reporter disabled.
-    private const string MonitorUrl = "";
-    private const string MonitorKey = "";
+    private const string MonitorUrl = "https://sionyx-monitor.onrender.com";
+    private const string MonitorKey = "AfVP3oOC0yL8PgqNvwBsBTdgi8WkBccsrMH3UKjfn5Y=";
 
     private static readonly HttpClient s_http = new() { Timeout = TimeSpan.FromSeconds(10) };
     private static readonly DateTime s_startUtc = DateTime.UtcNow;
