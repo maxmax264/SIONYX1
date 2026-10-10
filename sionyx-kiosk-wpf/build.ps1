@@ -246,6 +246,41 @@ function Invoke-PublishInputInjector {
     return $true
 }
 
+# SionyxGuard: crash/hang guard service (see docs/CRASH-GUARD.md). Soft-fail like the injector:
+# a problem publishing it must not block the kiosk build - the MSI just ships without it.
+function Invoke-PublishGuard {
+    Write-Header "Publishing SionyxGuard (crash/hang guard service)"
+
+    $guardCsproj = Join-Path $ScriptDir "src\SionyxGuard\SionyxGuard.csproj"
+    $guardOutDir = Join-Path $ScriptDir "installer\guard\SionyxGuard"
+
+    if (-not (Test-Path $guardCsproj)) {
+        Write-Warn "SionyxGuard.csproj not found at $guardCsproj - skipping (crash guard will be unavailable in this build)"
+        return $false
+    }
+
+    if (Test-Path $guardOutDir) { Remove-Item $guardOutDir -Recurse -Force }
+
+    dotnet publish $guardCsproj `
+        -c Release `
+        -r win-x64 `
+        --self-contained true `
+        /p:PublishSingleFile=true `
+        /p:IncludeNativeLibrariesForSelfExtract=true `
+        /p:DebugType=none `
+        /p:DebugSymbols=false `
+        -o $guardOutDir 2>&1 | Out-Host
+
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $guardOutDir "SionyxGuard.exe"))) {
+        Write-Warn "SionyxGuard publish failed - continuing without it (main kiosk app is unaffected)"
+        if (Test-Path $guardOutDir) { Remove-Item $guardOutDir -Recurse -Force }
+        return $false
+    }
+
+    Write-Ok "Published: SionyxGuard.exe"
+    return $true
+}
+
 function Test-InstallerSecrets {
     # Local/manual builds forget to set this every new PowerShell session,
     # so default it here. GitHub Actions still wins - it sets
@@ -371,6 +406,7 @@ function New-Installer([string]$ver) {
         -p:PublishDir=$publishDir `
         -p:SourceDir=$sourceDir `
         -p:HasInputInjector=$(if ($hasInputInjector) { "true" } else { "false" }) `
+        -p:HasGuard=$(if ($hasGuard) { "true" } else { "false" }) `
         2>&1
     $wixExit = $LASTEXITCODE
     $wixOutput | ForEach-Object { Write-Host $_ }
@@ -479,6 +515,7 @@ if (-not (Invoke-Publish)) {
 }
 # Only the LAST value is the real result; stray pipeline output must not make this truthy (it made the WiX build reference a missing exe).
 $hasInputInjector = (@(Invoke-PublishInputInjector) | Select-Object -Last 1) -eq $true
+$hasGuard = (@(Invoke-PublishGuard) | Select-Object -Last 1) -eq $true
 
 # Create installer
 $installerPath = New-Installer $newVersion

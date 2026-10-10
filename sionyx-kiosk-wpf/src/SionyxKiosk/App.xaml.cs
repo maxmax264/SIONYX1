@@ -299,6 +299,9 @@ public partial class App : Application
         // Start with Auth or Main
         // ================================================================
         _isKiosk = e.Args.Contains("--kiosk");
+
+        // Heartbeat for the SionyxGuard service (crash/hang detection). See docs/CRASH-GUARD.md.
+        GuardBeacon.Start(_isKiosk);
         var isVerbose = e.Args.Contains("--verbose");
 
         // Apply the kiosk explorer policy as early as possible in startup,
@@ -406,6 +409,7 @@ public partial class App : Application
 
         var authWindow = new AuthWindow(authVm);
         authWindow.Show();
+        GuardBeacon.MarkReady();
         // Topmost only controls z-order (stays visually on top) - it does
         // NOT give the window actual OS-level input focus. Without this,
         // the window can appear on top while a click is still required
@@ -626,6 +630,7 @@ public partial class App : Application
         }
 
         mainWindow.Show();
+        GuardBeacon.MarkReady();
         MainWindow = mainWindow;
         Log.Information("MainWindow shown and set as Application.MainWindow");
 
@@ -967,6 +972,9 @@ public partial class App : Application
     protected override async void OnExit(ExitEventArgs e)
     {
         Log.Information("SIONYX Kiosk shutting down");
+
+        // Every Shutdown() in this app is intentional (admin exit, update, logoff) - tell the guard not to lock.
+        GuardBeacon.MarkCleanExit();
 
         try
         {
